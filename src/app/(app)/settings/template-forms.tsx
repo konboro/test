@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react';
 
-import { Button, Field, inputClass } from '@/components/ui';
+import { Badge, Button, Field, inputClass, subtleLinkClass } from '@/components/ui';
 import { PLACEHOLDERS } from '@/lib/dunning/templates';
 
 import { resetTemplate, saveTemplate, type SettingsState } from './actions';
@@ -33,13 +33,22 @@ function SlotEditor({ slot }: { slot: TemplateSlotView }) {
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="text-left text-sm font-medium text-ink-900 hover:underline"
+          aria-expanded={open}
+          className="flex items-center gap-2 text-left text-sm font-medium text-ink-900 transition hover:text-brand-600"
         >
+          <svg
+            viewBox="0 0 20 20"
+            fill="none"
+            aria-hidden="true"
+            className={`h-3.5 w-3.5 shrink-0 text-ink-400 transition-transform ${open ? 'rotate-90' : ''}`}
+          >
+            <path d="M7 4l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
           {slot.label}
         </button>
-        <span className="shrink-0 text-xs text-ink-500">
+        <Badge tone={slot.customised ? 'info' : 'neutral'}>
           {slot.customised ? 'Προσαρμοσμένο' : 'Προεπιλογή'}
-        </span>
+        </Badge>
       </div>
 
       {open ? (
@@ -78,11 +87,7 @@ function SlotEditor({ slot }: { slot: TemplateSlotView }) {
           {slot.customised ? (
             <form action={reset}>
               <input type="hidden" name="slot" value={slot.key} />
-              <button
-                type="submit"
-                disabled={resetting}
-                className="text-xs font-medium text-ink-500 hover:text-ink-800 hover:underline disabled:opacity-50"
-              >
+              <button type="submit" disabled={resetting} className={`text-xs ${subtleLinkClass}`}>
                 {resetting ? 'Επαναφορά…' : 'Επαναφορά προεπιλογής'}
               </button>
             </form>

@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/server';
 import { CreditPacks, MyDataForm, ProfileForm } from './settings-forms';
 import { TemplateEditor, type TemplateSlotView } from './template-forms';
 
-export const metadata = { title: 'Ρυθμίσεις — lefta.app' };
+export const metadata = { title: 'Ρυθμίσεις' };
 export const dynamic = 'force-dynamic';
 
 export default async function SettingsPage({

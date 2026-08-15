@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-import { Badge, Card, CardHeader, EmptyState } from '@/components/ui';
+import { Badge, Card, CardHeader, EmptyState, subtleLinkClass } from '@/components/ui';
 import { workflowStatus } from '@/lib/dunning/status';
 import { contactLimitsDisabled } from '@/lib/limits';
 import { athensDate, formatDate, formatMoney } from '@/lib/money';
@@ -10,7 +10,7 @@ import type { DunningStep } from '@/types/database';
 import { markInvoicePaid } from './actions';
 import { CopyPayLink, CreateInvoiceForm, RemindButton } from './invoice-forms';
 
-export const metadata = { title: 'Παραστατικά — lefta.app' };
+export const metadata = { title: 'Παραστατικά' };
 export const dynamic = 'force-dynamic';
 
 const FILTERS = [
@@ -157,7 +157,7 @@ export default async function InvoicesPage({
                                 <input type="hidden" name="id" value={invoice.id} />
                                 <button
                                   type="submit"
-                                  className="text-sm font-medium text-ink-500 hover:text-ink-800 hover:underline"
+                                  className={`text-sm ${subtleLinkClass}`}
                                   title="Καταχώρηση εξόφλησης εκτός πλατφόρμας (π.χ. τραπεζικό έμβασμα)"
                                 >
                                   Εξοφλήθηκε

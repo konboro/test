@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
-import { Badge, Card, CardHeader, EmptyState, Stat } from '@/components/ui';
+import { Badge, Card, CardHeader, EmptyState, linkClass, Stat } from '@/components/ui';
 import { workflowStatus } from '@/lib/dunning/status';
 import { athensDate, daysBetween, formatDate, formatMoney } from '@/lib/money';
 import { createClient } from '@/lib/supabase/server';
@@ -9,7 +9,7 @@ import type { DunningStep } from '@/types/database';
 
 import { SyncButton } from './sync-button';
 
-export const metadata = { title: 'Επισκόπηση — lefta.app' };
+export const metadata = { title: 'Επισκόπηση' };
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
@@ -154,7 +154,7 @@ export default async function DashboardPage() {
           title="Πελάτες με ανοιχτά υπόλοιπα"
           subtitle="Η κατάσταση αφορά το παλαιότερο ανεξόφλητο παραστατικό κάθε πελάτη."
           action={
-            <Link href="/debtors" className="text-sm font-medium text-brand-600 hover:underline">
+            <Link href="/debtors" className={`text-sm ${linkClass}`}>
               Όλοι οι πελάτες
             </Link>
           }
@@ -182,7 +182,7 @@ export default async function DashboardPage() {
                 {rows.map(({ debtor, count, total, oldest, status, lastContact }) => (
                   <tr key={debtor.id} className="border-b border-ink-100 last:border-0">
                     <td className="px-5 py-3">
-                      <Link href="/debtors" className="font-medium text-ink-900 hover:underline">
+                      <Link href="/debtors" className="font-medium text-ink-900 underline-offset-2 transition hover:text-brand-600 hover:underline">
                         {debtor.name}
                       </Link>
                       <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-500">

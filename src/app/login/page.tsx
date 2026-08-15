@@ -1,8 +1,10 @@
 import Link from 'next/link';
 
+import { linkClass } from '@/components/ui';
+
 import { LoginForm } from './login-form';
 
-export const metadata = { title: 'Σύνδεση — lefta.app' };
+export const metadata = { title: 'Σύνδεση' };
 
 export default async function LoginPage({
   searchParams,
@@ -26,7 +28,7 @@ export default async function LoginPage({
 
         <p className="mt-6 text-center text-sm text-ink-500">
           Δεν έχετε λογαριασμό;{' '}
-          <Link href="/register" className="font-medium text-brand-600 hover:underline">
+          <Link href="/register" className={linkClass}>
             Δημιουργία
           </Link>
         </p>

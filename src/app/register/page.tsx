@@ -1,8 +1,10 @@
 import Link from 'next/link';
 
+import { linkClass } from '@/components/ui';
+
 import { RegisterForm } from './register-form';
 
-export const metadata = { title: 'Εγγραφή — lefta.app' };
+export const metadata = { title: 'Εγγραφή' };
 
 export default function RegisterPage() {
   return (
@@ -19,7 +21,7 @@ export default function RegisterPage() {
 
         <p className="mt-6 text-center text-sm text-ink-500">
           Έχετε ήδη λογαριασμό;{' '}
-          <Link href="/login" className="font-medium text-brand-600 hover:underline">
+          <Link href="/login" className={linkClass}>
             Σύνδεση
           </Link>
         </p>

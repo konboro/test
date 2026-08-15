@@ -1,13 +1,13 @@
 import { redirect } from 'next/navigation';
 
-import { Badge, Card, CardHeader, EmptyState } from '@/components/ui';
+import { Badge, Card, CardHeader, EmptyState, subtleLinkClass } from '@/components/ui';
 import { formatMoney } from '@/lib/money';
 import { createClient } from '@/lib/supabase/server';
 
 import { toggleMute } from './actions';
 import { CreateDebtorForm, EditDebtorForm } from './debtor-forms';
 
-export const metadata = { title: 'Πελάτες — lefta.app' };
+export const metadata = { title: 'Πελάτες' };
 export const dynamic = 'force-dynamic';
 
 export default async function DebtorsPage() {
@@ -90,7 +90,7 @@ export default async function DebtorsPage() {
                         <input type="hidden" name="muted" value={String(debtor.muted)} />
                         <button
                           type="submit"
-                          className="text-sm font-medium text-ink-500 hover:text-ink-800 hover:underline"
+                          className={`text-sm ${subtleLinkClass}`}
                         >
                           {debtor.muted ? 'Ενεργοποίηση' : 'Παύση'}
                         </button>

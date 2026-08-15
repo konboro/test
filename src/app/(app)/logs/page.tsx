@@ -5,7 +5,7 @@ import { STEP_SHORT } from '@/lib/dunning/status';
 import { createClient } from '@/lib/supabase/server';
 import type { CommStatus } from '@/types/database';
 
-export const metadata = { title: 'Ιστορικό επικοινωνίας — lefta.app' };
+export const metadata = { title: 'Ιστορικό επικοινωνίας' };
 export const dynamic = 'force-dynamic';
 
 const STATUS_TONE: Record<CommStatus, 'positive' | 'danger' | 'neutral'> = {

@@ -3,7 +3,7 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { Button, Field, inputClass } from '@/components/ui';
+import { Button, Field, inputClass, linkClass } from '@/components/ui';
 import type { DebtorRow } from '@/types/database';
 
 import { createDebtor, updateDebtor, type DebtorFormState } from './actions';
@@ -95,7 +95,7 @@ export function EditDebtorForm({ debtor }: { debtor: DebtorRow }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-sm font-medium text-brand-600 hover:underline"
+        className={`text-sm ${linkClass}`}
       >
         Επεξεργασία
       </button>
