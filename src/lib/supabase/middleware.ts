@@ -1,14 +1,16 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { isPayCode } from '@/lib/pay-code';
 import type { Database } from '@/types/database';
 
 const PUBLIC_PREFIXES = [
   '/login',
   '/register',
   '/auth',
-  // The debtor-facing payment page and the Checkout session it starts. Both are
-  // reached by anonymous visitors holding only a pay token.
+  // The debtor-facing payment page reached by an old, long reminder link, and
+  // the Checkout session it starts. Both see anonymous visitors holding only a
+  // payment credential.
   '/pay',
   '/api/stripe/pay',
   // Authenticated by Stripe's signature, not by a session cookie.
@@ -19,6 +21,12 @@ const PUBLIC_PREFIXES = [
 
 function isPublic(pathname: string) {
   if (pathname === '/') return true;
+
+  // Short payment links sit at the root: /<code>. The code alphabet carries no
+  // lowercase, so this test can never swallow one of the app's own routes and
+  // hand an unauthenticated visitor /invoices or /settings.
+  if (isPayCode(pathname.slice(1))) return true;
+
   return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 

@@ -78,6 +78,8 @@ export type InvoiceRow = {
   stripe_checkout_session_id: string | null;
   stripe_payment_intent_id: string | null;
   pay_token: string;
+  /** The short public credential the reminder link carries. */
+  short_code: string;
   source: 'mydata' | 'manual' | 'elorus';
   /** Stable id in the billing system; its own numbers repeat across sequences. */
   elorus_invoice_id: string | null;

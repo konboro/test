@@ -60,25 +60,8 @@ supabase/tests/run.sh # apply migrations to a throwaway Postgres and assert the 
 Leave `RESEND_API_KEY` and `YUBOTO_API_KEY` unset outside production and both senders
 enter **dry-run mode**: the message is logged to the console and recorded in
 `communications_log` exactly as it would have been sent, so the whole workflow is
-exercisable end to end with no third-party accounts.
-
-In production a missing key makes that channel **unavailable rather than failing**. The
-engine treats an unconfigured provider exactly like a debtor it cannot reach: the step is
-skipped *before* a contact is claimed, so the rung is left unconsumed and fires on a later
-run once the key exists. This matters because claiming a contact is irreversible —
-`(invoice_id, step)` is unique — so a sweep that sent nothing must not also spend the
-ladder. A deployment with no providers at all is therefore safe to leave running: it
-reports what it would have done and changes nothing.
-
-`GET/POST /api/cron/dunning` reports which providers were live for the run:
-
-```json
-"providers": { "email": false, "sms": false, "payments": false }
-```
-
-Card payments have no dry-run — a Checkout session cannot be simulated — so without
-`STRIPE_SECRET_KEY` the payment page shows the document and tells the debtor to contact
-the issuer, rather than offering a button that fails when pressed.
+exercisable end to end with no third-party accounts. In production a missing key is a
+hard failure instead, recorded against the message as `status = 'failed'`.
 
 ---
 
@@ -172,67 +155,6 @@ Running out of credits degrades to email-only and is recorded as `status = 'skip
 
 ---
 
-### Who a reminder comes from
-
-The address stays on the platform domain, because that is the one carrying SPF
-and DKIM; verifying a domain per tenant would be a different product. What
-changes per message is the display name: the reminder arrives from the
-creditor's own company name, with their `reply_to_email` as Reply-To, so the
-debtor sees who is chasing them and replies land in the right inbox.
-
-The name is stripped of quotes, angle brackets and control characters first — a
-tenant types it themselves, and an unescaped newline in a header is how mail
-injection works.
-
-### Message copy
-
-The wording of every reminder is editable in *Settings → Κείμενα μηνυμάτων*, per
-(step, channel), plus one slot for the manual reminder. A slot with no row in
-`message_templates` uses the built-in Greek copy, so an untouched account behaves
-exactly as before and any edit is undone by deleting the override.
-
-Bodies are plain text with `{{placeholders}}` — `debtor_name`, `creditor_name`,
-`invoice`, `amount`, `due_date`, `pay_url`. An unknown token is left visible
-rather than blanked, so a typo shows up in the copy instead of quietly eating a
-sentence.
-
-What is *not* editable is the frame. A custom body is escaped into the platform
-shell rather than treated as markup, and the payment button and footer stay put:
-a template is copy, not a way to author arbitrary HTML in a message that goes out
-on someone else's behalf. The ladder's timing is not editable either — that is
-the compliance story, and it is not text.
-
-### Sending a reminder by hand
-
-Each open invoice has a **Υπενθύμιση** button that sends immediately, which is
-also the quickest way to test delivery without waiting for the 07:00 sweep.
-
-It is a real contact and obeys the once-per-debtor-per-day limit — that promise
-says nothing about who pressed the button. It does not consume a rung of the
-ladder: the contact row is written with `manual = true` and a null step, and the
-`(invoice_id, step)` unique index is partial, so step 2 still fires later on
-schedule. Muted debtors are refused.
-
-Before sending, a dialog shows the message rendered with this invoice's real
-values, which channels will carry it and to what address, the SMS segment count,
-and anything blocking it. The preview is produced by the same code as the send
-and claims nothing, so looking at a message cannot cost the debtor their contact
-for the day. The wording picker selects *copy*, including any ladder step's text
-— it does not move the invoice along the ladder.
-
-### Lifting the limit while setting delivery up
-
-The daily limit also makes it impossible to send the same test message twice.
-`UNSAFE_DISABLE_CONTACT_LIMITS=1` lifts it for **manual sends only**: the
-reminder goes out without claiming a contact row, so `dunning_contacts` is left
-untouched and ladder bookkeeping is unchanged. The automated sweep keeps every
-lock it has — an unbounded cron aimed at real debtors is a different risk from a
-person pressing a button.
-
-Deleting the variable restores the guarantee; there is no migration to undo and
-no state left behind. While it is set, the invoice list carries a banner, because
-a compliance switch nobody can see is one that gets left on.
-
 ## myDATA integration
 
 `RequestTransmittedDocs` is the endpoint used — it returns documents the tenant *issued*
@@ -257,37 +179,35 @@ every browser-readable projection.
 
 ## Payments
 
-**Every tenant collects on their own Stripe account.** They link it once in Settings
-(Connect, Standard, OAuth), and Checkout sessions are created *on that account* — a
-direct charge. The debtor pays the creditor; nothing settles to lefta, no application fee
-is taken, and lefta does not appear in the transaction. That is deliberate: routing
-customer money through the platform would make lefta a payment intermediary, which is
-incompatible with operating as a software provider that merely transmits reminders.
+**Every tenant collects on their own Stripe account** — through Connect where a
+platform account exists, otherwise with their own key stored encrypted against
+their row. Either way the debtor pays the creditor and nothing settles to lefta.
+A return endpoint verifies the Checkout session with Stripe and settles the
+invoice, so payment works before any webhook is configured; the webhook remains
+authoritative where it is.
 
-SMS credit packs are the exception and stay on the platform account — that is lefta
-selling to the tenant, not a payment on anyone's behalf.
+The reminder links to `lefta.app/<short_code>` — 10 symbols over a 32-symbol alphabet
+(uppercase and digits, without `0`/`O` and `1`/`I`), so internal invoice ids are never
+enumerable and the link survives being read aloud or retyped. The length is a security
+parameter, not cosmetics: the page behind it names the debtor and the amount, and at
+1 000 guesses/s against 10 000 invoices, 10 symbols need ~3 years for a single hit where
+6 would need under two minutes. Both live in `src/lib/pay-code.ts`.
 
-The reminder links to `/pay/<pay_token>` — an opaque 24-byte token, so internal invoice
-ids are never enumerable. The page reads through a `security definer` function exposing
-only the fields it needs, rather than opening the `invoices` table to anonymous access.
-It also returns whether the creditor can actually take a card, so the button is never
-offered when Stripe would refuse it. The Checkout amount is always taken from the
-database, never from the request.
+Because the alphabet has no lowercase, a code can never collide with one of the app's own
+routes, which is what makes it safe to serve the link from the domain root. The middleware
+gates on the same test, so `/<code>` is public while `/invoices` stays behind auth.
+
+Older reminders point at `/pay/<pay_token>` — an opaque 24-byte token. That route is kept
+forever: those links are already in debtors' inboxes. `get_invoice_for_payment` accepts
+either credential, and `payPath()` returns a visitor to the URL shape they arrived on.
+
+The page reads through that `security definer` function exposing only the fields it needs,
+rather than opening the `invoices` table to anonymous access. The Checkout amount is
+always taken from the database, never from the request.
 
 `checkout.session.completed` is the only path that marks an invoice paid. It is
 idempotent twice over: the update is guarded on `status = 'pending'`, and SMS credit
 grants key on the Stripe session id.
-
-Because invoice events now arrive from connected accounts, the webhook verifies against
-both the platform and the connect endpoint secret, and checks that the event's `account`
-matches the account that tenant actually connected — session metadata is
-attacker-controllable on any connected account, so without that check one connected
-account could settle another tenant's invoice. Credit-pack events carrying an account id
-are refused for the same reason.
-
-The Connect handshake's `state` is HMAC-signed and bound to one tenant for fifteen
-minutes. Unsigned, a crafted link could attach an attacker's Stripe account to someone
-else's tenant and silently redirect their collections.
 
 ### Local webhook testing
 
@@ -386,10 +306,12 @@ Then register an account, add a debtor with a real email, create a manual invoic
 - Every table is tenant-scoped by `auth.uid()` through RLS.
 - The myDATA key column is excluded from the `authenticated` grant entirely, so even a
   compromised anon key cannot read the ciphertext.
-- `pay_token` and all settlement columns are revoked from `authenticated` — only the
-  webhook writes them. Note the revoke is done at **table** level before re-granting the
-  allowed columns: Supabase's default privileges hand `authenticated` a table-wide
-  `UPDATE`, and a column-level `REVOKE` against a table-level grant is silently a no-op.
+- `pay_token`, `short_code` and all settlement columns are revoked from `authenticated` —
+  only the webhook writes them. Note the revoke is done at **table** level before
+  re-granting the allowed columns: Supabase's default privileges hand `authenticated` a
+  table-wide `UPDATE`, and a column-level `REVOKE` against a table-level grant is silently
+  a no-op. Both payment credentials stay outside the re-granted list, so a browser session
+  cannot mint itself a link.
   `supabase/tests/run.sh` asserts this, because it is easy to reintroduce.
 - `communications_log` is append-only, enforced by a trigger that rejects UPDATE and
   DELETE for every role, including the service role.

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { appUrl } from '@/lib/env';
+import { payCredentialColumn, payPath } from '@/lib/pay-code';
 import { paymentsFor } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -29,8 +30,9 @@ export async function GET(request: NextRequest) {
   const token = params.get('token') ?? '';
   const sessionId = params.get('session_id') ?? '';
 
+  // Back to the URL shape the debtor arrived on: short link or legacy token.
   const back = (suffix: string) =>
-    NextResponse.redirect(`${appUrl()}/pay/${encodeURIComponent(token)}${suffix}`);
+    NextResponse.redirect(`${appUrl()}${payPath(token)}${suffix}`);
 
   if (!token) return NextResponse.redirect(appUrl());
   if (!sessionId) return back('');
@@ -40,7 +42,7 @@ export async function GET(request: NextRequest) {
   const { data: invoice } = await admin
     .from('invoices')
     .select('id, user_id, status, amount_cents')
-    .eq('pay_token', token)
+    .eq(payCredentialColumn(token), token)
     .maybeSingle();
 
   // Show the page regardless: the debtor has paid and should not be met with an

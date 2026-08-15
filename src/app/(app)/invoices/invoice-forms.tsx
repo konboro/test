@@ -8,6 +8,7 @@ import { Button, Field, inputClass, linkClass, subtleLinkClass } from '@/compone
 import type { ReminderPreview } from '@/lib/dunning/manual';
 import { REMINDER_CHOICES } from '@/lib/dunning/templates';
 import { useT } from '@/lib/i18n/provider';
+import { payPath } from '@/lib/pay-code';
 
 import {
   createInvoice,
@@ -350,12 +351,12 @@ export function DueDateButton({
 }
 
 /** Copies the debtor-facing payment URL to the clipboard. */
-export function CopyPayLink({ token }: { token: string }) {
+export function CopyPayLink({ code }: { code: string }) {
   const t = useT();
   const [copied, setCopied] = useState(false);
 
   async function copy() {
-    const url = `${window.location.origin}/pay/${token}`;
+    const url = `${window.location.origin}${payPath(code)}`;
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);

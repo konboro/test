@@ -13,6 +13,7 @@
 
 import { sendEmail } from '@/lib/email/send';
 import { appUrl } from '@/lib/env';
+import { payPath } from '@/lib/pay-code';
 import { emailAvailable, smsAvailable, type Channel } from '@/lib/providers';
 import { normalisePhone, sendSms } from '@/lib/sms/send';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -49,7 +50,10 @@ export function templateContext(
     amountCents: invoice.amount_cents,
     currency: invoice.currency,
     dueDate: invoice.due_date,
-    payUrl: `${appUrl()}/pay/${invoice.pay_token}`,
+    // The short code is what reminders carry; the long token stays valid for
+    // links already sent. Falling back to it also means a deploy landing ahead
+    // of the migration still mails something that works.
+    payUrl: `${appUrl()}${payPath(invoice.short_code ?? invoice.pay_token)}`,
   };
 }
 
