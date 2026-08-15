@@ -80,7 +80,7 @@ export default async function PayPage({
                   </>
                 )}
               </div>
-            ) : payable && paymentsAvailable() ? (
+            ) : payable && paymentsAvailable() && invoice.payments_enabled ? (
               <>
                 <PayButton token={token} />
                 <p className="mt-3 text-center text-xs text-ink-500">
@@ -88,7 +88,8 @@ export default async function PayPage({
                 </p>
               </>
             ) : payable ? (
-              // Card payments are not wired up yet. The document details above are
+              // Either the platform has no Stripe key, or this creditor has not
+              // connected their own account yet. The document details above are
               // still worth showing — a reminder link must never dead-end on a
               // button that fails the moment it is pressed.
               <div className="rounded-lg bg-ink-100 px-4 py-3 text-center text-sm text-ink-600">

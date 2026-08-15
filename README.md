@@ -245,14 +245,37 @@ every browser-readable projection.
 
 ## Payments
 
+**Every tenant collects on their own Stripe account.** They link it once in Settings
+(Connect, Standard, OAuth), and Checkout sessions are created *on that account* — a
+direct charge. The debtor pays the creditor; nothing settles to lefta, no application fee
+is taken, and lefta does not appear in the transaction. That is deliberate: routing
+customer money through the platform would make lefta a payment intermediary, which is
+incompatible with operating as a software provider that merely transmits reminders.
+
+SMS credit packs are the exception and stay on the platform account — that is lefta
+selling to the tenant, not a payment on anyone's behalf.
+
 The reminder links to `/pay/<pay_token>` — an opaque 24-byte token, so internal invoice
 ids are never enumerable. The page reads through a `security definer` function exposing
 only the fields it needs, rather than opening the `invoices` table to anonymous access.
-The Checkout amount is always taken from the database, never from the request.
+It also returns whether the creditor can actually take a card, so the button is never
+offered when Stripe would refuse it. The Checkout amount is always taken from the
+database, never from the request.
 
 `checkout.session.completed` is the only path that marks an invoice paid. It is
 idempotent twice over: the update is guarded on `status = 'pending'`, and SMS credit
 grants key on the Stripe session id.
+
+Because invoice events now arrive from connected accounts, the webhook verifies against
+both the platform and the connect endpoint secret, and checks that the event's `account`
+matches the account that tenant actually connected — session metadata is
+attacker-controllable on any connected account, so without that check one connected
+account could settle another tenant's invoice. Credit-pack events carrying an account id
+are refused for the same reason.
+
+The Connect handshake's `state` is HMAC-signed and bound to one tenant for fifteen
+minutes. Unsigned, a crafted link could attach an attacker's Stripe account to someone
+else's tenant and silently redirect their collections.
 
 ### Local webhook testing
 

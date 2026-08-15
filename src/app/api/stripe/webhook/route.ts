@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 
-import { requireEnv } from '@/lib/env';
+import { optionalEnv } from '@/lib/env';
 import { stripe } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -22,24 +22,23 @@ export async function POST(request: Request) {
   // The raw body is required — the signature is computed over the exact bytes.
   const payload = await request.text();
 
-  let event: Stripe.Event;
-  try {
-    event = stripe().webhooks.constructEvent(
-      payload,
-      signature,
-      requireEnv('STRIPE_WEBHOOK_SECRET'),
-    );
-  } catch (cause) {
-    const message = cause instanceof Error ? cause.message : String(cause);
-    console.error('[stripe:webhook] signature verification failed', message);
-    return NextResponse.json({ error: `Webhook signature failed: ${message}` }, { status: 400 });
+  const event = verify(payload, signature);
+  if (!event) {
+    return NextResponse.json({ error: 'Webhook signature failed' }, { status: 400 });
   }
 
   try {
     switch (event.type) {
       case 'checkout.session.completed':
       case 'checkout.session.async_payment_succeeded':
-        await handleCompletedSession(event.data.object);
+        await handleCompletedSession(event.data.object, event.account ?? null);
+        break;
+
+      case 'account.updated':
+        // Onboarding finishes asynchronously, and Stripe can also disable a
+        // previously good account. Keeping the mirror current is what stops the
+        // payment page offering a button Stripe would refuse.
+        await handleAccountUpdated(event.data.object);
         break;
 
       case 'checkout.session.expired':
@@ -60,7 +59,49 @@ export async function POST(request: Request) {
   return NextResponse.json({ received: true });
 }
 
-async function handleCompletedSession(session: Stripe.Checkout.Session) {
+/**
+ * Verifies against both possible endpoints.
+ *
+ * Invoice payments are direct charges, so their events originate on the
+ * creditor's connected account; SMS credit purchases happen on the platform
+ * account. Stripe signs each with the secret of the endpoint it was delivered
+ * to, and the two can be configured separately. Trying both means either layout
+ * works — one endpoint with "events on connected accounts" enabled, or two
+ * endpoints with their own secrets.
+ */
+function verify(payload: string, signature: string): Stripe.Event | null {
+  const secrets = [
+    optionalEnv('STRIPE_WEBHOOK_SECRET'),
+    optionalEnv('STRIPE_CONNECT_WEBHOOK_SECRET'),
+  ].filter((secret): secret is string => Boolean(secret));
+
+  if (secrets.length === 0) {
+    console.error('[stripe:webhook] no webhook secret configured');
+    return null;
+  }
+
+  for (const secret of secrets) {
+    try {
+      return stripe().webhooks.constructEvent(payload, signature, secret);
+    } catch {
+      // Try the next secret before giving up.
+    }
+  }
+
+  console.error('[stripe:webhook] signature matched none of the configured secrets');
+  return null;
+}
+
+async function handleAccountUpdated(account: Stripe.Account) {
+  const { error } = await createAdminClient()
+    .from('users')
+    .update({ stripe_charges_enabled: Boolean(account.charges_enabled) })
+    .eq('stripe_account_id', account.id);
+
+  if (error) throw new Error(`Updating connected account: ${error.message}`);
+}
+
+async function handleCompletedSession(session: Stripe.Checkout.Session, account: string | null) {
   // `paid` is the only status that settles funds; `unpaid`/`no_payment_required`
   // must not grant anything.
   if (session.payment_status !== 'paid') return;
@@ -70,8 +111,27 @@ async function handleCompletedSession(session: Stripe.Checkout.Session) {
 
   if (kind === 'invoice_payment') {
     const invoiceId = session.metadata?.invoice_id;
-    if (!invoiceId) {
-      console.error('[stripe:webhook] invoice_payment session without invoice_id', session.id);
+    const tenantId = session.metadata?.lefta_user_id;
+
+    if (!invoiceId || !tenantId) {
+      console.error('[stripe:webhook] invoice_payment session without ids', session.id);
+      return;
+    }
+
+    // The event must come from the account that tenant actually connected.
+    // Metadata is attacker-controllable on any connected account, so without
+    // this check one connected account could settle another tenant's invoice.
+    const { data: creditor } = await admin
+      .from('users')
+      .select('stripe_account_id')
+      .eq('id', tenantId)
+      .maybeSingle();
+
+    if (!account || !creditor?.stripe_account_id || creditor.stripe_account_id !== account) {
+      console.error('[stripe:webhook] account mismatch for invoice', {
+        invoiceId,
+        account,
+      });
       return;
     }
 
@@ -108,6 +168,14 @@ async function handleCompletedSession(session: Stripe.Checkout.Session) {
   }
 
   if (kind === 'sms_credits') {
+    // Credit packs are sold by lefta on the platform account. An event carrying
+    // an account id is from a connected account, which must not be able to mint
+    // itself credits by replaying this shape.
+    if (account) {
+      console.error('[stripe:webhook] sms_credits from a connected account', account);
+      return;
+    }
+
     const userId = session.metadata?.lefta_user_id;
     const credits = Number.parseInt(session.metadata?.credits ?? '', 10);
 

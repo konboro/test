@@ -23,6 +23,10 @@ export type UserRow = {
   mydata_environment: MyDataEnvironment;
   mydata_last_sync_at: string | null;
   stripe_customer_id: string | null;
+  /** Connected Stripe account. Invoices are charged directly on it. */
+  stripe_account_id: string | null;
+  stripe_charges_enabled: boolean;
+  stripe_connected_at: string | null;
   sms_credits: number;
   automation_enabled: boolean;
   reply_to_email: string | null;
@@ -133,6 +137,8 @@ export type PaymentPageInvoice = {
   status: InvoiceStatus;
   debtor_name: string;
   creditor_name: string;
+  /** Whether the creditor's connected Stripe account can take a card today. */
+  payments_enabled: boolean;
 }
 
 /**

@@ -8,17 +8,29 @@ import { SMS_PACKS } from '@/lib/stripe';
 import { createClient } from '@/lib/supabase/server';
 
 import { CreditPacks, MyDataForm, ProfileForm } from './settings-forms';
+import { StripeConnect } from './stripe-forms';
 import { TemplateEditor, type TemplateSlotView } from './template-forms';
 
 export const metadata = { title: 'Ρυθμίσεις' };
 export const dynamic = 'force-dynamic';
 
+/** Outcomes of the Connect round trip, reported back on the redirect. */
+const STRIPE_NOTICES: Record<string, string> = {
+  connected: 'Ο λογαριασμός Stripe συνδέθηκε. Οι πελάτες σας μπορούν πλέον να πληρώνουν με κάρτα.',
+  pending:
+    'Ο λογαριασμός συνδέθηκε, αλλά το Stripe δεν έχει ολοκληρώσει τον έλεγχο. Το κουμπί πληρωμής θα ενεργοποιηθεί αυτόματα μόλις ολοκληρωθεί.',
+  cancelled: 'Η σύνδεση με το Stripe ακυρώθηκε.',
+  failed: 'Η σύνδεση με το Stripe απέτυχε. Δοκιμάστε ξανά.',
+  'already-linked':
+    'Αυτός ο λογαριασμός Stripe χρησιμοποιείται ήδη από άλλον χρήστη του lefta.app.',
+};
+
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ credits?: string }>;
+  searchParams: Promise<{ credits?: string; stripe?: string }>;
 }) {
-  const { credits } = await searchParams;
+  const { credits, stripe } = await searchParams;
 
   const supabase = await createClient();
   const {
@@ -29,7 +41,7 @@ export default async function SettingsPage({
   const { data: profile } = await supabase
     .from('users')
     .select(
-      'company_name, vat_number, reply_to_email, default_payment_terms_days, automation_enabled, mydata_user_id, mydata_environment, sms_credits',
+      'company_name, vat_number, reply_to_email, default_payment_terms_days, automation_enabled, mydata_user_id, mydata_environment, sms_credits, stripe_account_id, stripe_charges_enabled',
     )
     .eq('id', user.id)
     .maybeSingle();
@@ -76,9 +88,45 @@ export default async function SettingsPage({
         </div>
       ) : null}
 
+      {STRIPE_NOTICES[stripe ?? ''] ? (
+        <div
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            stripe === 'connected'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+              : stripe === 'pending'
+                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                : 'border-ink-200 bg-white text-ink-600'
+          }`}
+        >
+          {STRIPE_NOTICES[stripe ?? '']}
+        </div>
+      ) : null}
+
       <Card>
         <CardHeader title="Στοιχεία επιχείρησης" />
         <ProfileForm profile={profile} />
+      </Card>
+
+      <Card>
+        <div id="stripe" className="scroll-mt-20">
+          <CardHeader
+            title="Είσπραξη με κάρτα (Stripe)"
+            subtitle="Οι πληρωμές πηγαίνουν απευθείας στον δικό σας λογαριασμό. Το lefta.app δεν μεσολαβεί στη ροή χρημάτων."
+            action={
+              profile.stripe_account_id ? (
+                <Badge tone={profile.stripe_charges_enabled ? 'positive' : 'warning'}>
+                  {profile.stripe_charges_enabled ? 'Ενεργό' : 'Σε εκκρεμότητα'}
+                </Badge>
+              ) : (
+                <Badge tone="warning">Μη συνδεδεμένο</Badge>
+              )
+            }
+          />
+          <StripeConnect
+            accountId={profile.stripe_account_id}
+            chargesEnabled={profile.stripe_charges_enabled}
+          />
+        </div>
       </Card>
 
       <Card>

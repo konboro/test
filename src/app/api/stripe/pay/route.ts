@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { appUrl } from '@/lib/env';
-import { stripe } from '@/lib/stripe';
+import { onBehalfOf, stripe } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export const runtime = 'nodejs';
@@ -38,39 +38,57 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'This invoice is no longer payable.' }, { status: 409 });
   }
 
-  const { data: debtor } = await admin
-    .from('debtors')
-    .select('email, name')
-    .eq('id', invoice.debtor_id)
-    .maybeSingle();
+  const [{ data: debtor }, { data: creditor }] = await Promise.all([
+    admin.from('debtors').select('email, name').eq('id', invoice.debtor_id).maybeSingle(),
+    admin
+      .from('users')
+      .select('stripe_account_id, stripe_charges_enabled')
+      .eq('id', invoice.user_id)
+      .maybeSingle(),
+  ]);
+
+  // The creditor collects on their own Stripe account. Without one there is no
+  // one to pay — and lefta must not step in and take the money on their behalf.
+  if (!creditor?.stripe_account_id || !creditor.stripe_charges_enabled) {
+    return NextResponse.json(
+      { error: 'Ο εκδότης δεν δέχεται προς το παρόν ηλεκτρονικές πληρωμές.' },
+      { status: 409 },
+    );
+  }
 
   const label =
     [invoice.series, invoice.invoice_number].filter(Boolean).join(' ') ||
     invoice.mark ||
     invoice.id.slice(0, 8);
 
-  const session = await stripe().checkout.sessions.create({
-    mode: 'payment',
-    line_items: [
-      {
-        quantity: 1,
-        price_data: {
-          currency: invoice.currency.toLowerCase(),
-          unit_amount: invoice.amount_cents,
-          product_data: { name: `Παραστατικό ${label}` },
+  // A *direct charge*: the session lives on the creditor's account and the funds
+  // settle there. No application fee is taken, so lefta never appears in the
+  // payment at all.
+  const session = await stripe().checkout.sessions.create(
+    {
+      mode: 'payment',
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: invoice.currency.toLowerCase(),
+            unit_amount: invoice.amount_cents,
+            product_data: { name: `Παραστατικό ${label}` },
+          },
         },
+      ],
+      ...(debtor?.email ? { customer_email: debtor.email } : {}),
+      metadata: {
+        kind: 'invoice_payment',
+        invoice_id: invoice.id,
+        lefta_user_id: invoice.user_id,
       },
-    ],
-    ...(debtor?.email ? { customer_email: debtor.email } : {}),
-    metadata: {
-      kind: 'invoice_payment',
-      invoice_id: invoice.id,
-      lefta_user_id: invoice.user_id,
+      // Stripe expands `{CHECKOUT_SESSION_ID}` itself.
+      success_url: `${appUrl()}/pay/${parsed.data.token}?paid=1&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl()}/pay/${parsed.data.token}`,
     },
-    // Stripe expands `{CHECKOUT_SESSION_ID}` itself.
-    success_url: `${appUrl()}/pay/${parsed.data.token}?paid=1&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${appUrl()}/pay/${parsed.data.token}`,
-  });
+    onBehalfOf(creditor.stripe_account_id),
+  );
 
   await admin
     .from('invoices')
