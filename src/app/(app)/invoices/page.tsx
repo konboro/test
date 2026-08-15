@@ -136,7 +136,7 @@ export default async function InvoicesPage({
                         <div className="flex items-center justify-end gap-3">
                           {invoice.status === 'pending' ? (
                             <>
-                              <CopyPayLink token={invoice.pay_token} />
+                              <CopyPayLink code={invoice.short_code ?? invoice.pay_token} />
                               <form action={markInvoicePaid}>
                                 <input type="hidden" name="id" value={invoice.id} />
                                 <button

@@ -1,6 +1,7 @@
 import { sendEmail } from '@/lib/email/send';
 import { appUrl } from '@/lib/env';
 import { athensDate, daysBetween } from '@/lib/money';
+import { payPath } from '@/lib/pay-code';
 import { normalisePhone, sendSms } from '@/lib/sms/send';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { DebtorRow, DunningStep, InvoiceRow, UserRow } from '@/types/database';
@@ -279,7 +280,10 @@ async function deliver(
     amountCents: invoice.amount_cents,
     currency: invoice.currency,
     dueDate: invoice.due_date,
-    payUrl: `${appUrl()}/pay/${invoice.pay_token}`,
+    // `short_code` only exists once the migration has run. Falling back to the
+    // long token means a deploy that lands ahead of the migration still mails a
+    // link that works, rather than /pay/undefined.
+    payUrl: `${appUrl()}${payPath(invoice.short_code ?? invoice.pay_token)}`,
   };
 
   if (candidate.channels.includes('email') && debtor.email) {

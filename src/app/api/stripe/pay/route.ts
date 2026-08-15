@@ -2,20 +2,29 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { appUrl } from '@/lib/env';
+import { PAY_CODE_LENGTH, payCredentialColumn, payPath } from '@/lib/pay-code';
 import { stripe } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export const runtime = 'nodejs';
 
-const schema = z.object({ token: z.string().min(16).max(128) });
+// Either credential: a short code or a 48-character legacy token. Alphanumeric
+// only, so nothing that reaches the query filter can carry syntax with it.
+const schema = z.object({
+  token: z
+    .string()
+    .min(PAY_CODE_LENGTH)
+    .max(128)
+    .regex(/^[A-Za-z0-9]+$/),
+});
 
 /**
  * Creates the debtor-facing Checkout session.
  *
  * Public by design: the caller is an anonymous visitor holding a payment link.
- * The opaque `pay_token` is the only credential, and it grants nothing beyond
- * paying this one invoice — the amount is always taken from the database, never
- * from the request.
+ * The credential in that link is the only thing they hold, and it grants nothing
+ * beyond paying this one invoice — the amount is always taken from the database,
+ * never from the request.
  */
 export async function POST(request: Request) {
   const parsed = schema.safeParse(await request.json().catch(() => null));
@@ -26,7 +35,7 @@ export async function POST(request: Request) {
   const { data: invoice } = await admin
     .from('invoices')
     .select('id, user_id, debtor_id, amount_cents, currency, status, invoice_number, series, mark')
-    .eq('pay_token', parsed.data.token)
+    .eq(payCredentialColumn(parsed.data.token), parsed.data.token)
     .maybeSingle();
 
   if (!invoice) return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
@@ -67,9 +76,10 @@ export async function POST(request: Request) {
       invoice_id: invoice.id,
       lefta_user_id: invoice.user_id,
     },
-    // Stripe expands `{CHECKOUT_SESSION_ID}` itself.
-    success_url: `${appUrl()}/pay/${parsed.data.token}?paid=1&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${appUrl()}/pay/${parsed.data.token}`,
+    // Stripe expands `{CHECKOUT_SESSION_ID}` itself. `payPath` returns the visitor
+    // to the same URL shape they arrived on, short or legacy.
+    success_url: `${appUrl()}${payPath(parsed.data.token)}?paid=1&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${appUrl()}${payPath(parsed.data.token)}`,
   });
 
   await admin

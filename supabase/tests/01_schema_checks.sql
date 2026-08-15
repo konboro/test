@@ -51,6 +51,49 @@ end $$;
 \echo '  ok  pay_token generated as 24 random bytes'
 
 -- --------------------------------------------------------------------------
+-- short_code: auto-generated, unique, drawn from the unambiguous alphabet
+-- --------------------------------------------------------------------------
+
+do $$
+declare c1 text; c2 text;
+begin
+  select short_code into c1 from public.invoices where id = 'bbbbbbbb-0000-0000-0000-000000000001';
+  select short_code into c2 from public.invoices where id = 'bbbbbbbb-0000-0000-0000-000000000002';
+
+  if c1 is null or length(c1) <> 10 then
+    raise exception 'FAIL: short_code should be 10 chars, got %', coalesce(length(c1)::text, 'null');
+  end if;
+
+  -- Lowercase or an ambiguous glyph here would break the root-level route: the
+  -- middleware only treats a path as public when it matches this alphabet.
+  if c1 !~ '^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{10}$' then
+    raise exception 'FAIL: short_code outside the allowed alphabet: %', c1;
+  end if;
+
+  if c1 = c2 then
+    raise exception 'FAIL: short_code repeated across invoices: %', c1;
+  end if;
+end $$;
+\echo '  ok  short_code generated as 10 unambiguous symbols'
+
+-- The public lookup has to answer to either credential, or every reminder sent
+-- before short links existed would 404.
+do $$
+declare tok text; code text; by_token uuid; by_code uuid;
+begin
+  select pay_token, short_code into tok, code
+    from public.invoices where id = 'bbbbbbbb-0000-0000-0000-000000000001';
+
+  select invoice_id into by_token from public.get_invoice_for_payment(tok);
+  select invoice_id into by_code  from public.get_invoice_for_payment(code);
+
+  if by_token is distinct from by_code or by_code is null then
+    raise exception 'FAIL: lookup disagrees between credentials (% vs %)', by_token, by_code;
+  end if;
+end $$;
+\echo '  ok  get_invoice_for_payment accepts both the short code and the legacy token'
+
+-- --------------------------------------------------------------------------
 -- COMPLIANCE LOCK: one contact per debtor per calendar day
 -- --------------------------------------------------------------------------
 

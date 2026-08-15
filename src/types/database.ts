@@ -61,6 +61,7 @@ export type InvoiceRow = {
   stripe_checkout_session_id: string | null;
   stripe_payment_intent_id: string | null;
   pay_token: string;
+  short_code: string;
   source: 'mydata' | 'manual';
   created_at: string;
   updated_at: string;

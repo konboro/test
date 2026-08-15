@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { Button, Field, inputClass } from '@/components/ui';
+import { payPath } from '@/lib/pay-code';
 
 import { createInvoice, type InvoiceFormState } from './actions';
 
@@ -95,11 +96,11 @@ export function CreateInvoiceForm({
 }
 
 /** Copies the debtor-facing payment URL to the clipboard. */
-export function CopyPayLink({ token }: { token: string }) {
+export function CopyPayLink({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
 
   async function copy() {
-    const url = `${window.location.origin}/pay/${token}`;
+    const url = `${window.location.origin}${payPath(code)}`;
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);

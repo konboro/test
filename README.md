@@ -179,10 +179,24 @@ every browser-readable projection.
 
 ## Payments
 
-The reminder links to `/pay/<pay_token>` — an opaque 24-byte token, so internal invoice
-ids are never enumerable. The page reads through a `security definer` function exposing
-only the fields it needs, rather than opening the `invoices` table to anonymous access.
-The Checkout amount is always taken from the database, never from the request.
+The reminder links to `lefta.app/<short_code>` — 10 symbols over a 32-symbol alphabet
+(uppercase and digits, without `0`/`O` and `1`/`I`), so internal invoice ids are never
+enumerable and the link survives being read aloud or retyped. The length is a security
+parameter, not cosmetics: the page behind it names the debtor and the amount, and at
+1 000 guesses/s against 10 000 invoices, 10 symbols need ~3 years for a single hit where
+6 would need under two minutes. Both live in `src/lib/pay-code.ts`.
+
+Because the alphabet has no lowercase, a code can never collide with one of the app's own
+routes, which is what makes it safe to serve the link from the domain root. The middleware
+gates on the same test, so `/<code>` is public while `/invoices` stays behind auth.
+
+Older reminders point at `/pay/<pay_token>` — an opaque 24-byte token. That route is kept
+forever: those links are already in debtors' inboxes. `get_invoice_for_payment` accepts
+either credential, and `payPath()` returns a visitor to the URL shape they arrived on.
+
+The page reads through that `security definer` function exposing only the fields it needs,
+rather than opening the `invoices` table to anonymous access. The Checkout amount is
+always taken from the database, never from the request.
 
 `checkout.session.completed` is the only path that marks an invoice paid. It is
 idempotent twice over: the update is guarded on `status = 'pending'`, and SMS credit
@@ -285,10 +299,12 @@ Then register an account, add a debtor with a real email, create a manual invoic
 - Every table is tenant-scoped by `auth.uid()` through RLS.
 - The myDATA key column is excluded from the `authenticated` grant entirely, so even a
   compromised anon key cannot read the ciphertext.
-- `pay_token` and all settlement columns are revoked from `authenticated` — only the
-  webhook writes them. Note the revoke is done at **table** level before re-granting the
-  allowed columns: Supabase's default privileges hand `authenticated` a table-wide
-  `UPDATE`, and a column-level `REVOKE` against a table-level grant is silently a no-op.
+- `pay_token`, `short_code` and all settlement columns are revoked from `authenticated` —
+  only the webhook writes them. Note the revoke is done at **table** level before
+  re-granting the allowed columns: Supabase's default privileges hand `authenticated` a
+  table-wide `UPDATE`, and a column-level `REVOKE` against a table-level grant is silently
+  a no-op. Both payment credentials stay outside the re-granted list, so a browser session
+  cannot mint itself a link.
   `supabase/tests/run.sh` asserts this, because it is easy to reintroduce.
 - `communications_log` is append-only, enforced by a trigger that rejects UPDATE and
   DELETE for every role, including the service role.
