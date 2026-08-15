@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 
 import { Button, ButtonLink } from '@/components/ui';
+import { useT } from '@/lib/i18n/provider';
 
 interface SyncResponse {
   ok?: boolean;
@@ -15,6 +16,7 @@ interface SyncResponse {
 
 /** Triggers an on-demand myDATA pull and refreshes the server-rendered page. */
 export function SyncButton({ configured }: { configured: boolean }) {
+  const t = useT();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
@@ -23,7 +25,7 @@ export function SyncButton({ configured }: { configured: boolean }) {
   if (!configured) {
     return (
       <ButtonLink href="/settings" variant="secondary">
-        Σύνδεση με myDATA
+        {t.sync.connect}
       </ButtonLink>
     );
   }
@@ -37,13 +39,13 @@ export function SyncButton({ configured }: { configured: boolean }) {
       const body = (await response.json()) as SyncResponse;
 
       if (!response.ok || !body.ok) {
-        setMessage({ tone: 'error', text: body.error ?? 'Ο συγχρονισμός απέτυχε.' });
+        setMessage({ tone: 'error', text: body.error ?? t.sync.failed });
         return;
       }
 
       setMessage({
         tone: 'ok',
-        text: `Ελήφθησαν ${body.fetched ?? 0} παραστατικά · ${body.invoicesCreated ?? 0} νέα · ${body.debtorsCreated ?? 0} νέοι πελάτες.`,
+        text: t.sync.result(body.fetched ?? 0, body.invoicesCreated ?? 0, body.debtorsCreated ?? 0),
       });
       startTransition(() => router.refresh());
     } catch (error) {
@@ -56,7 +58,7 @@ export function SyncButton({ configured }: { configured: boolean }) {
   return (
     <div className="flex flex-col items-end gap-1.5">
       <Button onClick={sync} disabled={busy || pending}>
-        {busy ? 'Συγχρονισμός…' : 'Συγχρονισμός myDATA'}
+        {busy ? t.sync.running : t.sync.run}
       </Button>
       {message ? (
         <p

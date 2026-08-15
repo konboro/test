@@ -2,20 +2,23 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { signOut } from '@/app/auth/actions';
+import { getDictionary, getLocale } from '@/lib/i18n';
+import { LocaleProvider } from '@/lib/i18n/provider';
 import { createClient } from '@/lib/supabase/server';
 
 import { NavLink } from './nav-link';
 
-const NAV = [
-  { href: '/dashboard', label: 'Επισκόπηση' },
-  { href: '/invoices', label: 'Παραστατικά' },
-  { href: '/debtors', label: 'Πελάτες' },
-  { href: '/logs', label: 'Ιστορικό επικοινωνίας' },
-  { href: '/settings', label: 'Ρυθμίσεις' },
-];
-
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const [t, locale] = await Promise.all([getDictionary(), getLocale()]);
   const supabase = await createClient();
+
+  const NAV = [
+    { href: '/dashboard', label: t.nav.dashboard },
+    { href: '/invoices', label: t.nav.invoices },
+    { href: '/debtors', label: t.nav.debtors },
+    { href: '/logs', label: t.nav.logs },
+    { href: '/settings', label: t.nav.settings },
+  ];
 
   const {
     data: { user },
@@ -30,6 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .maybeSingle();
 
   return (
+    <LocaleProvider locale={locale}>
     <div className="min-h-screen">
       <header className="border-b border-ink-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
@@ -50,7 +54,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Link
               href="/settings#credits"
               className="tabular hidden rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700 sm:block"
-              title="Διαθέσιμα SMS"
+              title={t.nav.smsCredits}
             >
               {profile?.sms_credits ?? 0} SMS
             </Link>
@@ -62,7 +66,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 type="submit"
                 className="rounded-lg border border-ink-300 px-3 py-1.5 text-sm text-ink-700 transition hover:bg-ink-50"
               >
-                Έξοδος
+                {t.common.signOut}
               </button>
             </form>
           </div>
@@ -79,5 +83,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
     </div>
+    </LocaleProvider>
   );
 }

@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation';
 
 import { Badge, Card, CardHeader, EmptyState } from '@/components/ui';
-import { STEP_SHORT } from '@/lib/dunning/status';
+import { getDictionary } from '@/lib/i18n';
 import { createClient } from '@/lib/supabase/server';
-import type { CommStatus } from '@/types/database';
+import type { CommStatus, DunningStep } from '@/types/database';
 
 export const metadata = { title: 'Ιστορικό επικοινωνίας' };
 export const dynamic = 'force-dynamic';
@@ -14,14 +14,21 @@ const STATUS_TONE: Record<CommStatus, 'positive' | 'danger' | 'neutral'> = {
   skipped: 'neutral',
 };
 
-const STATUS_LABEL: Record<CommStatus, string> = {
-  sent: 'Στάλθηκε',
-  failed: 'Απέτυχε',
-  skipped: 'Παραλείφθηκε',
-};
-
 export default async function LogsPage() {
+  const t = await getDictionary();
   const supabase = await createClient();
+
+  const STATUS_LABEL: Record<CommStatus, string> = {
+    sent: t.logs.statusSent,
+    failed: t.logs.statusFailed,
+    skipped: t.logs.statusSkipped,
+  };
+
+  const STEP_SHORT: Record<DunningStep, string> = {
+    pre_due: t.steps.shortPreDue,
+    overdue_2: t.steps.shortOverdue2,
+    overdue_10: t.steps.shortOverdue10,
+  };
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -41,22 +48,22 @@ export default async function LogsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-ink-900">Ιστορικό επικοινωνίας</h1>
+        <h1 className="text-xl font-semibold text-ink-900">{t.logs.title}</h1>
         <p className="mt-0.5 text-sm text-ink-500">
-          Πλήρες, μη τροποποιήσιμο αρχείο κάθε μηνύματος που στάλθηκε για λογαριασμό σας.
+          {t.logs.subtitle}
         </p>
       </div>
 
       <Card>
         <CardHeader
-          title="Τελευταία 200 μηνύματα"
-          subtitle="Κάθε πελάτης λαμβάνει το πολύ μία επαφή ανά ημέρα."
+          title={t.logs.cardTitle}
+          subtitle={t.logs.cardSubtitle}
         />
 
         {!logs?.length ? (
           <EmptyState
-            title="Δεν έχει σταλεί κανένα μήνυμα"
-            body="Μόλις υπάρξει παραστατικό που πλησιάζει ή ξεπερνά τη λήξη του, η ροή θα ξεκινήσει αυτόματα."
+            title={t.logs.emptyTitle}
+            body={t.logs.emptyBody}
           />
         ) : (
           <ul className="divide-y divide-ink-100">
@@ -65,16 +72,16 @@ export default async function LogsPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium text-ink-900">
-                      {debtorsById.get(log.debtor_id) ?? 'Άγνωστος πελάτης'}
+                      {debtorsById.get(log.debtor_id) ?? t.common.unknownCustomer}
                     </span>
                     <Badge tone={log.channel === 'sms' ? 'info' : 'neutral'}>
-                      {log.channel === 'sms' ? 'SMS' : 'Email'}
+                      {log.channel === 'sms' ? t.common.sms : t.common.email}
                     </Badge>
                     {log.step ? <Badge tone="neutral">{STEP_SHORT[log.step]}</Badge> : null}
                     <Badge tone={STATUS_TONE[log.status]}>{STATUS_LABEL[log.status]}</Badge>
                   </div>
                   <time className="tabular text-xs text-ink-500" dateTime={log.sent_at}>
-                    {new Date(log.sent_at).toLocaleString('el-GR')}
+                    {new Date(log.sent_at).toLocaleString(t.dateTimeTag)}
                   </time>
                 </div>
 

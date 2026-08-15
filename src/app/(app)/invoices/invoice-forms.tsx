@@ -7,6 +7,7 @@ import { Modal } from '@/components/modal';
 import { Button, Field, inputClass, linkClass, subtleLinkClass } from '@/components/ui';
 import type { ReminderPreview } from '@/lib/dunning/manual';
 import { REMINDER_CHOICES } from '@/lib/dunning/templates';
+import { useT } from '@/lib/i18n/provider';
 
 import {
   createInvoice,
@@ -17,10 +18,11 @@ import {
 } from './actions';
 
 function Submit() {
+  const t = useT();
   const { pending } = useFormStatus();
   return (
     <Button type="submit" disabled={pending}>
-      {pending ? 'Καταχώρηση…' : 'Καταχώρηση'}
+      {pending ? t.common.saving : t.common.save}
     </Button>
   );
 }
@@ -30,6 +32,7 @@ export function CreateInvoiceForm({
 }: {
   debtors: Array<{ id: string; name: string }>;
 }) {
+  const t = useT();
   const [state, action] = useActionState<InvoiceFormState, FormData>(createInvoice, {});
   const [open, setOpen] = useState(false);
 
@@ -38,20 +41,20 @@ export function CreateInvoiceForm({
   if (!open) {
     return (
       <Button variant="secondary" onClick={() => setOpen(true)} disabled={debtors.length === 0}>
-        Χειροκίνητο παραστατικό
+        {t.invoices.newManual}
       </Button>
     );
   }
 
   return (
     <form action={action} className="w-full space-y-4 rounded-xl border border-ink-200 bg-white p-5 shadow-sm">
-      <h2 className="text-sm font-semibold text-ink-900">Νέο παραστατικό</h2>
+      <h2 className="text-sm font-semibold text-ink-900">{t.invoiceForm.heading}</h2>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Πελάτης">
+        <Field label={t.invoiceForm.customer}>
           <select name="debtor_id" required className={inputClass} defaultValue="">
             <option value="" disabled>
-              Επιλέξτε…
+              {t.invoiceForm.choose}
             </option>
             {debtors.map((d) => (
               <option key={d.id} value={d.id}>
@@ -61,23 +64,23 @@ export function CreateInvoiceForm({
           </select>
         </Field>
 
-        <Field label="Ποσό (€)">
+        <Field label={t.invoiceForm.amount}>
           <input name="amount" type="number" step="0.01" min="0.01" required className={inputClass} />
         </Field>
 
-        <Field label="Σειρά">
+        <Field label={t.invoiceForm.series}>
           <input name="series" className={inputClass} />
         </Field>
 
-        <Field label="Αριθμός">
+        <Field label={t.invoiceForm.number}>
           <input name="invoice_number" required className={inputClass} />
         </Field>
 
-        <Field label="Ημ. έκδοσης">
+        <Field label={t.invoiceForm.issueDate}>
           <input name="issue_date" type="date" required defaultValue={today} className={inputClass} />
         </Field>
 
-        <Field label="Ημ. λήξης">
+        <Field label={t.invoiceForm.dueDate}>
           <input name="due_date" type="date" required className={inputClass} />
         </Field>
       </div>
@@ -96,7 +99,7 @@ export function CreateInvoiceForm({
       <div className="flex gap-2">
         <Submit />
         <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
-          Άκυρο
+          {t.common.cancel}
         </Button>
       </div>
     </form>
@@ -113,6 +116,7 @@ export function CreateInvoiceForm({
  * point of having one.
  */
 export function RemindButton({ invoiceId, label }: { invoiceId: string; label: string }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [choice, setChoice] = useState('manual');
   const [preview, setPreview] = useState<ReminderPreview | null>(null);
@@ -148,20 +152,20 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
         type="button"
         onClick={() => setOpen(true)}
         className={`text-sm ${linkClass}`}
-        title="Προεπισκόπηση και αποστολή υπενθύμισης"
+        title={t.invoices.remindHint}
       >
-        Υπενθύμιση
+        {t.invoices.remind}
       </button>
 
       {open ? (
         <Modal
-          title="Υπενθύμιση πληρωμής"
-          subtitle={`Παραστατικό ${label}`}
+          title={t.reminder.title}
+          subtitle={t.reminder.invoiceLabel(label)}
           onClose={() => setOpen(false)}
           footer={
             <>
               <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
-                {sent ? 'Κλείσιμο' : 'Άκυρο'}
+                {sent ? t.common.close : t.common.cancel}
               </Button>
 
               {!sent ? (
@@ -169,14 +173,14 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
                   <input type="hidden" name="id" value={invoiceId} />
                   <input type="hidden" name="choice" value={choice} />
                   <Button type="submit" disabled={sending || loading || !preview?.willSend?.length}>
-                    {sending ? 'Αποστολή…' : 'Αποστολή τώρα'}
+                    {sending ? t.reminder.sending : t.reminder.send}
                   </Button>
                 </form>
               ) : null}
             </>
           }
         >
-          <Field label="Κείμενο">
+          <Field label={t.reminder.templateLabel}>
             <select
               value={choice}
               onChange={(e) => setChoice(e.target.value)}
@@ -192,12 +196,11 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
           </Field>
 
           <p className="text-xs text-ink-500">
-            Επιλέγετε μόνο το κείμενο. Η χειροκίνητη αποστολή δεν καταναλώνει βήμα της
-            αυτόματης ροής — το βήμα 2 θα σταλεί κανονικά αργότερα.
+            {t.reminder.note}
           </p>
 
           {loading ? (
-            <p className="text-sm text-ink-500">Φόρτωση προεπισκόπησης…</p>
+            <p className="text-sm text-ink-500">{t.reminder.loading}</p>
           ) : preview?.ok ? (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -212,7 +215,7 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
                   ))
                 ) : (
                   <span className="rounded-full bg-red-50 px-2 py-0.5 font-medium text-red-700">
-                    Κανένα διαθέσιμο κανάλι
+                    {t.reminder.noChannel}
                   </span>
                 )}
               </div>
@@ -228,7 +231,7 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
               {preview.willSend?.includes('email') ? (
                 <div className="rounded-lg border border-ink-200">
                   <div className="border-b border-ink-100 px-3 py-2 text-xs text-ink-500">
-                    Θέμα: <span className="text-ink-800">{preview.subject}</span>
+                    {t.reminder.subjectLabel}: <span className="text-ink-800">{preview.subject}</span>
                   </div>
                   <pre className="max-h-64 overflow-auto whitespace-pre-wrap px-3 py-3 text-xs leading-relaxed text-ink-800">
                     {preview.emailBody}
@@ -239,7 +242,7 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
               {preview.willSend?.includes('sms') ? (
                 <div className="rounded-lg border border-ink-200">
                   <div className="border-b border-ink-100 px-3 py-2 text-xs text-ink-500">
-                    SMS — {preview.smsSegments} τμήμα(τα)
+                    {t.reminder.smsSegments(preview.smsSegments ?? 0)}
                   </div>
                   <pre className="whitespace-pre-wrap px-3 py-3 text-xs leading-relaxed text-ink-800">
                     {preview.smsBody}
@@ -249,7 +252,7 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
             </div>
           ) : (
             <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-              {preview?.error ?? 'Δεν ήταν δυνατή η προεπισκόπηση.'}
+              {preview?.error ?? t.reminder.previewFailed}
             </p>
           )}
 
@@ -271,6 +274,7 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
 
 /** Copies the debtor-facing payment URL to the clipboard. */
 export function CopyPayLink({ token }: { token: string }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
 
   async function copy() {
@@ -287,7 +291,7 @@ export function CopyPayLink({ token }: { token: string }) {
 
   return (
     <button type="button" onClick={copy} className={`text-sm ${subtleLinkClass}`}>
-      {copied ? 'Αντιγράφηκε' : 'Σύνδεσμος πληρωμής'}
+      {copied ? t.invoices.payLinkCopied : t.invoices.payLink}
     </button>
   );
 }

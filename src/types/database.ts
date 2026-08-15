@@ -11,6 +11,8 @@ export type CommChannel = 'email' | 'sms';
 export type CommStatus = 'sent' | 'failed' | 'skipped';
 export type DunningStep = 'pre_due' | 'overdue_2' | 'overdue_10';
 export type MyDataEnvironment = 'production' | 'sandbox';
+/** Portal interface language. Reminder copy is unaffected. */
+export type UserLocale = 'el' | 'en';
 
 export type UserRow = {
   id: string;
@@ -30,6 +32,7 @@ export type UserRow = {
   sms_credits: number;
   automation_enabled: boolean;
   reply_to_email: string | null;
+  locale: UserLocale;
   default_payment_terms_days: number;
   created_at: string;
   updated_at: string;

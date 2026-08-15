@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react';
 
 import { Badge, Button, Field, inputClass, subtleLinkClass } from '@/components/ui';
 import { PLACEHOLDERS } from '@/lib/dunning/templates';
+import { useT } from '@/lib/i18n/provider';
 
 import { resetTemplate, saveTemplate, type SettingsState } from './actions';
 
@@ -18,6 +19,7 @@ export interface TemplateSlotView {
 }
 
 function SlotEditor({ slot }: { slot: TemplateSlotView }) {
+  const t = useT();
   const [saveState, save, saving] = useActionState<SettingsState, FormData>(saveTemplate, {});
   const [resetState, reset, resetting] = useActionState<SettingsState, FormData>(
     resetTemplate,
@@ -47,7 +49,7 @@ function SlotEditor({ slot }: { slot: TemplateSlotView }) {
           {slot.label}
         </button>
         <Badge tone={slot.customised ? 'info' : 'neutral'}>
-          {slot.customised ? 'Προσαρμοσμένο' : 'Προεπιλογή'}
+          {slot.customised ? t.templates.custom : t.templates.default}
         </Badge>
       </div>
 
@@ -57,12 +59,12 @@ function SlotEditor({ slot }: { slot: TemplateSlotView }) {
             <input type="hidden" name="slot" value={slot.key} />
 
             {slot.channel === 'email' ? (
-              <Field label="Θέμα">
+              <Field label={t.templates.subject}>
                 <input name="subject" defaultValue={slot.subject ?? ''} className={inputClass} />
               </Field>
             ) : null}
 
-            <Field label="Κείμενο">
+            <Field label={t.templates.body}>
               <textarea
                 name="body"
                 defaultValue={slot.body}
@@ -73,13 +75,13 @@ function SlotEditor({ slot }: { slot: TemplateSlotView }) {
 
             {slot.channel === 'sms' ? (
               <p className="text-xs text-ink-500">
-                Τα ελληνικά SMS χρεώνονται ανά 70 χαρακτήρες. Κρατήστε το σύντομο.
+                {t.templates.smsHint}
               </p>
             ) : null}
 
             <div className="flex gap-2">
               <Button type="submit" disabled={saving}>
-                {saving ? 'Αποθήκευση…' : 'Αποθήκευση'}
+                {saving ? t.common.saving : t.common.save}
               </Button>
             </div>
           </form>
@@ -88,7 +90,7 @@ function SlotEditor({ slot }: { slot: TemplateSlotView }) {
             <form action={reset}>
               <input type="hidden" name="slot" value={slot.key} />
               <button type="submit" disabled={resetting} className={`text-xs ${subtleLinkClass}`}>
-                {resetting ? 'Επαναφορά…' : 'Επαναφορά προεπιλογής'}
+                {resetting ? t.templates.resetting : t.templates.reset}
               </button>
             </form>
           ) : null}
@@ -110,11 +112,12 @@ function SlotEditor({ slot }: { slot: TemplateSlotView }) {
 }
 
 export function TemplateEditor({ slots }: { slots: TemplateSlotView[] }) {
+  const t = useT();
   return (
     <>
       <div className="border-b border-ink-100 bg-ink-50 px-5 py-3">
         <p className="text-xs text-ink-600">
-          Διαθέσιμες μεταβλητές — αντιγράψτε τις μέσα στο κείμενο:
+          {t.templates.placeholders}
         </p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {PLACEHOLDERS.map((p) => (

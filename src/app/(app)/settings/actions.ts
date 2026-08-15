@@ -1,9 +1,11 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
 import { z } from 'zod';
 
 import { parseSlotKey } from '@/lib/dunning/templates';
+import { isLocale, LOCALE_COOKIE } from '@/lib/i18n';
 import { createClient } from '@/lib/supabase/server';
 
 export interface SettingsState {
@@ -64,6 +66,36 @@ export async function updateProfile(
   revalidatePath('/settings');
   revalidatePath('/dashboard');
   return { success: 'Οι ρυθμίσεις αποθηκεύτηκαν.' };
+}
+
+/**
+ * Switches the portal language.
+ *
+ * Written to both the account and a cookie: the account is the durable
+ * preference that follows the tenant to a new browser, the cookie is what every
+ * subsequent render reads so a page does not have to query for it.
+ */
+export async function updateLocale(formData: FormData): Promise<void> {
+  const locale = String(formData.get('locale') ?? '');
+  if (!isLocale(locale)) return;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { error } = await supabase.from('users').update({ locale }).eq('id', user.id);
+  if (error) return;
+
+  (await cookies()).set(LOCALE_COOKIE, locale, {
+    path: '/',
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: 'lax',
+  });
+
+  // The language lives in the layout chrome too, so the whole tree has to go.
+  revalidatePath('/', 'layout');
 }
 
 const templateSchema = z.object({

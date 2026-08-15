@@ -3,16 +3,20 @@ import { redirect } from 'next/navigation';
 
 import { Badge, Card, CardHeader, EmptyState, linkClass, Stat } from '@/components/ui';
 import { workflowStatus } from '@/lib/dunning/status';
+import { getDictionary } from '@/lib/i18n';
 import { athensDate, daysBetween, formatDate, formatMoney } from '@/lib/money';
 import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
 
 import { SyncButton } from './sync-button';
 
-export const metadata = { title: 'Επισκόπηση' };
+export async function generateMetadata() {
+  return { title: (await getDictionary()).dashboard.title };
+}
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
+  const t = await getDictionary();
   const supabase = await createClient();
   const {
     data: { user },
@@ -72,7 +76,7 @@ export default async function DashboardPage() {
       );
 
       const status = oldest
-        ? workflowStatus(oldest, stepsByInvoice.get(oldest.id) ?? new Set(), today)
+        ? workflowStatus(oldest, stepsByInvoice.get(oldest.id) ?? new Set(), today, t)
         : null;
 
       const lastContact = (contacts ?? [])
@@ -94,11 +98,13 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-ink-900">Επισκόπηση</h1>
+          <h1 className="text-xl font-semibold text-ink-900">{t.dashboard.title}</h1>
           <p className="mt-0.5 text-sm text-ink-500">
             {profile?.mydata_last_sync_at
-              ? `Τελευταίος συγχρονισμός myDATA: ${new Date(profile.mydata_last_sync_at).toLocaleString('el-GR')}`
-              : 'Δεν έχει γίνει ακόμη συγχρονισμός με το myDATA.'}
+              ? t.dashboard.lastSync(
+                  new Date(profile.mydata_last_sync_at).toLocaleString(t.dateTimeTag),
+                )
+              : t.dashboard.neverSynced}
           </p>
         </div>
         <SyncButton configured={Boolean(profile?.mydata_user_id)} />
@@ -106,76 +112,75 @@ export default async function DashboardPage() {
 
       {profile && !profile.automation_enabled ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Η αυτοματοποίηση είναι απενεργοποιημένη. Δεν θα σταλεί καμία υπενθύμιση.{' '}
+          {t.dashboard.automationOff}{' '}
           <Link href="/settings" className="font-medium underline">
-            Ρυθμίσεις
+            {t.dashboard.settingsLink}
           </Link>
         </div>
       ) : null}
 
       {unreachable > 0 ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          {unreachable} {unreachable === 1 ? 'πελάτης' : 'πελάτες'} με ανεξόφλητα παραστατικά δεν
-          έχουν email ή τηλέφωνο — δεν μπορούν να λάβουν υπενθύμιση.{' '}
+          {t.dashboard.unreachable(unreachable)}{' '}
           <Link href="/debtors" className="font-medium underline">
-            Συμπλήρωση στοιχείων
+            {t.dashboard.fixContacts}
           </Link>
         </div>
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
-          label="Ανοιχτό υπόλοιπο"
+          label={t.dashboard.outstanding}
           value={formatMoney(outstandingCents)}
-          hint={`${pending.length} ενεργά παραστατικά`}
+          hint={t.dashboard.outstandingHint(pending.length)}
         />
         <Stat
-          label="Ληξιπρόθεσμα"
+          label={t.dashboard.overdue}
           value={formatMoney(overdueCents)}
-          hint={`${overdue.length} παραστατικά`}
+          hint={t.dashboard.overdueHint(overdue.length)}
           tone={overdueCents > 0 ? 'warning' : 'default'}
         />
         <Stat
-          label="Εισπράχθηκαν"
+          label={t.dashboard.collected}
           value={formatMoney(collectedCents)}
-          hint="Μέσω lefta.app"
+          hint={t.dashboard.collectedHint}
           tone="positive"
         />
         <Stat
-          label="Υπόλοιπο SMS"
+          label={t.dashboard.smsBalance}
           value={String(profile?.sms_credits ?? 0)}
-          hint={(profile?.sms_credits ?? 0) < 20 ? 'Χαμηλό υπόλοιπο' : 'Διαθέσιμα μηνύματα'}
+          hint={(profile?.sms_credits ?? 0) < 20 ? t.dashboard.smsLow : t.dashboard.smsOk}
           tone={(profile?.sms_credits ?? 0) < 20 ? 'warning' : 'default'}
         />
       </div>
 
       <Card>
         <CardHeader
-          title="Πελάτες με ανοιχτά υπόλοιπα"
-          subtitle="Η κατάσταση αφορά το παλαιότερο ανεξόφλητο παραστατικό κάθε πελάτη."
+          title={t.dashboard.openBalances}
+          subtitle={t.dashboard.openBalancesHint}
           action={
             <Link href="/debtors" className={`text-sm ${linkClass}`}>
-              Όλοι οι πελάτες
+              {t.dashboard.allCustomers}
             </Link>
           }
         />
 
         {rows.length === 0 ? (
           <EmptyState
-            title="Κανένα ανοιχτό υπόλοιπο"
-            body="Μόλις συγχρονίσετε τα παραστατικά σας από το myDATA, θα εμφανιστούν εδώ."
+            title={t.dashboard.emptyTitle}
+            body={t.dashboard.emptyBody}
           />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-500">
-                  <th className="px-5 py-2.5 font-medium">Πελάτης</th>
-                  <th className="px-5 py-2.5 font-medium">Παραστατικά</th>
-                  <th className="px-5 py-2.5 text-right font-medium">Υπόλοιπο</th>
-                  <th className="px-5 py-2.5 font-medium">Λήξη (παλαιότερο)</th>
-                  <th className="px-5 py-2.5 font-medium">Κατάσταση ροής</th>
-                  <th className="px-5 py-2.5 font-medium">Τελευταία επαφή</th>
+                  <th className="px-5 py-2.5 font-medium">{t.dashboard.colCustomer}</th>
+                  <th className="px-5 py-2.5 font-medium">{t.dashboard.colInvoices}</th>
+                  <th className="px-5 py-2.5 text-right font-medium">{t.dashboard.colBalance}</th>
+                  <th className="px-5 py-2.5 font-medium">{t.dashboard.colOldestDue}</th>
+                  <th className="px-5 py-2.5 font-medium">{t.dashboard.colWorkflow}</th>
+                  <th className="px-5 py-2.5 font-medium">{t.dashboard.colLastContact}</th>
                 </tr>
               </thead>
               <tbody>

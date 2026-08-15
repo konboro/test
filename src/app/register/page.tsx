@@ -1,10 +1,13 @@
 import Link from 'next/link';
 
 import { linkClass } from '@/components/ui';
+import { getDictionary } from '@/lib/i18n';
 
 import { RegisterForm } from './register-form';
 
-export const metadata = { title: 'Εγγραφή' };
+export async function generateMetadata() {
+  return { title: (await getDictionary()).auth.registerTitle };
+}
 
 export default function RegisterPage() {
   return (

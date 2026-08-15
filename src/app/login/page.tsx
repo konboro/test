@@ -1,10 +1,13 @@
 import Link from 'next/link';
 
 import { linkClass } from '@/components/ui';
+import { getDictionary } from '@/lib/i18n';
 
 import { LoginForm } from './login-form';
 
-export const metadata = { title: 'Σύνδεση' };
+export async function generateMetadata() {
+  return { title: (await getDictionary()).auth.signInTitle };
+}
 
 export default async function LoginPage({
   searchParams,

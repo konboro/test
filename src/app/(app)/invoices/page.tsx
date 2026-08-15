@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 
 import { Badge, Card, CardHeader, EmptyState, subtleLinkClass } from '@/components/ui';
 import { workflowStatus } from '@/lib/dunning/status';
+import { getDictionary } from '@/lib/i18n';
 import { contactLimitsDisabled } from '@/lib/limits';
 import { athensDate, formatDate, formatMoney } from '@/lib/money';
 import { createClient } from '@/lib/supabase/server';
@@ -10,14 +11,12 @@ import type { DunningStep } from '@/types/database';
 import { markInvoicePaid } from './actions';
 import { CopyPayLink, CreateInvoiceForm, RemindButton } from './invoice-forms';
 
-export const metadata = { title: 'Παραστατικά' };
+export async function generateMetadata() {
+  return { title: (await getDictionary()).invoices.title };
+}
 export const dynamic = 'force-dynamic';
 
-const FILTERS = [
-  { key: 'pending', label: 'Ανοιχτά' },
-  { key: 'paid', label: 'Εξοφλημένα' },
-  { key: 'all', label: 'Όλα' },
-] as const;
+const FILTER_KEYS = ['pending', 'paid', 'all'] as const;
 
 export default async function InvoicesPage({
   searchParams,
@@ -25,6 +24,7 @@ export default async function InvoicesPage({
   searchParams: Promise<{ filter?: string }>;
 }) {
   const { filter = 'pending' } = await searchParams;
+  const t = await getDictionary();
   const supabase = await createClient();
   const {
     data: { user },
@@ -59,9 +59,9 @@ export default async function InvoicesPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-ink-900">Παραστατικά</h1>
+          <h1 className="text-xl font-semibold text-ink-900">{t.invoices.title}</h1>
           <p className="mt-0.5 text-sm text-ink-500">
-            Συγχρονισμένα από το myDATA ή καταχωρημένα χειροκίνητα.
+            {t.invoices.subtitle}
           </p>
         </div>
         <CreateInvoiceForm debtors={debtors ?? []} />
@@ -69,50 +69,48 @@ export default async function InvoicesPage({
 
       {contactLimitsDisabled() ? (
         <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <p className="font-semibold">Δοκιμαστική λειτουργία — το ημερήσιο όριο είναι ανενεργό.</p>
+          <p className="font-semibold">{t.invoices.limitsOffTitle}</p>
           <p className="mt-1 text-xs leading-relaxed">
-            Οι χειροκίνητες υπενθυμίσεις στέλνονται χωρίς περιορισμό και δεν καταγράφονται ως
-            επαφές. Η αυτόματη ροή δεν επηρεάζεται. Αφαιρέστε το{' '}
-            <code>UNSAFE_DISABLE_CONTACT_LIMITS</code> πριν σταλεί οτιδήποτε σε πραγματικό πελάτη.
+            {t.invoices.limitsOffBody}
           </p>
         </div>
       ) : null}
 
       <div className="flex gap-1">
-        {FILTERS.map((f) => (
+        {FILTER_KEYS.map((key) => (
           <a
-            key={f.key}
-            href={`/invoices?filter=${f.key}`}
+            key={key}
+            href={`/invoices?filter=${key}`}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-              filter === f.key
+              filter === key
                 ? 'bg-ink-900 text-white'
                 : 'border border-ink-300 bg-white text-ink-600 hover:bg-ink-50'
             }`}
           >
-            {f.label}
+            {key === 'pending' ? t.invoices.filterOpen : key === 'paid' ? t.invoices.filterPaid : t.invoices.filterAll}
           </a>
         ))}
       </div>
 
       <Card>
-        <CardHeader title={`${invoices?.length ?? 0} παραστατικά`} />
+        <CardHeader title={t.invoices.count(invoices?.length ?? 0)} />
 
         {!invoices?.length ? (
           <EmptyState
-            title="Κανένα παραστατικό"
-            body="Συγχρονίστε με το myDATA από την επισκόπηση, ή καταχωρήστε ένα παραστατικό χειροκίνητα."
+            title={t.invoices.emptyTitle}
+            body={t.invoices.emptyBody}
           />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-500">
-                  <th className="px-5 py-2.5 font-medium">Παραστατικό</th>
-                  <th className="px-5 py-2.5 font-medium">Πελάτης</th>
-                  <th className="px-5 py-2.5 text-right font-medium">Ποσό</th>
-                  <th className="px-5 py-2.5 font-medium">Λήξη</th>
-                  <th className="px-5 py-2.5 font-medium">Κατάσταση</th>
-                  <th className="px-5 py-2.5 text-right font-medium">Ενέργειες</th>
+                  <th className="px-5 py-2.5 font-medium">{t.invoices.colInvoice}</th>
+                  <th className="px-5 py-2.5 font-medium">{t.invoices.colCustomer}</th>
+                  <th className="px-5 py-2.5 text-right font-medium">{t.invoices.colAmount}</th>
+                  <th className="px-5 py-2.5 font-medium">{t.invoices.colDue}</th>
+                  <th className="px-5 py-2.5 font-medium">{t.invoices.colStatus}</th>
+                  <th className="px-5 py-2.5 text-right font-medium">{t.invoices.colActions}</th>
                 </tr>
               </thead>
               <tbody>
@@ -121,6 +119,7 @@ export default async function InvoicesPage({
                     invoice,
                     stepsByInvoice.get(invoice.id) ?? new Set(),
                     today,
+                    t,
                   );
                   const label =
                     [invoice.series, invoice.invoice_number].filter(Boolean).join(' ') ||
@@ -132,7 +131,7 @@ export default async function InvoicesPage({
                       <td className="px-5 py-3">
                         <div className="font-medium text-ink-900">{label}</div>
                         <div className="tabular mt-0.5 text-xs text-ink-500">
-                          {invoice.mark ? `MARK ${invoice.mark}` : 'Χειροκίνητο'}
+                          {invoice.mark ? `MARK ${invoice.mark}` : t.invoices.manualSource}
                         </div>
                       </td>
                       <td className="px-5 py-3 text-ink-700">
@@ -158,9 +157,9 @@ export default async function InvoicesPage({
                                 <button
                                   type="submit"
                                   className={`text-sm ${subtleLinkClass}`}
-                                  title="Καταχώρηση εξόφλησης εκτός πλατφόρμας (π.χ. τραπεζικό έμβασμα)"
+                                  title={t.invoices.markPaidHint}
                                 >
-                                  Εξοφλήθηκε
+                                  {t.invoices.markPaid}
                                 </button>
                               </form>
                             </>

@@ -2,16 +2,22 @@ import { redirect } from 'next/navigation';
 
 import { Badge, Card, CardHeader } from '@/components/ui';
 import { LADDER } from '@/lib/dunning/engine';
-import { STEP_LABELS } from '@/lib/dunning/status';
+
 import { DEFAULT_TEMPLATES, EDITABLE_SLOTS, slotKey } from '@/lib/dunning/templates';
+import { DICTIONARIES } from '@/lib/i18n/dictionaries';
+import { getDictionary, LOCALES } from '@/lib/i18n';
 import { SMS_PACKS } from '@/lib/stripe';
 import { createClient } from '@/lib/supabase/server';
+import type { DunningStep } from '@/types/database';
 
+import { updateLocale } from './actions';
 import { CreditPacks, MyDataForm, ProfileForm } from './settings-forms';
 import { StripeConnect } from './stripe-forms';
 import { TemplateEditor, type TemplateSlotView } from './template-forms';
 
-export const metadata = { title: 'Ρυθμίσεις' };
+export async function generateMetadata() {
+  return { title: (await getDictionary()).settings.title };
+}
 export const dynamic = 'force-dynamic';
 
 /** Outcomes of the Connect round trip, reported back on the redirect. */
@@ -31,6 +37,7 @@ export default async function SettingsPage({
   searchParams: Promise<{ credits?: string; stripe?: string }>;
 }) {
   const { credits, stripe } = await searchParams;
+  const t = await getDictionary();
 
   const supabase = await createClient();
   const {
@@ -41,7 +48,7 @@ export default async function SettingsPage({
   const { data: profile } = await supabase
     .from('users')
     .select(
-      'company_name, vat_number, reply_to_email, default_payment_terms_days, automation_enabled, mydata_user_id, mydata_environment, sms_credits, stripe_account_id, stripe_charges_enabled',
+      'company_name, vat_number, reply_to_email, default_payment_terms_days, automation_enabled, mydata_user_id, mydata_environment, sms_credits, stripe_account_id, stripe_charges_enabled, locale',
     )
     .eq('id', user.id)
     .maybeSingle();
@@ -53,7 +60,14 @@ export default async function SettingsPage({
     .from('message_templates')
     .select('step, channel, subject, body');
 
-  const overrides = new Map((templates ?? []).map((t) => [slotKey(t.step, t.channel), t]));
+  // Not `t` — that is the dictionary in this scope.
+  const overrides = new Map((templates ?? []).map((row) => [slotKey(row.step, row.channel), row]));
+
+  const stepLabels: Record<DunningStep, string> = {
+    pre_due: t.steps.longPreDue,
+    overdue_2: t.steps.longOverdue2,
+    overdue_10: t.steps.longOverdue10,
+  };
 
   const slots: TemplateSlotView[] = EDITABLE_SLOTS.map((slot) => {
     const override = overrides.get(slot.key);
@@ -72,8 +86,8 @@ export default async function SettingsPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-ink-900">Ρυθμίσεις</h1>
-        <p className="mt-0.5 text-sm text-ink-500">Στοιχεία επιχείρησης, myDATA και SMS.</p>
+        <h1 className="text-xl font-semibold text-ink-900">{t.settings.title}</h1>
+        <p className="mt-0.5 text-sm text-ink-500">{t.settings.subtitle}</p>
       </div>
 
       {credits === 'success' ? (
@@ -103,22 +117,44 @@ export default async function SettingsPage({
       ) : null}
 
       <Card>
-        <CardHeader title="Στοιχεία επιχείρησης" />
+        <CardHeader title={t.settings.language} subtitle={t.settings.languageHint} />
+        <form action={updateLocale} className="flex flex-wrap gap-2 px-5 py-4">
+          {LOCALES.map((code) => (
+            <button
+              key={code}
+              type="submit"
+              name="locale"
+              value={code}
+              aria-current={profile.locale === code}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                profile.locale === code
+                  ? 'bg-ink-900 text-white'
+                  : 'border border-ink-300 bg-white text-ink-600 hover:bg-ink-50'
+              }`}
+            >
+              {DICTIONARIES[code].languageName}
+            </button>
+          ))}
+        </form>
+      </Card>
+
+      <Card>
+        <CardHeader title={t.settings.business} />
         <ProfileForm profile={profile} />
       </Card>
 
       <Card>
         <div id="stripe" className="scroll-mt-20">
           <CardHeader
-            title="Είσπραξη με κάρτα (Stripe)"
-            subtitle="Οι πληρωμές πηγαίνουν απευθείας στον δικό σας λογαριασμό. Το lefta.app δεν μεσολαβεί στη ροή χρημάτων."
+            title={t.settings.stripe}
+            subtitle={t.settings.stripeHint}
             action={
               profile.stripe_account_id ? (
                 <Badge tone={profile.stripe_charges_enabled ? 'positive' : 'warning'}>
-                  {profile.stripe_charges_enabled ? 'Ενεργό' : 'Σε εκκρεμότητα'}
+                  {profile.stripe_charges_enabled ? t.settings.stripeActive : t.settings.stripePending}
                 </Badge>
               ) : (
-                <Badge tone="warning">Μη συνδεδεμένο</Badge>
+                <Badge tone="warning">{t.settings.notConnected}</Badge>
               )
             }
           />
@@ -131,13 +167,13 @@ export default async function SettingsPage({
 
       <Card>
         <CardHeader
-          title="Σύνδεση myDATA (ΑΑΔΕ)"
-          subtitle="Το Subscription Key αποθηκεύεται κρυπτογραφημένο (AES-256-GCM) και δεν επιστρέφεται ποτέ στον browser."
+          title={t.settings.mydata}
+          subtitle={t.settings.mydataHint}
           action={
             profile.mydata_user_id ? (
-              <Badge tone="positive">Συνδεδεμένο</Badge>
+              <Badge tone="positive">{t.settings.connected}</Badge>
             ) : (
-              <Badge tone="warning">Μη συνδεδεμένο</Badge>
+              <Badge tone="warning">{t.settings.notConnected}</Badge>
             )
           }
         />
@@ -151,11 +187,11 @@ export default async function SettingsPage({
       <Card>
         <div id="credits" className="scroll-mt-20">
           <CardHeader
-            title="Υπόλοιπο SMS"
-            subtitle="Ένα SMS καταναλώνεται ανά απεσταλμένο μήνυμα. Τα email είναι απεριόριστα."
+            title={t.settings.smsTitle}
+            subtitle={t.settings.smsHint}
             action={
               <span className="tabular text-sm font-semibold text-ink-900">
-                {profile.sms_credits} διαθέσιμα
+                {t.settings.smsAvailable(profile.sms_credits)}
               </span>
             }
           />
@@ -165,32 +201,32 @@ export default async function SettingsPage({
 
       <Card>
         <CardHeader
-          title="Κείμενα μηνυμάτων"
-          subtitle="Το περιεχόμενο είναι δικό σας. Το πλαίσιο του email (κουμπί πληρωμής και υποσέλιδο πλατφόρμας) παραμένει σταθερό."
+          title={t.settings.templatesTitle}
+          subtitle={t.settings.templatesHint}
         />
         <TemplateEditor slots={slots} />
       </Card>
 
       <Card>
         <CardHeader
-          title="Ροή υπενθυμίσεων"
-          subtitle="Ο χρονισμός είναι σταθερός και μη παραμετροποιήσιμος — παραμετροποιήσιμο είναι μόνο το κείμενο. Το lefta.app λειτουργεί αποκλειστικά ως πάροχος λογισμικού."
+          title={t.settings.flowTitle}
+          subtitle={t.settings.flowHint}
         />
         <ol className="divide-y divide-ink-100">
           {LADDER.map((rung) => (
             <li key={rung.step} className="flex items-start justify-between gap-4 px-5 py-4">
               <div>
-                <p className="text-sm font-medium text-ink-900">{STEP_LABELS[rung.step]}</p>
+                <p className="text-sm font-medium text-ink-900">{stepLabels[rung.step]}</p>
                 <p className="mt-0.5 text-xs text-ink-500">
                   {rung.offsetFrom < 0
-                    ? `${Math.abs(rung.offsetFrom)} ημέρες πριν τη λήξη`
-                    : `${rung.offsetFrom} ημέρες μετά τη λήξη`}
+                    ? t.settings.beforeDue(Math.abs(rung.offsetFrom))
+                    : t.settings.afterDue(rung.offsetFrom)}
                 </p>
               </div>
               <div className="flex gap-1.5">
                 {rung.channels.map((channel) => (
                   <Badge key={channel} tone={channel === 'sms' ? 'info' : 'neutral'}>
-                    {channel === 'sms' ? 'SMS' : 'Email'}
+                    {channel === 'sms' ? t.common.sms : t.common.email}
                   </Badge>
                 ))}
               </div>
@@ -199,13 +235,12 @@ export default async function SettingsPage({
         </ol>
         <div className="border-t border-ink-100 bg-ink-50 px-5 py-4 text-xs leading-relaxed text-ink-600">
           <p>
-            <strong className="font-semibold text-ink-800">Όριο συχνότητας:</strong> κάθε πελάτης
-            λαμβάνει το πολύ <strong>μία επαφή ανά ημερολογιακή ημέρα</strong>, ανεξάρτητα από το
-            πλήθος των ανεξόφλητων παραστατικών του. Το όριο επιβάλλεται στη βάση δεδομένων.
+            <strong className="font-semibold text-ink-800">{t.settings.rateLimitLabel}</strong>{' '}
+            {t.settings.rateLimitBody}
           </p>
           <p className="mt-2">
-            <strong className="font-semibold text-ink-800">Αυτόματη διακοπή:</strong> μόλις ένα
-            παραστατικό σημανθεί ως εξοφλημένο, η ροή σταματά αμέσως για αυτό.
+            <strong className="font-semibold text-ink-800">{t.settings.autoStopLabel}</strong>{' '}
+            {t.settings.autoStopBody}
           </p>
         </div>
       </Card>

@@ -1,16 +1,20 @@
 import { redirect } from 'next/navigation';
 
 import { Badge, Card, CardHeader, EmptyState, subtleLinkClass } from '@/components/ui';
+import { getDictionary } from '@/lib/i18n';
 import { formatMoney } from '@/lib/money';
 import { createClient } from '@/lib/supabase/server';
 
 import { toggleMute } from './actions';
 import { CreateDebtorForm, EditDebtorForm } from './debtor-forms';
 
-export const metadata = { title: 'Πελάτες' };
+export async function generateMetadata() {
+  return { title: (await getDictionary()).debtors.title };
+}
 export const dynamic = 'force-dynamic';
 
 export default async function DebtorsPage() {
+  const t = await getDictionary();
   const supabase = await createClient();
   const {
     data: { user },
@@ -34,22 +38,21 @@ export default async function DebtorsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-ink-900">Πελάτες</h1>
+          <h1 className="text-xl font-semibold text-ink-900">{t.debtors.title}</h1>
           <p className="mt-0.5 text-sm text-ink-500">
-            Οι πελάτες δημιουργούνται αυτόματα από το myDATA. Συμπληρώστε email και κινητό ώστε να
-            μπορούν να λαμβάνουν υπενθυμίσεις.
+            {t.debtors.subtitle}
           </p>
         </div>
         <CreateDebtorForm />
       </div>
 
       <Card>
-        <CardHeader title={`${debtors?.length ?? 0} πελάτες`} />
+        <CardHeader title={t.debtors.count(debtors?.length ?? 0)} />
 
         {!debtors?.length ? (
           <EmptyState
-            title="Κανένας πελάτης ακόμη"
-            body="Συγχρονίστε τα παραστατικά σας από το myDATA ή προσθέστε έναν πελάτη χειροκίνητα."
+            title={t.debtors.emptyTitle}
+            body={t.debtors.emptyBody}
           />
         ) : (
           <ul className="divide-y divide-ink-100">
@@ -64,14 +67,14 @@ export default async function DebtorsPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium text-ink-900">{debtor.name}</span>
                         {debtor.vat_number ? (
-                          <span className="tabular text-xs text-ink-500">ΑΦΜ {debtor.vat_number}</span>
+                          <span className="tabular text-xs text-ink-500">{t.debtors.vat} {debtor.vat_number}</span>
                         ) : null}
-                        {debtor.muted ? <Badge tone="neutral">σε παύση</Badge> : null}
-                        {!reachable ? <Badge tone="danger">χωρίς στοιχεία επικοινωνίας</Badge> : null}
+                        {debtor.muted ? <Badge tone="neutral">{t.debtors.muted}</Badge> : null}
+                        {!reachable ? <Badge tone="danger">{t.debtors.noContact}</Badge> : null}
                       </div>
                       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-500">
-                        <span>{debtor.email ?? '— χωρίς email'}</span>
-                        <span className="tabular">{debtor.phone ?? '— χωρίς τηλέφωνο'}</span>
+                        <span>{debtor.email ?? t.debtors.noEmail}</span>
+                        <span className="tabular">{debtor.phone ?? t.debtors.noPhone}</span>
                       </div>
                     </div>
 
@@ -80,7 +83,7 @@ export default async function DebtorsPage() {
                         <p className="tabular text-sm font-semibold text-ink-900">
                           {formatMoney(open?.total ?? 0)}
                         </p>
-                        <p className="text-xs text-ink-500">{open?.count ?? 0} ανοιχτά</p>
+                        <p className="text-xs text-ink-500">{t.debtors.openCount(open?.count ?? 0)}</p>
                       </div>
 
                       <EditDebtorForm debtor={debtor} />
@@ -92,7 +95,7 @@ export default async function DebtorsPage() {
                           type="submit"
                           className={`text-sm ${subtleLinkClass}`}
                         >
-                          {debtor.muted ? 'Ενεργοποίηση' : 'Παύση'}
+                          {debtor.muted ? t.debtors.unmute : t.debtors.mute}
                         </button>
                       </form>
                     </div>
