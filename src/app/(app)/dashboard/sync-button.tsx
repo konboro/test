@@ -12,6 +12,7 @@ interface SyncResponse {
   invoicesCreated?: number;
   debtorsCreated?: number;
   fetched?: number;
+  hasMore?: boolean;
 }
 
 /** Triggers an on-demand myDATA pull and refreshes the server-rendered page. */
@@ -45,7 +46,9 @@ export function SyncButton({ configured }: { configured: boolean }) {
 
       setMessage({
         tone: 'ok',
-        text: t.sync.result(body.fetched ?? 0, body.invoicesCreated ?? 0, body.debtorsCreated ?? 0),
+        text:
+          t.sync.result(body.fetched ?? 0, body.invoicesCreated ?? 0, body.debtorsCreated ?? 0) +
+          (body.hasMore ? ` ${t.sync.more}` : ''),
       });
       startTransition(() => router.refresh());
     } catch (error) {

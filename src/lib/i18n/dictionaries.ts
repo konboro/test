@@ -209,6 +209,7 @@ const el = {
     failed: 'Ο συγχρονισμός απέτυχε.',
     result: (fetched: number, invoices: number, debtors: number) =>
       `Ελήφθησαν ${fetched} παραστατικά · ${invoices} νέα · ${debtors} νέοι πελάτες.`,
+    more: 'Υπάρχουν κι άλλα — πατήστε ξανά για συνέχεια.',
   },
 
   invoiceForm: {
@@ -436,6 +437,7 @@ const en: typeof el = {
     failed: 'The sync failed.',
     result: (fetched: number, invoices: number, debtors: number) =>
       `${fetched} documents fetched · ${invoices} new · ${debtors} new customers.`,
+    more: 'More remain — press again to continue.',
   },
 
   invoiceForm: {

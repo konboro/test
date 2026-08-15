@@ -1,5 +1,29 @@
 import { describe, expect, it } from 'vitest';
 
+import { toAadeDate } from './client';
+import { parseRequestedDoc } from './parser';
+import { syncWindow } from './sync';
+
+describe('the date window a sync covers', () => {
+  it('formats dates the way AADE demands', () => {
+    // ISO is rejected outright: "Parameter dateFrom must be in dd/MM/yyyy format".
+    expect(toAadeDate('2026-01-01')).toBe('01/01/2026');
+    expect(toAadeDate('2026-08-15')).toBe('15/08/2026');
+  });
+
+  it('refuses anything that is not an ISO date', () => {
+    expect(() => toAadeDate('15/08/2026')).toThrow();
+    expect(() => toAadeDate('')).toThrow();
+  });
+
+  it('covers the current calendar year to date', () => {
+    // Bounded on purpose: unfiltered, mark=0 starts at the oldest document the
+    // account ever filed and pages forward through years of retail receipts.
+    expect(syncWindow('2026-08-15')).toEqual({ from: '2026-01-01', to: '2026-08-15' });
+    expect(syncWindow('2027-01-01')).toEqual({ from: '2027-01-01', to: '2027-01-01' });
+  });
+});
+
 describe('the WCF envelope AADE production actually returns', () => {
   /** Wraps a document the way mydatapi.aade.gr does: escaped, inside <string>. */
   function envelope(inner: string): string {
@@ -58,7 +82,6 @@ describe('the WCF envelope AADE production actually returns', () => {
   });
 });
 
-import { parseRequestedDoc } from './parser';
 
 /** Shaped after a real AADE `RequestTransmittedDocs` response. */
 const SAMPLE = `<?xml version="1.0" encoding="utf-8"?>

@@ -24,6 +24,8 @@ export type UserRow = {
   mydata_subscription_key_enc: string | null;
   mydata_environment: MyDataEnvironment;
   mydata_last_sync_at: string | null;
+  /** Highest MARK seen by a sync, including skipped documents. The resume point. */
+  mydata_last_mark: string | null;
   stripe_customer_id: string | null;
   /** Connected Stripe account. Invoices are charged directly on it. */
   stripe_account_id: string | null;
