@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 
 import { Badge, Card, CardHeader, EmptyState, subtleLinkClass } from '@/components/ui';
+import { displayName } from '@/lib/debtors';
 import { workflowStatus } from '@/lib/dunning/status';
 import { getDictionary } from '@/lib/i18n';
 import { contactLimitsDisabled } from '@/lib/limits';
@@ -37,7 +38,7 @@ export default async function InvoicesPage({
 
   const [{ data: invoices }, { data: debtors }, { data: contacts }] = await Promise.all([
     query.limit(500),
-    supabase.from('debtors').select('id, name').order('name'),
+    supabase.from('debtors').select('id, name, vat_number').order('name'),
     supabase.from('dunning_contacts').select('invoice_id, step'),
   ]);
 
@@ -108,6 +109,7 @@ export default async function InvoicesPage({
                   <th className="px-5 py-2.5 font-medium">{t.invoices.colInvoice}</th>
                   <th className="px-5 py-2.5 font-medium">{t.invoices.colCustomer}</th>
                   <th className="px-5 py-2.5 text-right font-medium">{t.invoices.colAmount}</th>
+                  <th className="px-5 py-2.5 font-medium">{t.invoices.colIssue}</th>
                   <th className="px-5 py-2.5 font-medium">{t.invoices.colDue}</th>
                   <th className="px-5 py-2.5 font-medium">{t.invoices.colStatus}</th>
                   <th className="px-5 py-2.5 text-right font-medium">{t.invoices.colActions}</th>
@@ -121,24 +123,55 @@ export default async function InvoicesPage({
                     today,
                     t,
                   );
-                  const label =
-                    [invoice.series, invoice.invoice_number].filter(Boolean).join(' ') ||
-                    invoice.mark ||
-                    invoice.id.slice(0, 8);
+                  // The creditor's own document number, which is what they and
+                  // their customer recognise. The MARK is AADE's id and belongs
+                  // underneath it, labelled — not standing in for the number.
+                  const number =
+                    [invoice.series, invoice.invoice_number].filter(Boolean).join(' ') || null;
+                  const label = number ?? invoice.mark ?? invoice.id.slice(0, 8);
+
+                  const debtor = debtorsById.get(invoice.debtor_id);
+                  const customer = debtor ? displayName(debtor) : null;
 
                   return (
                     <tr key={invoice.id} className="border-b border-ink-100 last:border-0">
                       <td className="px-5 py-3">
-                        <div className="font-medium text-ink-900">{label}</div>
+                        {number ? (
+                          <div className="font-medium text-ink-900">{number}</div>
+                        ) : (
+                          <div className="font-medium italic text-ink-400">
+                            {t.invoices.noNumber}
+                          </div>
+                        )}
                         <div className="tabular mt-0.5 text-xs text-ink-500">
-                          {invoice.mark ? `MARK ${invoice.mark}` : t.invoices.manualSource}
+                          {invoice.mark ? (
+                            <>
+                              <span className="text-ink-400">{t.invoices.markLabel}</span>{' '}
+                              {invoice.mark}
+                            </>
+                          ) : (
+                            t.invoices.manualSource
+                          )}
                         </div>
                       </td>
-                      <td className="px-5 py-3 text-ink-700">
-                        {debtorsById.get(invoice.debtor_id)?.name ?? '—'}
+                      <td className="px-5 py-3">
+                        {customer ? (
+                          <div className="text-ink-800">{customer}</div>
+                        ) : (
+                          <div className="italic text-ink-400">{t.debtors.nameMissing}</div>
+                        )}
+                        {debtor?.vat_number ? (
+                          <div className="tabular mt-0.5 text-xs text-ink-500">
+                            <span className="text-ink-400">{t.debtors.vat}</span>{' '}
+                            {debtor.vat_number}
+                          </div>
+                        ) : null}
                       </td>
                       <td className="tabular px-5 py-3 text-right font-medium text-ink-900">
                         {formatMoney(invoice.amount_cents, invoice.currency)}
+                      </td>
+                      <td className="tabular px-5 py-3 text-ink-500">
+                        {formatDate(invoice.issue_date)}
                       </td>
                       <td className="tabular px-5 py-3 text-ink-600">
                         {formatDate(invoice.due_date)}
