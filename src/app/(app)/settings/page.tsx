@@ -6,6 +6,7 @@ import { LADDER } from '@/lib/dunning/engine';
 import { DEFAULT_TEMPLATES, EDITABLE_SLOTS, slotKey } from '@/lib/dunning/templates';
 import { DICTIONARIES } from '@/lib/i18n/dictionaries';
 import { getDictionary, LOCALES } from '@/lib/i18n';
+import { smsAvailable } from '@/lib/providers';
 import { connectConfigured, SMS_PACKS } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
@@ -50,7 +51,7 @@ export default async function SettingsPage({
   const { data: profile } = await supabase
     .from('users')
     .select(
-      'company_name, vat_number, reply_to_email, default_payment_terms_days, automation_enabled, mydata_user_id, mydata_environment, sms_credits, stripe_account_id, stripe_charges_enabled, locale, elorus_organization_id',
+      'company_name, vat_number, reply_to_email, automation_enabled, mydata_user_id, mydata_environment, sms_credits, stripe_account_id, stripe_charges_enabled, locale, elorus_organization_id',
     )
     .eq('id', user.id)
     .maybeSingle();
@@ -197,6 +198,7 @@ export default async function SettingsPage({
         />
       </Card>
 
+      {profile.mydata_user_id || !profile.elorus_organization_id ? (
       <Card>
         <CardHeader
           title={t.settings.mydata}
@@ -215,7 +217,9 @@ export default async function SettingsPage({
           environment={profile.mydata_environment}
         />
       </Card>
+      ) : null}
 
+      {smsAvailable() ? (
       <Card>
         <div id="credits" className="scroll-mt-20">
           <CardHeader
@@ -230,6 +234,7 @@ export default async function SettingsPage({
           <CreditPacks packs={SMS_PACKS} />
         </div>
       </Card>
+      ) : null}
 
       <Card>
         <CardHeader

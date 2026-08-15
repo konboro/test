@@ -260,6 +260,15 @@ const el = {
   },
 
   templates: {
+    emailGroup: 'Μηνύματα email',
+    emailGroupHint: 'Χωρίς όριο μήκους. Το πλαίσιο και το κουμπί πληρωμής προστίθενται αυτόματα.',
+    smsGroup: 'Μηνύματα SMS',
+    smsGroupHint: 'Χρεώνονται ανά 70 χαρακτήρες στα ελληνικά. Ο σύνδεσμος πληρωμής μετρά κι αυτός.',
+    preview: 'Προεπισκόπηση',
+    previewHint: 'Με ενδεικτικά στοιχεία — έτσι ακριβώς θα διαβαστεί.',
+    insertHint: 'Πατήστε μια μεταβλητή για να την εισαγάγετε.',
+    segments: (n: number) => `${n} τμήμα(τα) SMS`,
+    segmentWarning: 'Πάνω από ένα τμήμα — κάθε επιπλέον χρεώνεται ξεχωριστά.',
     custom: 'Προσαρμοσμένο',
     default: 'Προεπιλογή',
     subject: 'Θέμα',
@@ -538,6 +547,15 @@ const en: typeof el = {
   },
 
   templates: {
+    emailGroup: 'Email messages',
+    emailGroupHint: 'No length limit. The frame and payment button are added automatically.',
+    smsGroup: 'SMS messages',
+    smsGroupHint: 'Billed per 70 characters in Greek. The payment link counts too.',
+    preview: 'Preview',
+    previewHint: 'With sample details — this is exactly how it reads.',
+    insertHint: 'Click a variable to insert it.',
+    segments: (n: number) => `${n} SMS segment(s)`,
+    segmentWarning: 'More than one segment — each extra one is billed separately.',
     custom: 'Customised',
     default: 'Default',
     subject: 'Subject',

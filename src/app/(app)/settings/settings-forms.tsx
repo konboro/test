@@ -25,7 +25,6 @@ export function ProfileForm({
     company_name: string | null;
     vat_number: string | null;
     reply_to_email: string | null;
-    default_payment_terms_days: number;
     automation_enabled: boolean;
   };
 }) {
@@ -59,20 +58,6 @@ export function ProfileForm({
           />
         </Field>
 
-        <Field
-          label="Ημέρες πίστωσης"
-          hint="Το myDATA δεν περιέχει ημερομηνία λήξης· υπολογίζεται από την έκδοση."
-        >
-          <input
-            name="default_payment_terms_days"
-            type="number"
-            min={0}
-            max={365}
-            required
-            defaultValue={profile.default_payment_terms_days}
-            className={inputClass}
-          />
-        </Field>
       </div>
 
       <label className="flex items-start gap-3 rounded-lg border border-ink-200 bg-ink-50 px-4 py-3">

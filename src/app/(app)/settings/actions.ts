@@ -30,11 +30,6 @@ const profileSchema = z.object({
     .refine((v) => v === null || z.string().email().safeParse(v).success, {
       message: 'Μη έγκυρο email απάντησης.',
     }),
-  default_payment_terms_days: z.coerce
-    .number()
-    .int()
-    .min(0, 'Οι ημέρες πίστωσης δεν μπορούν να είναι αρνητικές.')
-    .max(365),
   automation_enabled: z.boolean(),
 });
 
@@ -46,7 +41,6 @@ export async function updateProfile(
     company_name: formData.get('company_name'),
     vat_number: formData.get('vat_number'),
     reply_to_email: formData.get('reply_to_email'),
-    default_payment_terms_days: formData.get('default_payment_terms_days'),
     automation_enabled: formData.get('automation_enabled') === 'on',
   });
 
