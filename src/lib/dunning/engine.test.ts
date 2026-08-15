@@ -97,14 +97,14 @@ describe('provider availability gates the contact claim', () => {
   function unconfiguredProduction() {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('RESEND_API_KEY', '');
-    vi.stubEnv('YUBOTO_API_KEY', '');
+    vi.stubEnv('BREVO_API_KEY', '');
     vi.stubEnv('STRIPE_SECRET_KEY', '');
   }
 
   it('treats both channels as available outside production, so a dry run still exercises the flow', () => {
     vi.stubEnv('NODE_ENV', 'development');
     vi.stubEnv('RESEND_API_KEY', '');
-    vi.stubEnv('YUBOTO_API_KEY', '');
+    vi.stubEnv('BREVO_API_KEY', '');
 
     expect(emailAvailable()).toBe(true);
     expect(smsAvailable()).toBe(true);
@@ -137,7 +137,7 @@ describe('provider availability gates the contact claim', () => {
   it('still refuses a channel the debtor cannot receive, however well configured', () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('RESEND_API_KEY', 're_live_x');
-    vi.stubEnv('YUBOTO_API_KEY', 'yb_x');
+    vi.stubEnv('BREVO_API_KEY', 'xkeysib_x');
 
     expect(deliverableChannels(['email', 'sms'], { email: null, phone: '6971234567' })).toEqual([
       'sms',
