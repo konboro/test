@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
 
 import { markInvoicePaid } from './actions';
-import { CopyPayLink, CreateInvoiceForm } from './invoice-forms';
+import { CopyPayLink, CreateInvoiceForm, RemindButton } from './invoice-forms';
 
 export const metadata = { title: 'Παραστατικά — lefta.app' };
 export const dynamic = 'force-dynamic';
@@ -44,6 +44,9 @@ export default async function InvoicesPage({
 
   const stepsByInvoice = new Map<string, Set<DunningStep>>();
   for (const c of contacts ?? []) {
+    // A manual reminder has no step: it is a contact, not a rung, and must not
+    // move the invoice's position on the ladder.
+    if (!c.step) continue;
     const set = stepsByInvoice.get(c.invoice_id) ?? new Set<DunningStep>();
     set.add(c.step);
     stepsByInvoice.set(c.invoice_id, set);
@@ -136,6 +139,7 @@ export default async function InvoicesPage({
                         <div className="flex items-center justify-end gap-3">
                           {invoice.status === 'pending' ? (
                             <>
+                              <RemindButton invoiceId={invoice.id} />
                               <CopyPayLink token={invoice.pay_token} />
                               <form action={markInvoicePaid}>
                                 <input type="hidden" name="id" value={invoice.id} />

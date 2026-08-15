@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
+import { sendManualReminder } from '@/lib/dunning/manual';
 import { toCents } from '@/lib/money';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
@@ -10,6 +11,48 @@ import { createClient } from '@/lib/supabase/server';
 export interface InvoiceFormState {
   error?: string;
   success?: string;
+}
+
+export type ReminderState = InvoiceFormState;
+
+/**
+ * Sends a reminder for one invoice, on demand.
+ *
+ * Still bound by the once-per-debtor-per-day limit — see lib/dunning/manual.ts
+ * — so this is a way to bring a reminder forward, not a way around the guarantee.
+ */
+export async function sendReminder(
+  _prev: ReminderState,
+  formData: FormData,
+): Promise<ReminderState> {
+  const id = String(formData.get('id') ?? '');
+  if (!id) return { error: 'Λείπει το παραστατικό.' };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: 'Μη εξουσιοδοτημένη ενέργεια.' };
+
+  const result = await sendManualReminder({ userId: user.id, invoiceId: id });
+
+  revalidatePath('/invoices');
+  revalidatePath('/logs');
+
+  if (result.error) return { error: result.error };
+
+  const delivered = [
+    result.emailsSent > 0 ? 'email' : null,
+    result.smsSent > 0 ? 'SMS' : null,
+  ].filter(Boolean);
+
+  if (delivered.length === 0) {
+    // Nothing went out and nothing errored: a channel was skipped. Surface the
+    // reason verbatim — during setup that is exactly what needs fixing.
+    return { error: `Δεν στάλθηκε μήνυμα (${result.skipped.join(', ') || 'άγνωστος λόγος'}).` };
+  }
+
+  return { success: `Η υπενθύμιση στάλθηκε (${delivered.join(' + ')}).` };
 }
 
 /**

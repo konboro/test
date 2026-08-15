@@ -49,9 +49,11 @@ export default async function DashboardPage() {
     .filter((i) => i.status === 'paid')
     .reduce((sum, i) => sum + i.amount_cents, 0);
 
-  // Steps already fired, per invoice.
+  // Steps already fired, per invoice. Manual reminders carry no step — they are
+  // contacts, not rungs, and must not move an invoice along the ladder.
   const stepsByInvoice = new Map<string, Set<DunningStep>>();
   for (const c of contacts ?? []) {
+    if (!c.step) continue;
     const set = stepsByInvoice.get(c.invoice_id) ?? new Set<DunningStep>();
     set.add(c.step);
     stepsByInvoice.set(c.invoice_id, set);

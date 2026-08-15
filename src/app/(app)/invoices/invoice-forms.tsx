@@ -5,7 +5,7 @@ import { useFormStatus } from 'react-dom';
 
 import { Button, Field, inputClass } from '@/components/ui';
 
-import { createInvoice, type InvoiceFormState } from './actions';
+import { createInvoice, sendReminder, type InvoiceFormState, type ReminderState } from './actions';
 
 function Submit() {
   const { pending } = useFormStatus();
@@ -90,6 +90,43 @@ export function CreateInvoiceForm({
           Άκυρο
         </Button>
       </div>
+    </form>
+  );
+}
+
+/**
+ * Sends a reminder for this invoice now.
+ *
+ * The outcome is shown next to the button rather than as a toast: during setup
+ * the interesting answer is usually a refusal ("already contacted today", "no
+ * provider configured"), and that needs to stay on screen next to the row it
+ * belongs to.
+ */
+export function RemindButton({ invoiceId }: { invoiceId: string }) {
+  const [state, action, pending] = useActionState<ReminderState, FormData>(sendReminder, {});
+
+  return (
+    <form action={action} className="flex items-center gap-2">
+      <input type="hidden" name="id" value={invoiceId} />
+      <button
+        type="submit"
+        disabled={pending}
+        className="text-sm font-medium text-brand-600 hover:underline disabled:opacity-50"
+        title="Αποστολή υπενθύμισης τώρα (μία επικοινωνία ανά πελάτη ανά ημέρα)"
+      >
+        {pending ? 'Αποστολή…' : 'Υπενθύμιση'}
+      </button>
+
+      {state.error ? (
+        <span role="alert" className="max-w-[16rem] text-xs leading-tight text-red-600">
+          {state.error}
+        </span>
+      ) : null}
+      {state.success ? (
+        <span role="status" className="text-xs text-emerald-700">
+          {state.success}
+        </span>
+      ) : null}
     </form>
   );
 }
