@@ -35,33 +35,48 @@ export function normalisePhone(raw: string | null | undefined): string | null {
 }
 
 /**
+ * Whether the message needs UCS-2 rather than GSM-03.38.
+ *
+ * Every Greek reminder does. This drives two separate things — how many segments
+ * the message costs, and the `unicodeEnabled` flag Brevo needs — so it has one
+ * definition rather than two that can drift apart.
+ */
+export function usesUnicode(message: string): boolean {
+  return /[^\x00-\x7F]/.test(message);
+}
+
+/**
  * GSM-03.38 single-segment limit. Greek text falls back to UCS-2 (70 chars),
  * so templates are kept short enough to stay one segment either way.
  */
 export function segmentCount(message: string): number {
-  const isUnicode = /[^\x00-\x7F]/.test(message);
-  const limit = isUnicode ? 70 : 160;
-  const multipart = isUnicode ? 67 : 153;
+  const unicode = usesUnicode(message);
+  const limit = unicode ? 70 : 160;
+  const multipart = unicode ? 67 : 153;
   return message.length <= limit ? 1 : Math.ceil(message.length / multipart);
 }
 
 /**
  * Sends one SMS.
  *
- * The provider is Yuboto (Greek aggregator, https://services.yuboto.com). The
- * transport below is a real HTTP call against their Omni API; swapping in Twilio
- * means replacing only `dispatch` — the rest of the system depends on this
- * module's signature, not on the provider.
+ * The provider is Brevo, chosen to start because credits are sold in packs of
+ * 100 and never expire — the smallest commitment on the market that can still
+ * reach a real Greek handset. Every alternative gates real sending behind either
+ * a larger prepayment or a verification queue.
+ *
+ * Only `dispatch` knows that. Moving to Twilio or a Greek aggregator later means
+ * replacing that one function — the rest of the system depends on this module's
+ * signature, not on the provider.
  */
 export async function sendSms({ phone, message }: SmsMessage): Promise<SmsResult> {
   const to = normalisePhone(phone);
   if (!to) return { ok: false, error: `Unusable phone number: ${phone}` };
 
-  const apiKey = optionalEnv('YUBOTO_API_KEY');
+  const apiKey = optionalEnv('BREVO_API_KEY');
 
   if (!apiKey) {
     if (process.env.NODE_ENV === 'production') {
-      return { ok: false, error: 'YUBOTO_API_KEY is not configured' };
+      return { ok: false, error: 'BREVO_API_KEY is not configured' };
     }
     console.info('[sms:dry-run]', { to, segments: segmentCount(message), message });
     return { ok: true, messageId: `dry-run-${Date.now()}` };
@@ -70,46 +85,67 @@ export async function sendSms({ phone, message }: SmsMessage): Promise<SmsResult
   return dispatch(apiKey, to, message);
 }
 
+/**
+ * Taken from Brevo's own Go SDK, which is generated from their OpenAPI spec.
+ * Their published reference shows `/transactionalSMS/send` for the asynchronous
+ * variant; if a live send ever returns 404, this constant is the thing to change.
+ */
+const BREVO_SMS_ENDPOINT = 'https://api.brevo.com/v3/transactionalSMS/sms';
+
 async function dispatch(apiKey: string, to: string, message: string): Promise<SmsResult> {
+  // Brevo caps the sender at 11 alphanumeric characters, and Greek operators
+  // block generic names (INFO, SMS, NOTICE), so this has to stay a short brand.
   const sender = optionalEnv('SMS_SENDER_ID') ?? 'lefta';
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15_000);
 
   try {
-    const response = await fetch('https://services.yuboto.com/omni/v1/Send', {
+    const response = await fetch(BREVO_SMS_ENDPOINT, {
       method: 'POST',
       headers: {
-        Authorization: `Basic ${apiKey}`,
+        'api-key': apiKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        phonenumbers: [to],
-        channel: 'sms',
-        sms: {
-          sender,
-          text: message,
-          // Reminders are worthless once stale; expire rather than deliver late.
-          validity: 1440,
-          typesms: 'sms',
-        },
+        sender,
+        // Brevo accepts 6–15 digits with an optional leading '+', so the E.164
+        // form `normalisePhone` produces goes through unchanged.
+        recipient: to,
+        content: message,
+        // Reminders are informational, not marketing. The distinction is not
+        // cosmetic: transactional messages are exempt from the consent and
+        // quiet-hours rules that govern promotional SMS.
+        type: 'transactional',
+        // Brevo defaults this to false, which would mangle every Greek reminder
+        // we send. It has to be derived from the content, not assumed.
+        unicodeEnabled: usesUnicode(message),
       }),
       signal: controller.signal,
     });
 
     const body = (await response.json().catch(() => null)) as
-      | { ErrorCode?: number; ErrorMessage?: string; Message?: { id?: string }[] }
+      | { messageId?: number | string; message?: string; code?: string }
       | null;
 
     if (!response.ok) {
-      return { ok: false, error: `SMS provider responded ${response.status}` };
+      // Brevo returns {code, message} on rejection. Carry the message through:
+      // an unusable sender or an empty credit balance both land here, and the
+      // difference matters to whoever reads the log.
+      const detail = body?.message;
+      return {
+        ok: false,
+        error: detail
+          ? `SMS provider responded ${response.status}: ${detail}`
+          : `SMS provider responded ${response.status}`,
+      };
     }
 
-    if (body?.ErrorCode && body.ErrorCode !== 0) {
-      return { ok: false, error: body.ErrorMessage ?? `Provider error ${body.ErrorCode}` };
-    }
-
-    return { ok: true, messageId: body?.Message?.[0]?.id };
+    return {
+      ok: true,
+      // messageId comes back as a number; the rest of the system stores a string.
+      messageId: body?.messageId === undefined ? undefined : String(body.messageId),
+    };
   } catch (cause) {
     if (cause instanceof Error && cause.name === 'AbortError') {
       return { ok: false, error: 'SMS request timed out' };
