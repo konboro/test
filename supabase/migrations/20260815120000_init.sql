@@ -3,7 +3,15 @@
 -- lefta operates strictly as an IT/software provider: it transmits reminders on
 -- behalf of the creditor. It never acts as a debt collection agency.
 
-create extension if not exists "pgcrypto";
+-- pgcrypto ships pre-installed into the `extensions` schema on a real Supabase
+-- project, which makes a bare `create extension if not exists pgcrypto` a silent
+-- no-op: the extension is already there, so nothing moves into `public` and
+-- gen_random_bytes stays outside the search_path used while applying DDL. Pin
+-- the schema and qualify the call sites, so this applies identically on Supabase
+-- and on the plain Postgres that supabase/tests/run.sh spins up.
+create schema if not exists extensions;
+create extension if not exists "pgcrypto" with schema extensions;
+grant usage on schema extensions to anon, authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
 -- enums
@@ -115,7 +123,7 @@ create table public.invoices (
 
   -- Opaque, unguessable token used in the public /pay/<token> URL so that
   -- internal ids are never enumerable by third parties.
-  pay_token      text not null default encode(gen_random_bytes(24), 'hex'),
+  pay_token      text not null default encode(extensions.gen_random_bytes(24), 'hex'),
 
   source         text not null default 'mydata' check (source in ('mydata', 'manual')),
 
