@@ -1,0 +1,216 @@
+import Link from 'next/link';
+import { redirect } from 'next/navigation';
+
+import { Badge, Card, CardHeader, EmptyState, Stat } from '@/components/ui';
+import { workflowStatus } from '@/lib/dunning/status';
+import { athensDate, daysBetween, formatDate, formatMoney } from '@/lib/money';
+import { createClient } from '@/lib/supabase/server';
+import type { DunningStep } from '@/types/database';
+
+import { SyncButton } from './sync-button';
+
+export const metadata = { title: 'Επισκόπηση — lefta.app' };
+export const dynamic = 'force-dynamic';
+
+export default async function DashboardPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+
+  const today = athensDate();
+
+  // RLS scopes every one of these to the signed-in tenant.
+  const [{ data: profile }, { data: invoices }, { data: debtors }, { data: contacts }] =
+    await Promise.all([
+      supabase
+        .from('users')
+        .select('company_name, sms_credits, mydata_user_id, mydata_last_sync_at, automation_enabled')
+        .eq('id', user.id)
+        .maybeSingle(),
+      supabase
+        .from('invoices')
+        .select('id, debtor_id, amount_cents, currency, due_date, status, invoice_number, series, mark')
+        .in('status', ['pending', 'paid'])
+        .order('due_date', { ascending: true }),
+      supabase.from('debtors').select('id, name, vat_number, email, phone, muted'),
+      supabase.from('dunning_contacts').select('invoice_id, debtor_id, step, contact_on'),
+    ]);
+
+  const allInvoices = invoices ?? [];
+  const pending = allInvoices.filter((i) => i.status === 'pending');
+  const overdue = pending.filter((i) => daysBetween(i.due_date, today) > 0);
+
+  const outstandingCents = pending.reduce((sum, i) => sum + i.amount_cents, 0);
+  const overdueCents = overdue.reduce((sum, i) => sum + i.amount_cents, 0);
+
+  const collectedCents = allInvoices
+    .filter((i) => i.status === 'paid')
+    .reduce((sum, i) => sum + i.amount_cents, 0);
+
+  // Steps already fired, per invoice.
+  const stepsByInvoice = new Map<string, Set<DunningStep>>();
+  for (const c of contacts ?? []) {
+    const set = stepsByInvoice.get(c.invoice_id) ?? new Set<DunningStep>();
+    set.add(c.step);
+    stepsByInvoice.set(c.invoice_id, set);
+  }
+
+  const debtorsById = new Map((debtors ?? []).map((d) => [d.id, d]));
+
+  // Roll pending invoices up per debtor for the overview table.
+  const rows = [...debtorsById.values()]
+    .map((debtor) => {
+      const own = pending.filter((i) => i.debtor_id === debtor.id);
+      const total = own.reduce((sum, i) => sum + i.amount_cents, 0);
+      const oldest = own.reduce<(typeof own)[number] | null>(
+        (worst, i) => (!worst || i.due_date < worst.due_date ? i : worst),
+        null,
+      );
+
+      const status = oldest
+        ? workflowStatus(oldest, stepsByInvoice.get(oldest.id) ?? new Set(), today)
+        : null;
+
+      const lastContact = (contacts ?? [])
+        .filter((c) => c.debtor_id === debtor.id)
+        .map((c) => c.contact_on)
+        .sort()
+        .at(-1);
+
+      return { debtor, count: own.length, total, oldest, status, lastContact };
+    })
+    .filter((row) => row.count > 0)
+    .sort((a, b) => b.total - a.total);
+
+  const unreachable = (debtors ?? []).filter(
+    (d) => !d.email && !d.phone && pending.some((i) => i.debtor_id === d.id),
+  ).length;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-ink-900">Επισκόπηση</h1>
+          <p className="mt-0.5 text-sm text-ink-500">
+            {profile?.mydata_last_sync_at
+              ? `Τελευταίος συγχρονισμός myDATA: ${new Date(profile.mydata_last_sync_at).toLocaleString('el-GR')}`
+              : 'Δεν έχει γίνει ακόμη συγχρονισμός με το myDATA.'}
+          </p>
+        </div>
+        <SyncButton configured={Boolean(profile?.mydata_user_id)} />
+      </div>
+
+      {profile && !profile.automation_enabled ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Η αυτοματοποίηση είναι απενεργοποιημένη. Δεν θα σταλεί καμία υπενθύμιση.{' '}
+          <Link href="/settings" className="font-medium underline">
+            Ρυθμίσεις
+          </Link>
+        </div>
+      ) : null}
+
+      {unreachable > 0 ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {unreachable} {unreachable === 1 ? 'πελάτης' : 'πελάτες'} με ανεξόφλητα παραστατικά δεν
+          έχουν email ή τηλέφωνο — δεν μπορούν να λάβουν υπενθύμιση.{' '}
+          <Link href="/debtors" className="font-medium underline">
+            Συμπλήρωση στοιχείων
+          </Link>
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat
+          label="Ανοιχτό υπόλοιπο"
+          value={formatMoney(outstandingCents)}
+          hint={`${pending.length} ενεργά παραστατικά`}
+        />
+        <Stat
+          label="Ληξιπρόθεσμα"
+          value={formatMoney(overdueCents)}
+          hint={`${overdue.length} παραστατικά`}
+          tone={overdueCents > 0 ? 'warning' : 'default'}
+        />
+        <Stat
+          label="Εισπράχθηκαν"
+          value={formatMoney(collectedCents)}
+          hint="Μέσω lefta.app"
+          tone="positive"
+        />
+        <Stat
+          label="Υπόλοιπο SMS"
+          value={String(profile?.sms_credits ?? 0)}
+          hint={(profile?.sms_credits ?? 0) < 20 ? 'Χαμηλό υπόλοιπο' : 'Διαθέσιμα μηνύματα'}
+          tone={(profile?.sms_credits ?? 0) < 20 ? 'warning' : 'default'}
+        />
+      </div>
+
+      <Card>
+        <CardHeader
+          title="Πελάτες με ανοιχτά υπόλοιπα"
+          subtitle="Η κατάσταση αφορά το παλαιότερο ανεξόφλητο παραστατικό κάθε πελάτη."
+          action={
+            <Link href="/debtors" className="text-sm font-medium text-brand-600 hover:underline">
+              Όλοι οι πελάτες
+            </Link>
+          }
+        />
+
+        {rows.length === 0 ? (
+          <EmptyState
+            title="Κανένα ανοιχτό υπόλοιπο"
+            body="Μόλις συγχρονίσετε τα παραστατικά σας από το myDATA, θα εμφανιστούν εδώ."
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-500">
+                  <th className="px-5 py-2.5 font-medium">Πελάτης</th>
+                  <th className="px-5 py-2.5 font-medium">Παραστατικά</th>
+                  <th className="px-5 py-2.5 text-right font-medium">Υπόλοιπο</th>
+                  <th className="px-5 py-2.5 font-medium">Λήξη (παλαιότερο)</th>
+                  <th className="px-5 py-2.5 font-medium">Κατάσταση ροής</th>
+                  <th className="px-5 py-2.5 font-medium">Τελευταία επαφή</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(({ debtor, count, total, oldest, status, lastContact }) => (
+                  <tr key={debtor.id} className="border-b border-ink-100 last:border-0">
+                    <td className="px-5 py-3">
+                      <Link href="/debtors" className="font-medium text-ink-900 hover:underline">
+                        {debtor.name}
+                      </Link>
+                      <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-500">
+                        {debtor.vat_number ? <span>ΑΦΜ {debtor.vat_number}</span> : null}
+                        {debtor.muted ? <Badge tone="neutral">σε παύση</Badge> : null}
+                        {!debtor.email && !debtor.phone ? (
+                          <Badge tone="danger">χωρίς στοιχεία</Badge>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td className="tabular px-5 py-3 text-ink-600">{count}</td>
+                    <td className="tabular px-5 py-3 text-right font-medium text-ink-900">
+                      {formatMoney(total)}
+                    </td>
+                    <td className="tabular px-5 py-3 text-ink-600">
+                      {oldest ? formatDate(oldest.due_date) : '—'}
+                    </td>
+                    <td className="px-5 py-3">
+                      {status ? <Badge tone={status.tone}>{status.label}</Badge> : '—'}
+                    </td>
+                    <td className="tabular px-5 py-3 text-ink-500">
+                      {lastContact ? formatDate(lastContact) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
