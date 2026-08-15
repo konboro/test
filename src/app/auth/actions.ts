@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
+import { safeNextPath } from '@/lib/redirects';
 import { createClient } from '@/lib/supabase/server';
 
 export interface AuthState {
@@ -32,8 +33,7 @@ export async function signIn(_prev: AuthState, formData: FormData): Promise<Auth
     return { error: 'Λάθος email ή κωδικός.' };
   }
 
-  const next = formData.get('next');
-  redirect(typeof next === 'string' && next.startsWith('/') ? next : '/dashboard');
+  redirect(safeNextPath(formData.get('next')));
 }
 
 export async function signUp(_prev: AuthState, formData: FormData): Promise<AuthState> {

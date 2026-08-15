@@ -13,6 +13,11 @@ const PUBLIC_PREFIXES = [
   // payment credential.
   '/pay',
   '/api/stripe/pay',
+  // Where Stripe returns the debtor after Checkout. The visitor is anonymous —
+  // they hold a payment credential, not a session — and for a tenant collecting
+  // on their own key this endpoint is the only settlement path, so gating it
+  // behind auth would swallow the payment confirmation entirely.
+  '/api/stripe/confirm',
   // Authenticated by Stripe's signature, not by a session cookie.
   '/api/stripe/webhook',
   // Authenticated by the CRON_SECRET bearer token.

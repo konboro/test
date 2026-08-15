@@ -115,7 +115,7 @@ function resolveChannels(debtor: DebtorRow): { channels: Channel[]; notes: strin
 
   const phone = normalisePhone(debtor.phone);
   if (!phone) notes.push('Ο πελάτης δεν έχει έγκυρο κινητό.');
-  else if (!channelAvailable('sms')) notes.push('Δεν έχει ρυθμιστεί πάροχος SMS (Yuboto).');
+  else if (!channelAvailable('sms')) notes.push('Δεν έχει ρυθμιστεί πάροχος SMS (Brevo).');
   else channels.push('sms');
 
   return { channels, notes };
