@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { appUrl } from '@/lib/env';
+import type Stripe from 'stripe';
+
 import { paymentsFor } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -67,8 +69,7 @@ export async function POST(request: Request) {
   // Either way this is a charge on the creditor's own account: through Connect
   // it is a direct charge, through their key it is simply their account. No
   // application fee is taken, so lefta never appears in the payment at all.
-  const session = await payments.client.checkout.sessions.create(
-    {
+  const params: Stripe.Checkout.SessionCreateParams = {
       mode: 'payment',
       line_items: [
         {
@@ -92,9 +93,12 @@ export async function POST(request: Request) {
       // Stripe expands `{CHECKOUT_SESSION_ID}` itself.
       success_url: `${appUrl()}/api/stripe/confirm?token=${parsed.data.token}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl()}/pay/${parsed.data.token}`,
-    },
-    payments.options,
-  );
+  };
+
+  // Passing options at all is conditional: see TenantPayments in lib/stripe.
+  const session = payments.options
+    ? await payments.client.checkout.sessions.create(params, payments.options)
+    : await payments.client.checkout.sessions.create(params);
 
   await admin
     .from('invoices')

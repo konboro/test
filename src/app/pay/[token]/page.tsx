@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
 
 import { formatDate, formatMoney } from '@/lib/money';
-import { paymentsAvailable } from '@/lib/providers';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 import { PayButton } from './pay-button';
@@ -80,7 +79,7 @@ export default async function PayPage({
                   </>
                 )}
               </div>
-            ) : payable && paymentsAvailable() && invoice.payments_enabled ? (
+            ) : payable && invoice.payments_enabled ? (
               <>
                 <PayButton token={token} />
                 <p className="mt-3 text-center text-xs text-ink-500">

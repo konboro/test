@@ -52,9 +52,16 @@ export function onBehalfOf(accountId: string): Stripe.RequestOptions {
  * Connect wins when both are present: it is revocable from either side and does
  * not involve holding somebody else's secret key.
  */
+/**
+ * `options` is undefined rather than `{}` for the own-key case on purpose.
+ * stripe-node inspects the second argument and rejects one it does not
+ * recognise as request options — an empty object included — with "Unknown
+ * arguments ([object Object])", failing the call outright. Callers must omit
+ * the argument entirely rather than pass something empty.
+ */
 export type TenantPayments =
   | { kind: 'connect'; client: Stripe; options: Stripe.RequestOptions }
-  | { kind: 'own-key'; client: Stripe; options: Record<string, never> }
+  | { kind: 'own-key'; client: Stripe; options: undefined }
   | { kind: 'none' };
 
 export function paymentsFor(tenant: {
@@ -77,7 +84,7 @@ export function paymentsFor(tenant: {
         apiVersion: '2025-02-24.acacia',
         typescript: true,
       }),
-      options: {},
+      options: undefined,
     };
   }
 

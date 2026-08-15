@@ -57,7 +57,9 @@ export async function GET(request: NextRequest) {
   if (payments.kind === 'none') return back('?paid=1');
 
   try {
-    const session = await payments.client.checkout.sessions.retrieve(sessionId, payments.options);
+    const session = payments.options
+      ? await payments.client.checkout.sessions.retrieve(sessionId, payments.options)
+      : await payments.client.checkout.sessions.retrieve(sessionId);
 
     if (session.payment_status !== 'paid') return back('?paid=1');
 
