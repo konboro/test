@@ -153,6 +153,13 @@ const el = {
     openCount: (n: number) => `${n} ανοιχτά`,
     mute: 'Παύση',
     unmute: 'Ενεργοποίηση',
+    backToList: '← Όλοι οι πελάτες',
+    invoicesTitle: 'Παραστατικά πελάτη',
+    noInvoicesTitle: 'Κανένα παραστατικό',
+    noInvoicesBody: 'Δεν υπάρχει ακόμη παραστατικό για αυτόν τον πελάτη.',
+    notFound: 'Ο πελάτης δεν βρέθηκε.',
+    paidTotal: 'Εξοφλημένα',
+    notesLabel: 'Σημειώσεις',
   },
 
   logs: {
@@ -393,6 +400,13 @@ const en: typeof el = {
     openCount: (n: number) => `${n} open`,
     mute: 'Mute',
     unmute: 'Unmute',
+    backToList: '← All customers',
+    invoicesTitle: 'Customer documents',
+    noInvoicesTitle: 'No documents',
+    noInvoicesBody: 'There is no document for this customer yet.',
+    notFound: 'Customer not found.',
+    paidTotal: 'Paid',
+    notesLabel: 'Notes',
   },
 
   logs: {

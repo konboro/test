@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { Badge, Card, CardHeader, EmptyState, subtleLinkClass } from '@/components/ui';
@@ -97,16 +98,19 @@ export default async function DebtorsPage() {
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        {name ? (
-                          <span className="font-medium text-ink-900">{name}</span>
-                        ) : (
-                          // Imported customers usually arrive nameless. Saying so
-                          // beats showing "ΑΦΜ 123456789" in the name slot, right
-                          // beside the identical VAT number.
-                          <span className="font-medium italic text-ink-400">
-                            {t.debtors.nameMissing}
-                          </span>
-                        )}
+                        <Link
+                          href={`/debtors/${debtor.id}`}
+                          className="font-medium underline-offset-2 transition hover:text-brand-600 hover:underline"
+                        >
+                          {name ? (
+                            <span className="text-ink-900">{name}</span>
+                          ) : (
+                            // Imported customers usually arrive nameless. Saying
+                            // so beats showing "ΑΦΜ 123456789" in the name slot,
+                            // right beside the identical VAT number.
+                            <span className="italic text-ink-400">{t.debtors.nameMissing}</span>
+                          )}
+                        </Link>
                         {debtor.muted ? <Badge tone="neutral">{t.debtors.muted}</Badge> : null}
                         {!reachable ? <Badge tone="danger">{t.debtors.noContact}</Badge> : null}
                       </div>
