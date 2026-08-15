@@ -88,9 +88,17 @@ create policy invoices_delete_own on public.invoices
 
 -- Never let a browser session forge the payment token or the settlement fields;
 -- those are written by the Stripe webhook under the service role.
-revoke update (pay_token, stripe_checkout_session_id, stripe_payment_intent_id,
-               paid_at, paid_amount_cents)
-  on public.invoices from authenticated;
+--
+-- This must revoke UPDATE at *table* level before granting the allowed columns.
+-- Supabase's default privileges hand `authenticated` a table-wide UPDATE, and a
+-- column-level REVOKE against a table-level grant is silently a no-op — the
+-- table grant keeps covering every column.
+revoke update on public.invoices from anon, authenticated;
+
+grant update (
+  debtor_id, invoice_number, series, amount_cents, currency,
+  issue_date, due_date, status
+) on public.invoices to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- dunning_contacts — readable history, claimed only by the engine

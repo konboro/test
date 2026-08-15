@@ -52,6 +52,7 @@ npm run typecheck     # tsc --noEmit
 npm run lint          # eslint
 npm test              # vitest
 npm run build         # production build
+supabase/tests/run.sh # apply migrations to a throwaway Postgres and assert the schema
 ```
 
 ### Running without provider keys
@@ -285,7 +286,10 @@ Then register an account, add a debtor with a real email, create a manual invoic
 - The myDATA key column is excluded from the `authenticated` grant entirely, so even a
   compromised anon key cannot read the ciphertext.
 - `pay_token` and all settlement columns are revoked from `authenticated` — only the
-  webhook writes them.
+  webhook writes them. Note the revoke is done at **table** level before re-granting the
+  allowed columns: Supabase's default privileges hand `authenticated` a table-wide
+  `UPDATE`, and a column-level `REVOKE` against a table-level grant is silently a no-op.
+  `supabase/tests/run.sh` asserts this, because it is easy to reintroduce.
 - `communications_log` is append-only, enforced by a trigger that rejects UPDATE and
   DELETE for every role, including the service role.
 - The cron secret is compared in constant time.
