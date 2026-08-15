@@ -48,68 +48,91 @@ export function segmentCount(message: string): number {
 /**
  * Sends one SMS.
  *
- * The provider is Yuboto (Greek aggregator, https://services.yuboto.com). The
- * transport below is a real HTTP call against their Omni API; swapping in Twilio
- * means replacing only `dispatch` — the rest of the system depends on this
- * module's signature, not on the provider.
+ * The provider is Twilio. Greece is an alphanumeric-sender-only market there —
+ * long and short codes are not supported — which means no number to buy and no
+ * sender-ID pre-registration to wait on. That is the whole reason it is the
+ * provider we can switch on the same day. The trade is price: Twilio runs about
+ * double a Greek aggregator per message, and Greek text is UCS-2, so a reminder
+ * over 70 characters costs two segments.
+ *
+ * Only `dispatch` knows any of that. Moving to Yuboto or Apifon later means
+ * replacing that one function — the rest of the system depends on this module's
+ * signature, not on the provider.
  */
 export async function sendSms({ phone, message }: SmsMessage): Promise<SmsResult> {
   const to = normalisePhone(phone);
   if (!to) return { ok: false, error: `Unusable phone number: ${phone}` };
 
-  const apiKey = optionalEnv('YUBOTO_API_KEY');
+  const accountSid = optionalEnv('TWILIO_ACCOUNT_SID');
+  const authToken = optionalEnv('TWILIO_AUTH_TOKEN');
 
-  if (!apiKey) {
+  if (!accountSid || !authToken) {
     if (process.env.NODE_ENV === 'production') {
-      return { ok: false, error: 'YUBOTO_API_KEY is not configured' };
+      return { ok: false, error: 'TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN are not configured' };
     }
     console.info('[sms:dry-run]', { to, segments: segmentCount(message), message });
     return { ok: true, messageId: `dry-run-${Date.now()}` };
   }
 
-  return dispatch(apiKey, to, message);
+  return dispatch({ accountSid, authToken }, to, message);
 }
 
-async function dispatch(apiKey: string, to: string, message: string): Promise<SmsResult> {
+interface TwilioCredentials {
+  accountSid: string;
+  authToken: string;
+}
+
+async function dispatch(
+  { accountSid, authToken }: TwilioCredentials,
+  to: string,
+  message: string,
+): Promise<SmsResult> {
+  // Greek operators block generic sender names (INFO, SMS, NOTICE), so this has
+  // to stay a brand the recipient can place.
   const sender = optionalEnv('SMS_SENDER_ID') ?? 'lefta';
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15_000);
 
   try {
-    const response = await fetch('https://services.yuboto.com/omni/v1/Send', {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        phonenumbers: [to],
-        channel: 'sms',
-        sms: {
-          sender,
-          text: message,
-          // Reminders are worthless once stale; expire rather than deliver late.
-          validity: 1440,
-          typesms: 'sms',
+    const response = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Messages.json`,
+      {
+        method: 'POST',
+        headers: {
+          // btoa, not Buffer: nothing else here ties the module to the Node runtime.
+          Authorization: `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-      }),
-      signal: controller.signal,
-    });
+        body: new URLSearchParams({
+          To: to,
+          From: sender,
+          Body: message,
+          // Reminders are worthless once stale; expire in the queue rather than
+          // land days late. 36000 s (10 h) is Twilio's ceiling for this.
+          ValidityPeriod: '36000',
+        }),
+        signal: controller.signal,
+      },
+    );
 
     const body = (await response.json().catch(() => null)) as
-      | { ErrorCode?: number; ErrorMessage?: string; Message?: { id?: string }[] }
+      | { sid?: string; code?: number; message?: string; error_message?: string }
       | null;
 
     if (!response.ok) {
-      return { ok: false, error: `SMS provider responded ${response.status}` };
+      // Rejected requests carry {code, message, more_info}. `error_message` is
+      // the field used once a message has been accepted and failed later.
+      const detail = body?.message ?? body?.error_message;
+      return {
+        ok: false,
+        error: detail
+          ? `SMS provider responded ${response.status}: ${detail}`
+          : `SMS provider responded ${response.status}`,
+      };
     }
 
-    if (body?.ErrorCode && body.ErrorCode !== 0) {
-      return { ok: false, error: body.ErrorMessage ?? `Provider error ${body.ErrorCode}` };
-    }
-
-    return { ok: true, messageId: body?.Message?.[0]?.id };
+    return { ok: true, messageId: body?.sid };
   } catch (cause) {
     if (cause instanceof Error && cause.name === 'AbortError') {
       return { ok: false, error: 'SMS request timed out' };

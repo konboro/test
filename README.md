@@ -19,7 +19,7 @@ collection activity.
 | Database  | Supabase — PostgreSQL + Auth + RLS                 |
 | Payments  | Stripe Checkout + webhooks                         |
 | Email     | Resend                                             |
-| SMS       | Yuboto (Greek aggregator)                          |
+| SMS       | Twilio (alphanumeric sender; see below)            |
 | Scheduler | Vercel Cron (any scheduler with a bearer token works) |
 
 ---
@@ -57,7 +57,7 @@ supabase/tests/run.sh # apply migrations to a throwaway Postgres and assert the 
 
 ### Running without provider keys
 
-Leave `RESEND_API_KEY` and `YUBOTO_API_KEY` unset outside production and both senders
+Leave `RESEND_API_KEY` and the `TWILIO_*` pair unset outside production and both senders
 enter **dry-run mode**: the message is logged to the console and recorded in
 `communications_log` exactly as it would have been sent, so the whole workflow is
 exercisable end to end with no third-party accounts. In production a missing key is a
@@ -246,7 +246,7 @@ deploys crash on every request:
 | `STRIPE_SECRET_KEY`             | Stripe → Developers → API keys                |
 | `STRIPE_WEBHOOK_SECRET`         | created in step 5                             |
 | `RESEND_API_KEY`, `EMAIL_FROM`  | Resend (required in production)               |
-| `YUBOTO_API_KEY`, `SMS_SENDER_ID` | Yuboto (required in production)             |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `SMS_SENDER_ID` | Twilio (required in production) |
 
 `ENCRYPTION_KEY` cannot be rotated casually: it decrypts stored myDATA subscription keys,
 so changing it orphans every credential already saved. Generate it once, keep it.
@@ -309,6 +309,6 @@ Not built (out of MVP scope): subscription billing for lefta itself, myDATA
 Greek.
 
 Integration paths that need live credentials to verify end to end — the AADE endpoint
-shape, Resend/Yuboto delivery, and the Stripe webhook — are implemented against the
+shape, Resend/Twilio delivery, and the Stripe webhook — are implemented against the
 documented contracts and unit-tested at the parsing/logic layer, but have not been run
 against real accounts in this environment.
