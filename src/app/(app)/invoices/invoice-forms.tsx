@@ -13,6 +13,7 @@ import {
   createInvoice,
   previewReminder,
   sendReminder,
+  updateDueDate,
   type InvoiceFormState,
   type ReminderState,
 } from './actions';
@@ -264,6 +265,82 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
           {state.success ? (
             <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
               {state.success}
+            </p>
+          ) : null}
+        </Modal>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Edits one invoice's due date.
+ *
+ * The date itself is the control: it is already in the row, and making it
+ * clickable avoids adding another action to a table that has three of them.
+ */
+export function DueDateButton({
+  invoiceId,
+  dueDate,
+  display,
+}: {
+  invoiceId: string;
+  dueDate: string;
+  display: string;
+}) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  // Mirrored into a hidden field so the value survives the form submit — a bare
+  // date input inside the modal is not part of the footer form.
+  const [chosen, setChosen] = useState(dueDate);
+  const [state, action, saving] = useActionState<ReminderState, FormData>(updateDueDate, {});
+
+  useEffect(() => {
+    if (state.success) setOpen(false);
+  }, [state.success]);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title={t.invoices.editDueDate}
+        className="tabular underline-offset-2 transition hover:text-brand-600 hover:underline"
+      >
+        {display}
+      </button>
+
+      {open ? (
+        <Modal
+          title={t.invoices.editDueDate}
+          onClose={() => setOpen(false)}
+          footer={
+            <>
+              <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+                {t.common.cancel}
+              </Button>
+              <form action={action}>
+                <input type="hidden" name="id" value={invoiceId} />
+                <input type="hidden" name="due_date" value={chosen} />
+                <Button type="submit" disabled={saving}>
+                  {saving ? t.common.saving : t.common.save}
+                </Button>
+              </form>
+            </>
+          }
+        >
+          <Field label={t.invoices.dueDateLabel}>
+            <input
+              type="date"
+              defaultValue={dueDate}
+              onChange={(e) => setChosen(e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+
+          {state.error ? (
+            <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+              {state.error === 'invalid' ? t.invoices.dueDateInvalid : state.error}
             </p>
           ) : null}
         </Modal>

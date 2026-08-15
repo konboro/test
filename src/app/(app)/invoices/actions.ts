@@ -127,6 +127,50 @@ export async function markInvoicePaid(formData: FormData) {
   revalidatePath('/dashboard');
 }
 
+const dueDateSchema = z.object({
+  id: z.string().uuid(),
+  due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+/**
+ * Changes an invoice's due date.
+ *
+ * Worth having because the date is *derived*, not received: myDATA transmits an
+ * issue date and nothing else, so every imported invoice gets issue date plus
+ * the tenant's standard terms. When those terms do not apply — a payment plan, a
+ * disputed document, an account that pays on receipt — the guess needs
+ * correcting, and the due date is what the whole ladder keys off.
+ *
+ * Runs through the browser session rather than the service role: `due_date` is
+ * one of the columns granted to `authenticated`, so RLS already confines this to
+ * the tenant's own invoices.
+ */
+export async function updateDueDate(
+  _prev: ReminderState,
+  formData: FormData,
+): Promise<ReminderState> {
+  const parsed = dueDateSchema.safeParse({
+    id: formData.get('id'),
+    due_date: formData.get('due_date'),
+  });
+
+  if (!parsed.success) return { error: 'invalid' };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('invoices')
+    .update({ due_date: parsed.data.due_date })
+    .eq('id', parsed.data.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath('/invoices');
+  revalidatePath('/debtors');
+  revalidatePath('/dashboard');
+
+  return { success: 'saved' };
+}
+
 const manualInvoice = z.object({
   debtor_id: z.string().uuid('Επιλέξτε πελάτη.'),
   invoice_number: z.string().trim().min(1, 'Ο αριθμός παραστατικού είναι υποχρεωτικός.').max(50),

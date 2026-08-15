@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 
 import { Badge, Card, CardHeader, EmptyState, linkClass, Stat, subtleLinkClass } from '@/components/ui';
+import { aging } from '@/lib/aging';
 import { displayName } from '@/lib/debtors';
 import { workflowStatus } from '@/lib/dunning/status';
 import { getDictionary } from '@/lib/i18n';
@@ -10,6 +11,7 @@ import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
 
 import { toggleMute } from '../actions';
+import { DueDateButton } from '../../invoices/invoice-forms';
 import { EditDebtorForm } from '../debtor-forms';
 
 export const dynamic = 'force-dynamic';
@@ -172,6 +174,7 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
                   <th className="px-5 py-2.5 text-right font-medium">{t.invoices.colAmount}</th>
                   <th className="px-5 py-2.5 font-medium">{t.invoices.colIssue}</th>
                   <th className="px-5 py-2.5 font-medium">{t.invoices.colDue}</th>
+                  <th className="px-5 py-2.5 font-medium">{t.invoices.colAging}</th>
                   <th className="px-5 py-2.5 font-medium">{t.invoices.colStatus}</th>
                 </tr>
               </thead>
@@ -185,6 +188,7 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
                   );
                   const number =
                     [invoice.series, invoice.invoice_number].filter(Boolean).join(' ') || null;
+                  const age = aging(invoice, today, t);
 
                   return (
                     <tr key={invoice.id} className="border-b border-ink-100 last:border-0">
@@ -213,8 +217,19 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
                       <td className="tabular px-5 py-3 text-ink-500">
                         {formatDate(invoice.issue_date)}
                       </td>
-                      <td className="tabular px-5 py-3 text-ink-600">
-                        {formatDate(invoice.due_date)}
+                      <td className="px-5 py-3 text-ink-600">
+                        <DueDateButton
+                          invoiceId={invoice.id}
+                          dueDate={invoice.due_date}
+                          display={formatDate(invoice.due_date)}
+                        />
+                      </td>
+                      <td className="px-5 py-3">
+                        {age ? (
+                          <Badge tone={age.tone}>{age.label}</Badge>
+                        ) : (
+                          <span className="text-ink-400">—</span>
+                        )}
                       </td>
                       <td className="px-5 py-3">
                         <Badge tone={status.tone}>{status.label}</Badge>
