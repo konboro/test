@@ -1,0 +1,26 @@
+-- gen_pay_code has to be callable by whoever inserts an invoice.
+--
+-- 20260815203000 did two things that cannot both hold:
+--
+--   revoke all on function public.gen_pay_code() from public, anon, authenticated;
+--   alter column short_code set default public.gen_pay_code();
+--
+-- A column default is evaluated as the *inserting* role, not as the owner, so
+-- every insert from a browser session died with
+-- "permission denied for function gen_pay_code". The Elorus importer and the
+-- backfill were unaffected because both run as service_role, which is why 144
+-- rows have codes and the failure only showed up on the manual "add invoice"
+-- form.
+--
+-- Granting execute gives nothing away. The function reads no tables; it returns
+-- ten random characters. A code only means anything once it is stored on an
+-- invoice row, and the guarantee that a session cannot choose or overwrite one
+-- comes from the column-level UPDATE grant in 20260815120100, which stays exactly
+-- as it was. Being able to generate a random string is not the same as being
+-- able to attach it to somebody else's debt.
+--
+-- anon is deliberately not granted: unauthenticated visitors never insert
+-- invoices, and the payment page only ever reads a code through
+-- get_invoice_for_payment.
+
+grant execute on function public.gen_pay_code() to authenticated;
