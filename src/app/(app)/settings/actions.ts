@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
+import { parseSlotKey } from '@/lib/dunning/templates';
 import { createClient } from '@/lib/supabase/server';
 
 export interface SettingsState {
@@ -63,4 +64,100 @@ export async function updateProfile(
   revalidatePath('/settings');
   revalidatePath('/dashboard');
   return { success: 'Οι ρυθμίσεις αποθηκεύτηκαν.' };
+}
+
+const templateSchema = z.object({
+  slot: z.string(),
+  subject: z
+    .string()
+    .trim()
+    .max(300)
+    .optional()
+    .transform((v) => (v ? v : null)),
+  body: z
+    .string()
+    .trim()
+    .min(1, 'Το κείμενο δεν μπορεί να είναι κενό.')
+    .max(4000, 'Το κείμενο είναι πολύ μεγάλο.'),
+});
+
+/**
+ * Stores one template override.
+ *
+ * The unique index behind a slot is an expression index — `coalesce(step, 'manual')`,
+ * needed because null is not distinct from null — and postgrest cannot target an
+ * expression in `onConflict`, so this reads first and then inserts or updates
+ * rather than upserting.
+ */
+export async function saveTemplate(
+  _prev: SettingsState,
+  formData: FormData,
+): Promise<SettingsState> {
+  const parsed = templateSchema.safeParse({
+    slot: formData.get('slot'),
+    subject: formData.get('subject'),
+    body: formData.get('body'),
+  });
+
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Μη έγκυρο κείμενο.' };
+
+  const slot = parseSlotKey(parsed.data.slot);
+  if (!slot) return { error: 'Άγνωστο πρότυπο.' };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: 'Μη εξουσιοδοτημένη ενέργεια.' };
+
+  const lookup = supabase.from('message_templates').select('id').eq('channel', slot.channel);
+  const { data: existing } = await (slot.step === null
+    ? lookup.is('step', null)
+    : lookup.eq('step', slot.step)
+  ).maybeSingle();
+
+  const subject = slot.channel === 'email' ? parsed.data.subject : null;
+
+  const { error } = existing
+    ? await supabase
+        .from('message_templates')
+        .update({ subject, body: parsed.data.body })
+        .eq('id', existing.id)
+    : await supabase.from('message_templates').insert({
+        user_id: user.id,
+        step: slot.step,
+        channel: slot.channel,
+        subject,
+        body: parsed.data.body,
+      });
+
+  if (error) return { error: error.message };
+
+  revalidatePath('/settings');
+  return { success: 'Το πρότυπο αποθηκεύτηκε.' };
+}
+
+/** Drops the override, so the slot falls back to the built-in copy. */
+export async function resetTemplate(
+  _prev: SettingsState,
+  formData: FormData,
+): Promise<SettingsState> {
+  const slot = parseSlotKey(String(formData.get('slot') ?? ''));
+  if (!slot) return { error: 'Άγνωστο πρότυπο.' };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: 'Μη εξουσιοδοτημένη ενέργεια.' };
+
+  const deletion = supabase.from('message_templates').delete().eq('channel', slot.channel);
+  const { error } = await (slot.step === null
+    ? deletion.is('step', null)
+    : deletion.eq('step', slot.step));
+
+  if (error) return { error: error.message };
+
+  revalidatePath('/settings');
+  return { success: 'Επαναφέρθηκε το προεπιλεγμένο κείμενο.' };
 }

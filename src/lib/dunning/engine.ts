@@ -1,19 +1,12 @@
-import { sendEmail } from '@/lib/email/send';
-import { appUrl } from '@/lib/env';
 import { athensDate, daysBetween } from '@/lib/money';
-import {
-  channelAvailable,
-  emailAvailable,
-  providerStatus,
-  smsAvailable,
-  type Channel,
-  type ProviderStatus,
-} from '@/lib/providers';
-import { normalisePhone, sendSms } from '@/lib/sms/send';
+import { channelAvailable, providerStatus, type Channel, type ProviderStatus } from '@/lib/providers';
+import { normalisePhone } from '@/lib/sms/send';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { DebtorRow, DunningStep, InvoiceRow, UserRow } from '@/types/database';
 
-import { renderEmail, renderSms, type TemplateContext } from './templates';
+import { dispatchContact } from './dispatch';
+import { loadTemplateOverrides } from './template-store';
+import type { TemplateOverrides } from './templates';
 
 /**
  * The dunning ladder.
@@ -228,10 +221,14 @@ async function processTenant(
   // being skipped entirely.
   const contactedThisRun = new Set<string>();
 
+  // One read per tenant, not per message: the templates are the same for every
+  // invoice in this loop.
+  const overrides = candidates.length > 0 ? await loadTemplateOverrides(tenant.id) : {};
+
   for (const candidate of candidates) {
     if (contactedThisRun.has(candidate.debtor.id)) continue;
 
-    const outcome = await deliver(tenant, candidate, today, result, dryRun);
+    const outcome = await deliver(tenant, candidate, today, result, dryRun, overrides);
 
     // `dailyLimit` means the debtor was already contacted today (by an earlier
     // run, or a concurrent worker) — nothing else will get through for them.
@@ -249,6 +246,7 @@ async function deliver(
   today: string,
   result: DunningRunResult,
   dryRun: boolean,
+  overrides: TemplateOverrides,
 ): Promise<DeliveryOutcome> {
   const supabase = createAdminClient();
   const { invoice, debtor, step } = candidate;
@@ -309,140 +307,22 @@ async function deliver(
 
   result.contactsMade += 1;
 
-  const label =
-    [invoice.series, invoice.invoice_number].filter(Boolean).join(' ') ||
-    invoice.mark ||
-    invoice.id.slice(0, 8);
+  // From here the work is identical to a manual reminder, so it lives in one
+  // place: same templates, same credit accounting, same audit rows.
+  const sent = await dispatchContact({
+    tenant,
+    debtor,
+    invoice,
+    step,
+    contactId: contact.id,
+    channels: candidate.channels,
+    overrides,
+  });
 
-  const ctx: TemplateContext = {
-    debtorName: debtor.name,
-    creditorName: tenant.company_name ?? tenant.email,
-    invoiceLabel: label,
-    amountCents: invoice.amount_cents,
-    currency: invoice.currency,
-    dueDate: invoice.due_date,
-    payUrl: `${appUrl()}/pay/${invoice.pay_token}`,
-  };
-
-  if (candidate.channels.includes('email') && debtor.email && !emailAvailable()) {
-    // Reached only when another channel carried this contact — the step itself
-    // was never claimed on the strength of an unconfigured provider.
-    await supabase.from('communications_log').insert({
-      user_id: tenant.id,
-      debtor_id: debtor.id,
-      invoice_id: invoice.id,
-      contact_id: contact.id,
-      channel: 'email',
-      step,
-      status: 'skipped',
-      recipient: debtor.email,
-      content: renderEmail(step, ctx).text,
-      error: 'Email provider not configured',
-    });
-    result.skipped.push({ invoiceId: invoice.id, reason: 'email provider not configured' });
-  } else if (candidate.channels.includes('email') && debtor.email) {
-    const email = renderEmail(step, ctx);
-    const sent = await sendEmail({
-      to: debtor.email,
-      subject: email.subject,
-      text: email.text,
-      html: email.html,
-      ...(tenant.reply_to_email ? { replyTo: tenant.reply_to_email } : {}),
-    });
-
-    await supabase.from('communications_log').insert({
-      user_id: tenant.id,
-      debtor_id: debtor.id,
-      invoice_id: invoice.id,
-      contact_id: contact.id,
-      channel: 'email',
-      step,
-      status: sent.ok ? 'sent' : 'failed',
-      recipient: debtor.email,
-      subject: email.subject,
-      content: email.text,
-      provider_message_id: sent.messageId ?? null,
-      error: sent.error ?? null,
-    });
-
-    if (sent.ok) result.emailsSent += 1;
-    else result.errors.push({ invoiceId: invoice.id, error: `email: ${sent.error}` });
-  }
-
-  const phone = normalisePhone(debtor.phone);
-  if (candidate.channels.includes('sms') && phone) {
-    const body = renderSms(step, ctx);
-
-    // Ask whether the provider exists *before* reserving a credit. Reserving
-    // first would push every message through a reserve-then-refund cycle that
-    // bills nothing but writes a bogus row into the purchase ledger each time.
-    const smsReady = smsAvailable();
-
-    // SMS costs a credit. Reserve it first so a provider success can never be
-    // delivered without being paid for.
-    const { data: hasCredit } = smsReady
-      ? await supabase.rpc('consume_sms_credit', { p_user_id: tenant.id })
-      : { data: false };
-
-    if (!smsReady) {
-      await supabase.from('communications_log').insert({
-        user_id: tenant.id,
-        debtor_id: debtor.id,
-        invoice_id: invoice.id,
-        contact_id: contact.id,
-        channel: 'sms',
-        step,
-        status: 'skipped',
-        recipient: phone,
-        content: body,
-        error: 'SMS provider not configured',
-      });
-      result.skipped.push({ invoiceId: invoice.id, reason: 'sms provider not configured' });
-    } else if (!hasCredit) {
-      await supabase.from('communications_log').insert({
-        user_id: tenant.id,
-        debtor_id: debtor.id,
-        invoice_id: invoice.id,
-        contact_id: contact.id,
-        channel: 'sms',
-        step,
-        status: 'skipped',
-        recipient: phone,
-        content: body,
-        error: 'No SMS credits remaining',
-      });
-      result.skipped.push({ invoiceId: invoice.id, reason: 'out of SMS credits' });
-    } else {
-      const sent = await sendSms({ phone, message: body });
-
-      await supabase.from('communications_log').insert({
-        user_id: tenant.id,
-        debtor_id: debtor.id,
-        invoice_id: invoice.id,
-        contact_id: contact.id,
-        channel: 'sms',
-        step,
-        status: sent.ok ? 'sent' : 'failed',
-        recipient: phone,
-        content: body,
-        provider_message_id: sent.messageId ?? null,
-        error: sent.error ?? null,
-      });
-
-      if (sent.ok) {
-        result.smsSent += 1;
-      } else {
-        // Refund the reserved credit: nothing was delivered.
-        await supabase.rpc('grant_sms_credits', {
-          p_user_id: tenant.id,
-          p_credits: 1,
-          p_amount_cents: 0,
-          p_session_id: `refund:${contact.id}`,
-        });
-        result.errors.push({ invoiceId: invoice.id, error: `sms: ${sent.error}` });
-      }
-    }
-  }
+  result.emailsSent += sent.emailsSent;
+  result.smsSent += sent.smsSent;
+  for (const reason of sent.skipped) result.skipped.push({ invoiceId: invoice.id, reason });
+  for (const error of sent.errors) result.errors.push({ invoiceId: invoice.id, error });
 
   return 'contacted';
 }

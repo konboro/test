@@ -71,9 +71,28 @@ export type DunningContactRow = {
   user_id: string;
   debtor_id: string;
   invoice_id: string;
-  step: DunningStep;
+  /** Null for a manual reminder — those sit outside the ladder. */
+  step: DunningStep | null;
+  manual: boolean;
   contact_on: string;
   created_at: string;
+}
+
+/**
+ * A template slot: a ladder step, or `null` for the manual reminder. Mirrors the
+ * nullable `step` column on both dunning_contacts and message_templates.
+ */
+export type TemplateStep = DunningStep | null;
+
+export type MessageTemplateRow = {
+  id: string;
+  user_id: string;
+  step: TemplateStep;
+  channel: CommChannel;
+  subject: string | null;
+  body: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export type CommunicationLogRow = {
@@ -156,9 +175,15 @@ export interface Database {
         Update: Partial<InvoiceRow>;
         Relationships: NoRelationships;
       };
+      message_templates: {
+        Row: MessageTemplateRow;
+        Insert: InsertOf<MessageTemplateRow, 'user_id' | 'channel' | 'body'>;
+        Update: Partial<MessageTemplateRow>;
+        Relationships: NoRelationships;
+      };
       dunning_contacts: {
         Row: DunningContactRow;
-        Insert: InsertOf<DunningContactRow, 'user_id' | 'debtor_id' | 'invoice_id' | 'step'>;
+        Insert: InsertOf<DunningContactRow, 'user_id' | 'debtor_id' | 'invoice_id'>;
         // Append-only in practice: the RLS grants and a database trigger both
         // refuse mutation. Typed as Partial anyway, since postgrest-js requires
         // a real object type here.

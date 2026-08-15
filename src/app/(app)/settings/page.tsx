@@ -3,10 +3,12 @@ import { redirect } from 'next/navigation';
 import { Badge, Card, CardHeader } from '@/components/ui';
 import { LADDER } from '@/lib/dunning/engine';
 import { STEP_LABELS } from '@/lib/dunning/status';
+import { DEFAULT_TEMPLATES, EDITABLE_SLOTS, slotKey } from '@/lib/dunning/templates';
 import { SMS_PACKS } from '@/lib/stripe';
 import { createClient } from '@/lib/supabase/server';
 
 import { CreditPacks, MyDataForm, ProfileForm } from './settings-forms';
+import { TemplateEditor, type TemplateSlotView } from './template-forms';
 
 export const metadata = { title: 'Ρυθμίσεις — lefta.app' };
 export const dynamic = 'force-dynamic';
@@ -33,6 +35,27 @@ export default async function SettingsPage({
     .maybeSingle();
 
   if (!profile) redirect('/login');
+
+  // RLS scopes this to the tenant. A slot with no row keeps the built-in copy.
+  const { data: templates } = await supabase
+    .from('message_templates')
+    .select('step, channel, subject, body');
+
+  const overrides = new Map((templates ?? []).map((t) => [slotKey(t.step, t.channel), t]));
+
+  const slots: TemplateSlotView[] = EDITABLE_SLOTS.map((slot) => {
+    const override = overrides.get(slot.key);
+    const fallback = DEFAULT_TEMPLATES[slot.key];
+
+    return {
+      key: slot.key,
+      label: slot.label,
+      channel: slot.channel,
+      subject: override?.subject ?? fallback.subject,
+      body: override?.body ?? fallback.body,
+      customised: Boolean(override),
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -94,8 +117,16 @@ export default async function SettingsPage({
 
       <Card>
         <CardHeader
+          title="Κείμενα μηνυμάτων"
+          subtitle="Το περιεχόμενο είναι δικό σας. Το πλαίσιο του email (κουμπί πληρωμής και υποσέλιδο πλατφόρμας) παραμένει σταθερό."
+        />
+        <TemplateEditor slots={slots} />
+      </Card>
+
+      <Card>
+        <CardHeader
           title="Ροή υπενθυμίσεων"
-          subtitle="Σταθερή και μη παραμετροποιήσιμη. Το lefta.app λειτουργεί αποκλειστικά ως πάροχος λογισμικού."
+          subtitle="Ο χρονισμός είναι σταθερός και μη παραμετροποιήσιμος — παραμετροποιήσιμο είναι μόνο το κείμενο. Το lefta.app λειτουργεί αποκλειστικά ως πάροχος λογισμικού."
         />
         <ol className="divide-y divide-ink-100">
           {LADDER.map((rung) => (
