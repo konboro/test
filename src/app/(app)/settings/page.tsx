@@ -6,7 +6,8 @@ import { LADDER } from '@/lib/dunning/engine';
 import { DEFAULT_TEMPLATES, EDITABLE_SLOTS, slotKey } from '@/lib/dunning/templates';
 import { DICTIONARIES } from '@/lib/i18n/dictionaries';
 import { getDictionary, LOCALES } from '@/lib/i18n';
-import { smsAvailable } from '@/lib/providers';
+import { smsCreditsEnforced } from '@/lib/limits';
+import { paymentsAvailable } from '@/lib/providers';
 import { connectConfigured, SMS_PACKS } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
@@ -219,7 +220,9 @@ export default async function SettingsPage({
       </Card>
       ) : null}
 
-      {smsAvailable() ? (
+      {/* A purchase card, so it needs both halves of a purchase: a meter that
+          governs something, and a platform account that can take the money. */}
+      {smsCreditsEnforced() && paymentsAvailable() ? (
       <Card>
         <div id="credits" className="scroll-mt-20">
           <CardHeader

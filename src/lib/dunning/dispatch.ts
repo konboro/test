@@ -14,6 +14,7 @@
 import { sendEmail } from '@/lib/email/send';
 import { appUrl } from '@/lib/env';
 import { payPath } from '@/lib/pay-code';
+import { smsCreditsEnforced } from '@/lib/limits';
 import { emailAvailable, smsAvailable, type Channel } from '@/lib/providers';
 import { normalisePhone, sendSms } from '@/lib/sms/send';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -150,11 +151,14 @@ export async function dispatchContact(params: {
     // bills nothing but writes a bogus row into sms_credit_purchases each time.
     const smsReady = smsAvailable();
 
+    const billed = smsCreditsEnforced();
+
     // SMS costs a credit. Reserve it first so a provider success can never be
     // delivered without being paid for.
-    const { data: hasCredit } = smsReady
-      ? await supabase.rpc('consume_sms_credit', { p_user_id: tenant.id })
-      : { data: false };
+    const { data: hasCredit } =
+      smsReady && billed
+        ? await supabase.rpc('consume_sms_credit', { p_user_id: tenant.id })
+        : { data: !billed };
 
     if (!smsReady) {
       await supabase.from('communications_log').insert({
@@ -192,16 +196,20 @@ export async function dispatchContact(params: {
       if (sent.ok) {
         outcome.smsSent += 1;
       } else {
-        // Refund the reserved credit: nothing was delivered. The session id is
-        // what makes the grant idempotent, so with no contact row to key on it
-        // has to be unique per attempt — otherwise a second failed send would
-        // hit the unique index and silently skip its refund.
-        await supabase.rpc('grant_sms_credits', {
-          p_user_id: tenant.id,
-          p_credits: 1,
-          p_amount_cents: 0,
-          p_session_id: `refund:${contactId ?? crypto.randomUUID()}`,
-        });
+        // Refund the reserved credit: nothing was delivered. Only when one was
+        // actually reserved — refunding an unbilled send would mint credits out
+        // of failed messages. The session id is what makes the grant idempotent,
+        // so with no contact row to key on it has to be unique per attempt —
+        // otherwise a second failed send would hit the unique index and silently
+        // skip its refund.
+        if (billed) {
+          await supabase.rpc('grant_sms_credits', {
+            p_user_id: tenant.id,
+            p_credits: 1,
+            p_amount_cents: 0,
+            p_session_id: `refund:${contactId ?? crypto.randomUUID()}`,
+          });
+        }
         outcome.errors.push(`sms: ${sent.error}`);
       }
     }

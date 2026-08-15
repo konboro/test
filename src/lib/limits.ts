@@ -29,3 +29,22 @@ import { optionalEnv } from '@/lib/env';
 export function contactLimitsDisabled(): boolean {
   return optionalEnv('UNSAFE_DISABLE_CONTACT_LIMITS') === '1';
 }
+
+/**
+ * Whether the internal SMS credit meter governs anything.
+ *
+ * Credits record what a tenant has pre-paid lefta for. Nobody can buy any yet —
+ * selling packs needs a platform Stripe account, and lefta is not a company
+ * today — so enforcing the meter would block messages the SMS provider itself
+ * would deliver, which from the panel is indistinguishable from a broken
+ * integration.
+ *
+ * Tied to the same switch as the contact limit so testing has one thing to turn
+ * off. While it is off the balance is not merely ignored, it is hidden: a
+ * prominent "0 credits, running low" on the overview describes a constraint
+ * that is not in force, and a number that governs nothing teaches the operator
+ * to distrust the ones that do.
+ */
+export function smsCreditsEnforced(): boolean {
+  return !contactLimitsDisabled();
+}

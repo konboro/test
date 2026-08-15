@@ -5,6 +5,7 @@ import { Badge, Card, CardHeader, EmptyState, linkClass, Stat } from '@/componen
 import { displayName } from '@/lib/debtors';
 import { workflowStatus } from '@/lib/dunning/status';
 import { getDictionary } from '@/lib/i18n';
+import { smsCreditsEnforced } from '@/lib/limits';
 import { athensDate, daysBetween, formatDate, formatMoney } from '@/lib/money';
 import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
@@ -146,7 +147,11 @@ export default async function DashboardPage() {
         </div>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div
+        className={`grid gap-4 sm:grid-cols-2 ${
+          smsCreditsEnforced() ? 'lg:grid-cols-4' : 'lg:grid-cols-3'
+        }`}
+      >
         <Stat
           label={t.dashboard.outstanding}
           value={formatMoney(outstandingCents)}
@@ -164,12 +169,14 @@ export default async function DashboardPage() {
           hint={t.dashboard.collectedHint}
           tone="positive"
         />
-        <Stat
-          label={t.dashboard.smsBalance}
-          value={String(profile?.sms_credits ?? 0)}
-          hint={(profile?.sms_credits ?? 0) < 20 ? t.dashboard.smsLow : t.dashboard.smsOk}
-          tone={(profile?.sms_credits ?? 0) < 20 ? 'warning' : 'default'}
-        />
+        {smsCreditsEnforced() ? (
+          <Stat
+            label={t.dashboard.smsBalance}
+            value={String(profile?.sms_credits ?? 0)}
+            hint={(profile?.sms_credits ?? 0) < 20 ? t.dashboard.smsLow : t.dashboard.smsOk}
+            tone={(profile?.sms_credits ?? 0) < 20 ? 'warning' : 'default'}
+          />
+        ) : null}
       </div>
 
       <Card>
