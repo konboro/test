@@ -1,5 +1,63 @@
 import { describe, expect, it } from 'vitest';
 
+describe('the WCF envelope AADE production actually returns', () => {
+  /** Wraps a document the way mydatapi.aade.gr does: escaped, inside <string>. */
+  function envelope(inner: string): string {
+    const escaped = inner
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;');
+
+    return `<string xmlns="http://schemas.microsoft.com/2003/10/Serialization/">${escaped}</string>`;
+  }
+
+  const doc = `<?xml version="1.0" encoding="utf-8"?>
+<RequestedDoc xmlns="http://www.aade.gr/myDATA/invoice/v1.0">
+  <continuationToken><nextPartitionKey>pk</nextPartitionKey><nextRowKey>rk</nextRowKey></continuationToken>
+  <invoicesDoc>
+    <invoice>
+      <mark>400002863592642</mark>
+      <counterpart><vatNumber>111222333</vatNumber></counterpart>
+      <invoiceHeader><series>A</series><aa>1</aa><issueDate>2023-07-15</issueDate></invoiceHeader>
+      <invoiceSummary><totalGrossValue>150.00</totalGrossValue></invoiceSummary>
+    </invoice>
+  </invoicesDoc>
+</RequestedDoc>`;
+
+  it('reads an enveloped response, which is the only shape production sends', () => {
+    // Parsed as-is this yields { string: "…" }, so RequestedDoc is never found
+    // and every page silently looks empty.
+    const page = parseRequestedDoc(envelope(doc));
+
+    expect(page.invoices).toHaveLength(1);
+    expect(page.invoices[0]?.mark).toBe('400002863592642');
+    expect(page.invoices[0]?.counterpart.vatNumber).toBe('111222333');
+    expect(page.continuationToken).toEqual({ nextPartitionKey: 'pk', nextRowKey: 'rk' });
+  });
+
+  it('still reads a bare document, which is what the sandbox returns', () => {
+    expect(parseRequestedDoc(doc).invoices).toHaveLength(1);
+  });
+
+  it('does not trip the entity-expansion guard on a large page', () => {
+    // The real failure: a live page carried 76,699 escaped entities against a
+    // default cap of 1,000, and the parse aborted instead of returning invoices.
+    const many = doc.replace(
+      '</invoicesDoc>',
+      `${'<invoice><mark>1</mark><invoiceHeader><issueDate>2024-01-01</issueDate></invoiceHeader></invoice>'.repeat(400)}</invoicesDoc>`,
+    );
+
+    expect(() => parseRequestedDoc(envelope(many))).not.toThrow();
+    expect(parseRequestedDoc(envelope(many)).invoices.length).toBeGreaterThan(300);
+  });
+
+  it('leaves a genuinely escaped ampersand in the data alone', () => {
+    const withAmp = doc.replace('<vatNumber>111222333</vatNumber>', '<vatNumber>1&amp;2</vatNumber>');
+    expect(parseRequestedDoc(envelope(withAmp)).invoices[0]?.counterpart.vatNumber).toBe('1&2');
+  });
+});
+
 import { parseRequestedDoc } from './parser';
 
 /** Shaped after a real AADE `RequestTransmittedDocs` response. */
