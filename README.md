@@ -60,8 +60,25 @@ supabase/tests/run.sh # apply migrations to a throwaway Postgres and assert the 
 Leave `RESEND_API_KEY` and `YUBOTO_API_KEY` unset outside production and both senders
 enter **dry-run mode**: the message is logged to the console and recorded in
 `communications_log` exactly as it would have been sent, so the whole workflow is
-exercisable end to end with no third-party accounts. In production a missing key is a
-hard failure instead, recorded against the message as `status = 'failed'`.
+exercisable end to end with no third-party accounts.
+
+In production a missing key makes that channel **unavailable rather than failing**. The
+engine treats an unconfigured provider exactly like a debtor it cannot reach: the step is
+skipped *before* a contact is claimed, so the rung is left unconsumed and fires on a later
+run once the key exists. This matters because claiming a contact is irreversible —
+`(invoice_id, step)` is unique — so a sweep that sent nothing must not also spend the
+ladder. A deployment with no providers at all is therefore safe to leave running: it
+reports what it would have done and changes nothing.
+
+`GET/POST /api/cron/dunning` reports which providers were live for the run:
+
+```json
+"providers": { "email": false, "sms": false, "payments": false }
+```
+
+Card payments have no dry-run — a Checkout session cannot be simulated — so without
+`STRIPE_SECRET_KEY` the payment page shows the document and tells the debtor to contact
+the issuer, rather than offering a button that fails when pressed.
 
 ---
 
