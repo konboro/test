@@ -15,9 +15,12 @@ import { Button } from '@/components/ui';
 export function StripeConnect({
   accountId,
   chargesEnabled,
+  available,
 }: {
   accountId: string | null;
   chargesEnabled: boolean;
+  /** False when the platform has no Connect client id configured. */
+  available: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -44,6 +47,17 @@ export function StripeConnect({
     } finally {
       setBusy(false);
     }
+  }
+
+  if (!accountId && !available) {
+    // Better an explicit state than a button that redirects into a 500 because
+    // the platform has no Connect client id.
+    return (
+      <p className="px-5 py-4 text-sm leading-relaxed text-ink-600">
+        Η σύνδεση με Stripe δεν είναι ακόμη διαθέσιμη σε αυτή την εγκατάσταση. Επικοινωνήστε με τον
+        διαχειριστή της πλατφόρμας.
+      </p>
+    );
   }
 
   if (!accountId) {

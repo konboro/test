@@ -6,7 +6,7 @@ import { LADDER } from '@/lib/dunning/engine';
 import { DEFAULT_TEMPLATES, EDITABLE_SLOTS, slotKey } from '@/lib/dunning/templates';
 import { DICTIONARIES } from '@/lib/i18n/dictionaries';
 import { getDictionary, LOCALES } from '@/lib/i18n';
-import { SMS_PACKS } from '@/lib/stripe';
+import { connectConfigured, SMS_PACKS } from '@/lib/stripe';
 import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
 
@@ -161,6 +161,7 @@ export default async function SettingsPage({
           <StripeConnect
             accountId={profile.stripe_account_id}
             chargesEnabled={profile.stripe_charges_enabled}
+            available={connectConfigured()}
           />
         </div>
       </Card>
