@@ -26,6 +26,10 @@ export type UserRow = {
   mydata_last_sync_at: string | null;
   /** Highest MARK seen by a sync, including skipped documents. The resume point. */
   mydata_last_mark: string | null;
+  /** Elorus API key, AES-256-GCM, same envelope as the myDATA one. */
+  elorus_api_key_enc: string | null;
+  elorus_organization_id: string | null;
+  elorus_last_sync_at: string | null;
   stripe_customer_id: string | null;
   /** Connected Stripe account. Invoices are charged directly on it. */
   stripe_account_id: string | null;
@@ -44,6 +48,8 @@ export type DebtorRow = {
   id: string;
   user_id: string;
   name: string;
+  /** Stable id in the billing system, when the customer came from there. */
+  elorus_contact_id: string | null;
   vat_number: string | null;
   email: string | null;
   phone: string | null;
@@ -70,7 +76,9 @@ export type InvoiceRow = {
   stripe_checkout_session_id: string | null;
   stripe_payment_intent_id: string | null;
   pay_token: string;
-  source: 'mydata' | 'manual';
+  source: 'mydata' | 'manual' | 'elorus';
+  /** Stable id in the billing system; its own numbers repeat across sequences. */
+  elorus_invoice_id: string | null;
   created_at: string;
   updated_at: string;
 }

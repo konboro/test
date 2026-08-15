@@ -192,6 +192,13 @@ const el = {
     mydata: 'Σύνδεση myDATA (ΑΑΔΕ)',
     mydataHint:
       'Το Subscription Key αποθηκεύεται κρυπτογραφημένο (AES-256-GCM) και δεν επιστρέφεται ποτέ στον browser.',
+    elorus: 'Σύνδεση Elorus',
+    elorusHint:
+      'Το Elorus έχει ό,τι δεν στέλνει το myDATA: επωνυμία, email και την πραγματική ημερομηνία λήξης κάθε παραστατικού.',
+    elorusOrgId: 'Organization ID',
+    elorusOrgIdHint: 'Elorus → Settings → Organization → Organization ID',
+    elorusApiKey: 'API key',
+    elorusApiKeyHint: 'Elorus → User Profile. Αποθηκεύεται κρυπτογραφημένο.',
     connected: 'Συνδεδεμένο',
     notConnected: 'Μη συνδεδεμένο',
     stripe: 'Είσπραξη με κάρτα (Stripe)',
@@ -231,6 +238,9 @@ const el = {
   sync: {
     connect: 'Σύνδεση με myDATA',
     run: 'Συγχρονισμός myDATA',
+    elorusRun: 'Συγχρονισμός Elorus',
+    elorusResult: (contacts: number, invoices: number, created: number) =>
+      `Πελάτες: ${contacts} · Παραστατικά: ${invoices} · Νέα: ${created}.`,
     running: 'Συγχρονισμός…',
     failed: 'Ο συγχρονισμός απέτυχε.',
     result: (fetched: number, invoices: number, debtors: number) =>
@@ -447,6 +457,13 @@ const en: typeof el = {
     mydata: 'myDATA connection (AADE)',
     mydataHint:
       'The subscription key is stored encrypted (AES-256-GCM) and is never returned to the browser.',
+    elorus: 'Elorus connection',
+    elorusHint:
+      'Elorus holds what myDATA does not send: the customer name, an email, and each document\u2019s real due date.',
+    elorusOrgId: 'Organization ID',
+    elorusOrgIdHint: 'Elorus → Settings → Organization → Organization ID',
+    elorusApiKey: 'API key',
+    elorusApiKeyHint: 'Elorus → User Profile. Stored encrypted.',
     connected: 'Connected',
     notConnected: 'Not connected',
     stripe: 'Card payments (Stripe)',
@@ -485,6 +502,9 @@ const en: typeof el = {
   sync: {
     connect: 'Connect myDATA',
     run: 'Sync myDATA',
+    elorusRun: 'Sync Elorus',
+    elorusResult: (contacts: number, invoices: number, created: number) =>
+      `Customers: ${contacts} · Documents: ${invoices} · New: ${created}.`,
     running: 'Syncing…',
     failed: 'The sync failed.',
     result: (fetched: number, invoices: number, debtors: number) =>

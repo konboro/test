@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
 
 import { updateLocale } from './actions';
+import { ElorusForm } from './elorus-forms';
 import { CreditPacks, MyDataForm, ProfileForm } from './settings-forms';
 import { StripeConnect } from './stripe-forms';
 import { TemplateEditor, type TemplateSlotView } from './template-forms';
@@ -48,7 +49,7 @@ export default async function SettingsPage({
   const { data: profile } = await supabase
     .from('users')
     .select(
-      'company_name, vat_number, reply_to_email, default_payment_terms_days, automation_enabled, mydata_user_id, mydata_environment, sms_credits, stripe_account_id, stripe_charges_enabled, locale',
+      'company_name, vat_number, reply_to_email, default_payment_terms_days, automation_enabled, mydata_user_id, mydata_environment, sms_credits, stripe_account_id, stripe_charges_enabled, locale, elorus_organization_id',
     )
     .eq('id', user.id)
     .maybeSingle();
@@ -164,6 +165,24 @@ export default async function SettingsPage({
             available={connectConfigured()}
           />
         </div>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title={t.settings.elorus}
+          subtitle={t.settings.elorusHint}
+          action={
+            profile.elorus_organization_id ? (
+              <Badge tone="positive">{t.settings.connected}</Badge>
+            ) : (
+              <Badge tone="warning">{t.settings.notConnected}</Badge>
+            )
+          }
+        />
+        <ElorusForm
+          connected={Boolean(profile.elorus_organization_id)}
+          organizationId={profile.elorus_organization_id}
+        />
       </Card>
 
       <Card>

@@ -8,7 +8,7 @@ import { athensDate, daysBetween, formatDate, formatMoney } from '@/lib/money';
 import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
 
-import { SyncButton } from './sync-button';
+import { ElorusSyncButton, SyncButton } from './sync-button';
 
 export async function generateMetadata() {
   return { title: (await getDictionary()).dashboard.title };
@@ -30,7 +30,9 @@ export default async function DashboardPage() {
     await Promise.all([
       supabase
         .from('users')
-        .select('company_name, sms_credits, mydata_user_id, mydata_last_sync_at, automation_enabled')
+        .select(
+          'company_name, sms_credits, mydata_user_id, mydata_last_sync_at, automation_enabled, elorus_organization_id, elorus_last_sync_at',
+        )
         .eq('id', user.id)
         .maybeSingle(),
       supabase
@@ -107,7 +109,10 @@ export default async function DashboardPage() {
               : t.dashboard.neverSynced}
           </p>
         </div>
-        <SyncButton configured={Boolean(profile?.mydata_user_id)} />
+        <div className="flex flex-wrap items-start gap-2">
+          <ElorusSyncButton configured={Boolean(profile?.elorus_organization_id)} />
+          <SyncButton configured={Boolean(profile?.mydata_user_id)} />
+        </div>
       </div>
 
       {profile && !profile.automation_enabled ? (

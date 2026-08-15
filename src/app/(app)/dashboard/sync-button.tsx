@@ -15,6 +15,74 @@ interface SyncResponse {
   hasMore?: boolean;
 }
 
+/**
+ * Pulls customers and documents from the billing system.
+ *
+ * Separate from the myDATA button because they read different things: Elorus is
+ * the source of record — names, emails, real due dates — while myDATA only
+ * covers documents filed before Elorus was in use.
+ */
+export function ElorusSyncButton({ configured }: { configured: boolean }) {
+  const t = useT();
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+
+  if (!configured) return null;
+
+  async function sync() {
+    setBusy(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch('/api/elorus/sync', { method: 'POST' });
+      const body = (await response.json()) as {
+        ok?: boolean;
+        error?: string;
+        contactsFetched?: number;
+        invoicesFetched?: number;
+        invoicesCreated?: number;
+      };
+
+      if (!response.ok || !body.ok) {
+        setMessage({ tone: 'error', text: body.error ?? t.sync.failed });
+        return;
+      }
+
+      setMessage({
+        tone: 'ok',
+        text: t.sync.elorusResult(
+          body.contactsFetched ?? 0,
+          body.invoicesFetched ?? 0,
+          body.invoicesCreated ?? 0,
+        ),
+      });
+      startTransition(() => router.refresh());
+    } catch (error) {
+      setMessage({ tone: 'error', text: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1.5">
+      <Button onClick={sync} disabled={busy || pending}>
+        {busy ? t.sync.running : t.sync.elorusRun}
+      </Button>
+      {message ? (
+        <p
+          role="status"
+          className={`max-w-xs text-right text-xs ${message.tone === 'ok' ? 'text-emerald-700' : 'text-red-700'}`}
+        >
+          {message.text}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 /** Triggers an on-demand myDATA pull and refreshes the server-rendered page. */
 export function SyncButton({ configured }: { configured: boolean }) {
   const t = useT();
