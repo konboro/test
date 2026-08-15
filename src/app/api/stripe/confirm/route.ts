@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { appUrl } from '@/lib/env';
 import { payCredentialColumn, payPath } from '@/lib/pay-code';
+import { notifyPaymentReceived } from '@/lib/payments/notify';
 import { paymentsFor } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest) {
         ? session.payment_intent
         : (session.payment_intent?.id ?? null);
 
-    await admin
+    const { data: settled } = await admin
       .from('invoices')
       .update({
         status: 'paid',
@@ -90,7 +91,12 @@ export async function GET(request: NextRequest) {
         stripe_checkout_session_id: session.id,
       })
       .eq('id', invoice.id)
-      .eq('status', 'pending');
+      .eq('status', 'pending')
+      .select('id');
+
+    // Only on the transition. Arriving twice, or after the webhook already
+    // settled it, updates nothing and must not send a second notification.
+    if (settled?.length) await notifyPaymentReceived(invoice.id);
   } catch (cause) {
     // A failure here costs nothing: the webhook still settles it if configured,
     // and the debtor still sees their confirmation.

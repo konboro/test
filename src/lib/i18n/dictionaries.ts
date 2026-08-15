@@ -270,6 +270,20 @@ const el = {
     placeholders: 'Διαθέσιμες μεταβλητές — αντιγράψτε τις μέσα στο κείμενο:',
   },
 
+  paymentReceived: {
+    subject: (amount: string, invoice: string) => `Πληρωμή ${amount} — ${invoice}`,
+    line: (customer: string, amount: string, invoice: string) =>
+      `Ο πελάτης ${customer} εξόφλησε ${amount} για το παραστατικό ${invoice} μέσω lefta.app.`,
+  },
+
+  recentPayments: {
+    title: 'Πρόσφατες πληρωμές',
+    subtitle: 'Εισπράξεις μέσω του συνδέσμου πληρωμής.',
+    emptyTitle: 'Καμία πληρωμή ακόμη',
+    emptyBody: 'Μόλις κάποιος πελάτης πληρώσει μέσω του συνδέσμου, θα εμφανιστεί εδώ.',
+    colWhen: 'Ημερομηνία',
+  },
+
   workflow: {
     paid: 'Εξοφλήθηκε',
     cancelled: 'Ακυρώθηκε',
@@ -532,6 +546,20 @@ const en: typeof el = {
     reset: 'Restore default',
     resetting: 'Restoring…',
     placeholders: 'Available variables — paste them into the text:',
+  },
+
+  paymentReceived: {
+    subject: (amount: string, invoice: string) => `Payment ${amount} — ${invoice}`,
+    line: (customer: string, amount: string, invoice: string) =>
+      `${customer} paid ${amount} for invoice ${invoice} through lefta.app.`,
+  },
+
+  recentPayments: {
+    title: 'Recent payments',
+    subtitle: 'Collected through the payment link.',
+    emptyTitle: 'No payments yet',
+    emptyBody: 'As soon as a customer pays through the link, it shows up here.',
+    colWhen: 'Date',
   },
 
   workflow: {

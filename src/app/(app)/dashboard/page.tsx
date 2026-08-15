@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { Badge, Card, CardHeader, EmptyState, linkClass, Stat } from '@/components/ui';
+import { displayName } from '@/lib/debtors';
 import { workflowStatus } from '@/lib/dunning/status';
 import { getDictionary } from '@/lib/i18n';
 import { athensDate, daysBetween, formatDate, formatMoney } from '@/lib/money';
@@ -26,8 +27,13 @@ export default async function DashboardPage() {
   const today = athensDate();
 
   // RLS scopes every one of these to the signed-in tenant.
-  const [{ data: profile }, { data: invoices }, { data: debtors }, { data: contacts }] =
-    await Promise.all([
+  const [
+    { data: profile },
+    { data: invoices },
+    { data: debtors },
+    { data: contacts },
+    { data: recentPayments },
+  ] = await Promise.all([
       supabase
         .from('users')
         .select(
@@ -42,6 +48,13 @@ export default async function DashboardPage() {
         .order('due_date', { ascending: true }),
       supabase.from('debtors').select('id, name, vat_number, email, phone, muted'),
       supabase.from('dunning_contacts').select('invoice_id, debtor_id, step, contact_on'),
+      supabase
+        .from('invoices')
+        .select('id, debtor_id, amount_cents, currency, paid_at, paid_amount_cents, invoice_number, series, mark')
+        .eq('status', 'paid')
+        .not('stripe_checkout_session_id', 'is', null)
+        .order('paid_at', { ascending: false })
+        .limit(8),
     ]);
 
   const allInvoices = invoices ?? [];
@@ -158,6 +171,58 @@ export default async function DashboardPage() {
           tone={(profile?.sms_credits ?? 0) < 20 ? 'warning' : 'default'}
         />
       </div>
+
+      <Card>
+        <CardHeader title={t.recentPayments.title} subtitle={t.recentPayments.subtitle} />
+
+        {!recentPayments?.length ? (
+          <EmptyState title={t.recentPayments.emptyTitle} body={t.recentPayments.emptyBody} />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-500">
+                  <th className="px-5 py-2.5 font-medium">{t.recentPayments.colWhen}</th>
+                  <th className="px-5 py-2.5 font-medium">{t.invoices.colCustomer}</th>
+                  <th className="px-5 py-2.5 font-medium">{t.invoices.colInvoice}</th>
+                  <th className="px-5 py-2.5 text-right font-medium">{t.invoices.colAmount}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentPayments.map((payment) => {
+                  const customer = debtorsById.get(payment.debtor_id);
+                  const name = customer ? displayName(customer) : null;
+                  const number =
+                    [payment.series, payment.invoice_number].filter(Boolean).join(' ') ||
+                    payment.mark ||
+                    payment.id.slice(0, 8);
+
+                  return (
+                    <tr key={payment.id} className="border-b border-ink-100 last:border-0">
+                      <td className="tabular px-5 py-3 text-ink-600">
+                        {payment.paid_at
+                          ? new Date(payment.paid_at).toLocaleString(t.dateTimeTag)
+                          : '—'}
+                      </td>
+                      <td className="px-5 py-3">
+                        {name ? (
+                          <span className="text-ink-800">{name}</span>
+                        ) : (
+                          <span className="italic text-ink-400">{t.debtors.nameMissing}</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3 text-ink-700">{number}</td>
+                      <td className="tabular px-5 py-3 text-right font-medium text-emerald-700">
+                        {formatMoney(payment.paid_amount_cents ?? payment.amount_cents, payment.currency)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
       <Card>
         <CardHeader

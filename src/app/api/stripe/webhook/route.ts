@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 
 import { optionalEnv } from '@/lib/env';
+import { notifyPaymentReceived } from '@/lib/payments/notify';
 import { stripe } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -185,6 +186,7 @@ async function handleCompletedSession(session: Stripe.Checkout.Session, account:
       // Marking it paid removes it from the dunning engine's candidate set on
       // the next sweep — this is the AUTO-STOP.
       console.info('[stripe:webhook] invoice paid', invoiceId);
+      await notifyPaymentReceived(invoiceId);
     }
     return;
   }
