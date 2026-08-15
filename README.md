@@ -172,6 +172,18 @@ Running out of credits degrades to email-only and is recorded as `status = 'skip
 
 ---
 
+### Who a reminder comes from
+
+The address stays on the platform domain, because that is the one carrying SPF
+and DKIM; verifying a domain per tenant would be a different product. What
+changes per message is the display name: the reminder arrives from the
+creditor's own company name, with their `reply_to_email` as Reply-To, so the
+debtor sees who is chasing them and replies land in the right inbox.
+
+The name is stripped of quotes, angle brackets and control characters first — a
+tenant types it themselves, and an unescaped newline in a header is how mail
+injection works.
+
 ### Message copy
 
 The wording of every reminder is editable in *Settings → Κείμενα μηνυμάτων*, per

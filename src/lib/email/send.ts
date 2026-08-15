@@ -8,6 +8,48 @@ export interface EmailMessage {
   text: string;
   html: string;
   replyTo?: string;
+  /**
+   * The creditor's name, shown as the sender.
+   *
+   * The address stays on the platform domain — that is the one with SPF and
+   * DKIM, and signing as the creditor's own domain would require verifying each
+   * of theirs. The display name is what the recipient actually reads, so a
+   * reminder arrives from "Penny IKE" rather than from an unfamiliar platform,
+   * while the envelope stays aligned and deliverable.
+   */
+  fromName?: string;
+}
+
+/**
+ * Builds the From header.
+ *
+ * `EMAIL_FROM` may be a bare address (`noreply@lefta.app`) or already carry a
+ * display name (`lefta.app <noreply@lefta.app>`); either is accepted, and a
+ * per-message name overrides whatever it holds.
+ *
+ * The name is stripped of quotes, backslashes and newlines before use. A tenant
+ * chooses their own company name, and an unescaped one would otherwise let them
+ * inject header content.
+ */
+export function fromHeader(configured: string | undefined, fromName?: string): string {
+  const fallback = 'lefta.app <noreply@lefta.app>';
+  const raw = configured?.trim() || fallback;
+
+  const angled = /<([^>]+)>/.exec(raw);
+  const address = (angled?.[1] ?? raw).trim();
+
+  // Quotes and backslashes would break the quoting, angle brackets would close
+  // the address early, and any control character could end the header outright.
+  const name = fromName
+    ?.replace(/["\\<>]/g, '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!name) return raw;
+
+  return `${name} <${address}>`;
 }
 
 export interface SendResult {
@@ -31,7 +73,7 @@ function resend(): Resend {
  * aborts the rest of the run.
  */
 export async function sendEmail(message: EmailMessage): Promise<SendResult> {
-  const from = optionalEnv('EMAIL_FROM') ?? 'lefta.app <noreply@lefta.app>';
+  const from = fromHeader(optionalEnv('EMAIL_FROM'), message.fromName);
 
   // Local development without a provider key: log and report success so the
   // whole workflow stays exercisable end to end.

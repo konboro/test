@@ -115,6 +115,9 @@ export async function dispatchContact(params: {
         subject: email.subject,
         text: email.text,
         html: email.html,
+        // The debtor owes the creditor, not the platform: the reminder should
+        // read as coming from them.
+        ...(tenant.company_name ? { fromName: tenant.company_name } : {}),
         ...(tenant.reply_to_email ? { replyTo: tenant.reply_to_email } : {}),
       });
 
