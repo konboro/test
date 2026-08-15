@@ -31,14 +31,23 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
-        <p className="text-center text-sm text-ink-500">
+        <p className="text-center text-base font-semibold tracking-tight text-ink-900">
+          lefta<span className="text-brand-500">.app</span>
+        </p>
+        <p className="mt-3 text-center text-sm text-ink-500">
           Εξόφληση προς <span className="font-medium text-ink-800">{invoice.creditor_name}</span>
         </p>
 
-        <div className="mt-4 overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-sm">
-          <div className="border-b border-ink-200 px-6 py-6 text-center">
-            <p className="text-xs uppercase tracking-wide text-ink-500">Οφειλόμενο ποσό</p>
-            <p className="tabular mt-1 text-4xl font-semibold text-ink-900">
+        <div className="mt-4 overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-lg shadow-ink-900/5">
+          {/* The money-path accent: the same brand blue as the button in the
+              reminder email, so the page reads as the message's continuation. */}
+          <div aria-hidden="true" className="h-1 bg-brand-600" />
+
+          <div className="border-b border-ink-200 px-6 pb-6 pt-7 text-center">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-500">
+              Οφειλόμενο ποσό
+            </p>
+            <p className="mt-2 text-5xl font-semibold leading-none tracking-tight text-ink-900">
               {formatMoney(invoice.amount_cents, invoice.currency)}
             </p>
           </div>
@@ -50,17 +59,18 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
             <Row label="Ημ. λήξης" value={formatDate(invoice.due_date)} />
           </dl>
 
-          <div className="border-t border-ink-200 px-6 py-6">
+          <div className="border-t border-ink-200 bg-ink-50/50 px-6 py-6">
             {settled || paid ? (
-              <div className="rounded-lg bg-emerald-50 px-4 py-3 text-center text-sm text-emerald-800">
+              <div className="rounded-xl bg-emerald-50 px-4 py-4 text-center text-sm text-emerald-800 ring-1 ring-inset ring-emerald-200">
+                <CheckIcon />
                 {settled ? (
                   <>
-                    <p className="font-medium">Το παραστατικό έχει εξοφληθεί.</p>
+                    <p className="mt-2 font-medium">Το παραστατικό έχει εξοφληθεί.</p>
                     <p className="mt-1 text-xs">Ευχαριστούμε.</p>
                   </>
                 ) : (
                   <>
-                    <p className="font-medium">Η πληρωμή σας καταχωρείται.</p>
+                    <p className="mt-2 font-medium">Η πληρωμή σας καταχωρείται.</p>
                     <p className="mt-1 text-xs">
                       Η επιβεβαίωση ολοκληρώνεται σε λίγα δευτερόλεπτα. Μπορείτε να κλείσετε αυτή τη
                       σελίδα.
@@ -71,7 +81,8 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
             ) : payable && invoice.payments_enabled ? (
               <>
                 <PayButton token={credential} />
-                <p className="mt-3 text-center text-xs text-ink-500">
+                <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-ink-500">
+                  <LockIcon />
                   Ασφαλής πληρωμή με κάρτα μέσω Stripe. Το lefta.app δεν αποθηκεύει στοιχεία κάρτας.
                 </p>
               </>
@@ -79,12 +90,12 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
               // The creditor has neither a connected account nor their own key.
               // The document details above still stand — a reminder link must
               // never dead-end on a button that breaks when pressed.
-              <div className="rounded-lg bg-ink-100 px-4 py-3 text-center text-sm text-ink-600">
+              <div className="rounded-xl bg-ink-100 px-4 py-3 text-center text-sm text-ink-600">
                 Η ηλεκτρονική πληρωμή δεν είναι προς το παρόν διαθέσιμη. Επικοινωνήστε με τον εκδότη
                 για την εξόφληση.
               </div>
             ) : (
-              <div className="rounded-lg bg-ink-100 px-4 py-3 text-center text-sm text-ink-600">
+              <div className="rounded-xl bg-ink-100 px-4 py-3 text-center text-sm text-ink-600">
                 Το παραστατικό δεν είναι διαθέσιμο για ηλεκτρονική πληρωμή. Επικοινωνήστε με τον
                 εκδότη.
               </div>
@@ -111,5 +122,34 @@ function Row({ label, value }: { label: string; value: string }) {
       <dt className="text-ink-500">{label}</dt>
       <dd className="tabular text-right font-medium text-ink-900">{value}</dd>
     </div>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className="mx-auto h-6 w-6 text-emerald-600"
+    >
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M8 12.3l2.6 2.7L16 9.6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className="h-3.5 w-3.5 shrink-0">
+      <rect x="3" y="7" width="10" height="6.5" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M5.5 7V5.2a2.5 2.5 0 0 1 5 0V7" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
   );
 }

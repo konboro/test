@@ -17,26 +17,37 @@ const STEPS = [
   },
 ];
 
+const ASSURANCES = [
+  'Μία επαφή ανά πελάτη ανά ημέρα — όριο επιβεβλημένο στη βάση δεδομένων.',
+  'Πλήρες, μη τροποποιήσιμο αρχείο κάθε μηνύματος που στάλθηκε για λογαριασμό σας.',
+  'Οι πληρωμές πηγαίνουν απευθείας στον δικό σας λογαριασμό — το lefta.app δεν μεσολαβεί στη ροή χρημάτων.',
+];
+
 export default function HomePage() {
   return (
     <div className="min-h-screen">
-      <header className="border-b border-ink-200 bg-white">
+      <header className="sticky top-0 z-40 border-b border-ink-200/90 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
           <span className="text-base font-semibold tracking-tight">
             lefta<span className="text-brand-500">.app</span>
           </span>
           <div className="flex items-center gap-3">
-            <Link href="/login" className="text-sm font-medium text-ink-600 hover:text-ink-900">
+            <Link href="/login" className="text-sm font-medium text-ink-600 transition hover:text-ink-900">
               Σύνδεση
             </Link>
-            <ButtonLink href="/register">Δωρεάν δοκιμή</ButtonLink>
+            <ButtonLink href="/register" variant="brand">
+              Δωρεάν δοκιμή
+            </ButtonLink>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-5xl px-4">
-        <section className="py-20 text-center">
-          <h1 className="mx-auto max-w-2xl text-balance text-4xl font-semibold leading-tight tracking-tight text-ink-900 sm:text-5xl">
+        <section className="py-20 text-center sm:py-24">
+          <p className="mx-auto inline-flex items-center gap-2 rounded-full border border-brand-100 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">
+            Αυτοματοποιημένες εισπράξεις για ελληνικές επιχειρήσεις
+          </p>
+          <h1 className="mx-auto mt-5 max-w-2xl text-balance text-4xl font-semibold leading-tight tracking-tight text-ink-900 sm:text-5xl">
             Πληρωθείτε στην ώρα σας, χωρίς δύσκολα τηλεφωνήματα.
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-ink-600">
@@ -44,7 +55,7 @@ export default function HomePage() {
             στέλνει αυτόματες, ευγενικές υπενθυμίσεις με σύνδεσμο άμεσης πληρωμής.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <ButtonLink href="/register" className="px-5 py-2.5 text-base">
+            <ButtonLink href="/register" variant="brand" className="px-5 py-2.5 text-base">
               Ξεκινήστε δωρεάν
             </ButtonLink>
             <ButtonLink href="/login" variant="secondary" className="px-5 py-2.5 text-base">
@@ -53,10 +64,13 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="grid gap-5 pb-20 sm:grid-cols-3">
+        <section className="grid gap-5 pb-16 sm:grid-cols-3">
           {STEPS.map((step, index) => (
-            <div key={step.title} className="rounded-xl border border-ink-200 bg-white p-6 shadow-sm">
-              <span className="tabular inline-flex h-7 w-7 items-center justify-center rounded-full bg-ink-900 text-xs font-semibold text-white">
+            <div
+              key={step.title}
+              className="rounded-2xl border border-ink-200 bg-white p-6 shadow-sm"
+            >
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-brand-600 text-xs font-semibold text-white">
                 {index + 1}
               </span>
               <h2 className="mt-4 text-base font-semibold text-ink-900">{step.title}</h2>
@@ -65,14 +79,35 @@ export default function HomePage() {
           ))}
         </section>
 
-        <section className="mb-20 rounded-xl border border-ink-200 bg-white p-6">
-          <h2 className="text-sm font-semibold text-ink-900">Πάροχος λογισμικού, όχι εισπρακτική</h2>
+        <section className="mb-20 rounded-2xl border border-ink-200 bg-white p-6 shadow-sm sm:p-8">
+          <h2 className="text-sm font-semibold text-ink-900">
+            Πάροχος λογισμικού, όχι εισπρακτική
+          </h2>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ink-600">
             Το lefta.app διαβιβάζει υπενθυμίσεις για λογαριασμό σας. Δεν αναλαμβάνει απαιτήσεις, δεν
-            διαπραγματεύεται οφειλές και δεν ασκεί πίεση. Η ροή είναι σταθερή, με ανώτατο όριο{' '}
-            <strong className="font-semibold text-ink-800">μία επαφή ανά πελάτη ανά ημέρα</strong>,
-            και κάθε μήνυμα καταγράφεται σε πλήρες, μη τροποποιήσιμο αρχείο.
+            διαπραγματεύεται οφειλές και δεν ασκεί πίεση.
           </p>
+          <ul className="mt-5 grid gap-3 sm:grid-cols-3">
+            {ASSURANCES.map((item) => (
+              <li key={item} className="flex items-start gap-2.5 text-sm leading-relaxed text-ink-600">
+                <svg
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  aria-hidden="true"
+                  className="mt-0.5 h-4 w-4 shrink-0 text-brand-600"
+                >
+                  <path
+                    d="M4.5 10.5l3.5 3.5 7.5-8"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                {item}
+              </li>
+            ))}
+          </ul>
         </section>
       </main>
 

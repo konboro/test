@@ -69,6 +69,18 @@ export default async function DashboardPage() {
     .filter((i) => i.status === 'paid')
     .reduce((sum, i) => sum + i.amount_cents, 0);
 
+  // Aging buckets over the open balance. The thresholds mirror the ladder: at
+  // 1–9 days overdue the automated steps are still doing the chasing; from day
+  // 10 the final reminder has fired and the money is the operator's problem.
+  const agingBuckets = [
+    { key: 'notDue', label: t.dashboard.agingNotDue, swatch: 'bg-brand-500', match: (d: number) => d <= 0 },
+    { key: 'late1to9', label: t.dashboard.agingLate(1, 9), swatch: 'bg-amber-500', match: (d: number) => d >= 1 && d <= 9 },
+    { key: 'late10plus', label: t.dashboard.agingLatePlus(10), swatch: 'bg-red-500', match: (d: number) => d >= 10 },
+  ].map((bucket) => {
+    const own = pending.filter((i) => bucket.match(daysBetween(i.due_date, today)));
+    return { ...bucket, count: own.length, cents: own.reduce((sum, i) => sum + i.amount_cents, 0) };
+  });
+
   // Steps already fired, per invoice. Manual reminders carry no step — they are
   // contacts, not rungs, and must not move an invoice along the ladder.
   const stepsByInvoice = new Map<string, Set<DunningStep>>();
@@ -178,6 +190,47 @@ export default async function DashboardPage() {
           />
         ) : null}
       </div>
+
+      {outstandingCents > 0 ? (
+        <Card>
+          <CardHeader title={t.dashboard.aging} subtitle={t.dashboard.agingHint} />
+          <div className="px-5 py-5">
+            {/* One stacked strip; the 2px gaps are the card surface doing the
+                separating, so no segment needs a border. */}
+            <div className="flex h-3 w-full gap-[2px]" role="img" aria-label={t.dashboard.aging}>
+              {agingBuckets
+                .filter((bucket) => bucket.cents > 0)
+                .map((bucket) => (
+                  <div
+                    key={bucket.key}
+                    className={`${bucket.swatch} first:rounded-l-full last:rounded-r-full`}
+                    style={{
+                      width: `${(bucket.cents / outstandingCents) * 100}%`,
+                      minWidth: '8px',
+                    }}
+                    title={`${bucket.label}: ${formatMoney(bucket.cents)}`}
+                  />
+                ))}
+            </div>
+
+            <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-2">
+              {agingBuckets.map((bucket) => (
+                <div key={bucket.key} className="flex items-baseline gap-2">
+                  <span
+                    aria-hidden="true"
+                    className={`inline-block h-2.5 w-2.5 translate-y-px rounded-sm ${bucket.swatch}`}
+                  />
+                  <dt className="text-xs text-ink-500">{bucket.label}</dt>
+                  <dd className="tabular text-sm font-semibold text-ink-900">
+                    {formatMoney(bucket.cents)}
+                  </dd>
+                  <dd className="text-xs text-ink-400">{t.dashboard.agingInvoices(bucket.count)}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader title={t.recentPayments.title} subtitle={t.recentPayments.subtitle} />

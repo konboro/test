@@ -258,11 +258,43 @@ function toParagraphs(text: string): string {
  * reminder looks like it came from the same product as the payment page it
  * links to.
  */
+/**
+ * The document-summary box between the copy and the button. The tenant's prose
+ * may or may not restate the numbers; this block states them in one fixed,
+ * scannable place, the way a receipt would — and it is part of the frame, so a
+ * template override cannot remove or forge it.
+ */
+function factsBlock(ctx: TemplateContext): string {
+  const row = (label: string, value: string, emphasis = false) => `
+                        <tr>
+                          <td style="padding:4px 0;font-size:13px;color:#64748b;${emphasis ? 'border-top:1px solid #e2e8f0;padding-top:9px;' : ''}">${label}</td>
+                          <td align="right" style="padding:4px 0;font-size:${emphasis ? '15px' : '13px'};font-weight:${emphasis ? '700' : '600'};color:#0f172a;${emphasis ? 'border-top:1px solid #e2e8f0;padding-top:9px;' : ''}">${value}</td>
+                        </tr>`;
+
+  return `
+                  <tr>
+                    <td style="padding:8px 32px 0;">
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;">
+                        <tr>
+                          <td style="padding:12px 18px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                              ${row('Παραστατικό', escapeHtml(ctx.invoiceLabel))}
+                              ${row('Ημερομηνία λήξης', escapeHtml(formatDate(ctx.dueDate)))}
+                              ${row('Οφειλόμενο ποσό', escapeHtml(formatMoney(ctx.amountCents, ctx.currency)), true)}
+                            </table>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>`;
+}
+
 function shell(
   bodyHtml: string,
   payUrl: string,
   creditorName: string,
   preheader: string,
+  factsHtml = '',
 ): string {
   const safeUrl = escapeHtml(payUrl);
 
@@ -297,7 +329,7 @@ function shell(
                       ${bodyHtml}
                     </td>
                   </tr>
-
+${factsHtml}
                   <tr>
                     <td style="padding:16px 32px 32px;">
                       <!-- Bulletproof-ish button: a padded table cell, because
@@ -361,7 +393,7 @@ export function renderEmail(
   return {
     subject,
     text,
-    html: shell(toParagraphs(text), ctx.payUrl, ctx.creditorName, preheader),
+    html: shell(toParagraphs(text), ctx.payUrl, ctx.creditorName, preheader, factsBlock(ctx)),
   };
 }
 

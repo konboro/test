@@ -43,10 +43,15 @@ export function Stat({
   const toneClass =
     tone === 'warning' ? 'text-amber-700' : tone === 'positive' ? 'text-emerald-700' : 'text-ink-900';
 
+  // The value deliberately does NOT use tabular figures: at display size every
+  // digit as wide as a zero reads loose. Tabular numerals stay in table columns,
+  // where vertical alignment is what matters.
   return (
     <Card className="px-5 py-4">
       <p className="text-xs font-medium uppercase tracking-wide text-ink-500">{label}</p>
-      <p className={`tabular mt-2 text-2xl font-semibold ${toneClass}`}>{value}</p>
+      <p className={`mt-2 text-[28px] font-semibold leading-9 tracking-tight ${toneClass}`}>
+        {value}
+      </p>
       {hint ? <p className="mt-1 text-xs text-ink-500">{hint}</p> : null}
     </Card>
   );
