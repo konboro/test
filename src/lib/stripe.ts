@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 
+import { decryptSecret } from '@/lib/crypto';
 import { optionalEnv, requireEnv } from '@/lib/env';
 
 let client: Stripe | null = null;
@@ -35,6 +36,52 @@ export function stripe(): Stripe {
  */
 export function onBehalfOf(accountId: string): Stripe.RequestOptions {
   return { stripeAccount: accountId };
+}
+
+/**
+ * How a given tenant takes card payments.
+ *
+ * Two arrangements, and both end with the money on the creditor's own account:
+ *
+ *  - `connect`  — the platform's client acting on their connected account.
+ *                 The proper answer, and what this becomes once lefta itself has
+ *                 a Stripe account to be a platform with.
+ *  - `own-key`  — the tenant's own secret key, used directly. A bridge for
+ *                 before that exists.
+ *
+ * Connect wins when both are present: it is revocable from either side and does
+ * not involve holding somebody else's secret key.
+ */
+export type TenantPayments =
+  | { kind: 'connect'; client: Stripe; options: Stripe.RequestOptions }
+  | { kind: 'own-key'; client: Stripe; options: Record<string, never> }
+  | { kind: 'none' };
+
+export function paymentsFor(tenant: {
+  stripe_account_id: string | null;
+  stripe_charges_enabled: boolean;
+  stripe_secret_key_enc: string | null;
+}): TenantPayments {
+  if (tenant.stripe_account_id && tenant.stripe_charges_enabled && optionalEnv('STRIPE_SECRET_KEY')) {
+    return {
+      kind: 'connect',
+      client: stripe(),
+      options: onBehalfOf(tenant.stripe_account_id),
+    };
+  }
+
+  if (tenant.stripe_secret_key_enc) {
+    return {
+      kind: 'own-key',
+      client: new Stripe(decryptSecret(tenant.stripe_secret_key_enc), {
+        apiVersion: '2025-02-24.acacia',
+        typescript: true,
+      }),
+      options: {},
+    };
+  }
+
+  return { kind: 'none' };
 }
 
 /** OAuth client id (`ca_…`) from Stripe → Settings → Connect. */

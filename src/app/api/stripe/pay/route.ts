@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { appUrl } from '@/lib/env';
-import { onBehalfOf, stripe } from '@/lib/stripe';
+import { paymentsFor } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export const runtime = 'nodejs';
@@ -42,14 +42,17 @@ export async function POST(request: Request) {
     admin.from('debtors').select('email, name').eq('id', invoice.debtor_id).maybeSingle(),
     admin
       .from('users')
-      .select('stripe_account_id, stripe_charges_enabled')
+      .select('stripe_account_id, stripe_charges_enabled, stripe_secret_key_enc')
       .eq('id', invoice.user_id)
       .maybeSingle(),
   ]);
 
-  // The creditor collects on their own Stripe account. Without one there is no
-  // one to pay — and lefta must not step in and take the money on their behalf.
-  if (!creditor?.stripe_account_id || !creditor.stripe_charges_enabled) {
+  // The creditor collects on their own Stripe account, whether that is reached
+  // through Connect or through their own key. Without either there is nobody to
+  // pay — and lefta must not step in and take the money on their behalf.
+  const payments = creditor ? paymentsFor(creditor) : ({ kind: 'none' } as const);
+
+  if (payments.kind === 'none') {
     return NextResponse.json(
       { error: 'Ο εκδότης δεν δέχεται προς το παρόν ηλεκτρονικές πληρωμές.' },
       { status: 409 },
@@ -61,10 +64,10 @@ export async function POST(request: Request) {
     invoice.mark ||
     invoice.id.slice(0, 8);
 
-  // A *direct charge*: the session lives on the creditor's account and the funds
-  // settle there. No application fee is taken, so lefta never appears in the
-  // payment at all.
-  const session = await stripe().checkout.sessions.create(
+  // Either way this is a charge on the creditor's own account: through Connect
+  // it is a direct charge, through their key it is simply their account. No
+  // application fee is taken, so lefta never appears in the payment at all.
+  const session = await payments.client.checkout.sessions.create(
     {
       mode: 'payment',
       line_items: [
@@ -83,11 +86,14 @@ export async function POST(request: Request) {
         invoice_id: invoice.id,
         lefta_user_id: invoice.user_id,
       },
+      // Returns through our confirm endpoint, which verifies the session with
+      // Stripe and settles the invoice before showing the page. That is what
+      // makes payment work for a tenant who has no webhook pointed at us.
       // Stripe expands `{CHECKOUT_SESSION_ID}` itself.
-      success_url: `${appUrl()}/pay/${parsed.data.token}?paid=1&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${appUrl()}/api/stripe/confirm?token=${parsed.data.token}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl()}/pay/${parsed.data.token}`,
     },
-    onBehalfOf(creditor.stripe_account_id),
+    payments.options,
   );
 
   await admin

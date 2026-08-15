@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { Button } from '@/components/ui';
+import { Button, Field, inputClass } from '@/components/ui';
 
 /**
  * Links the tenant's own Stripe account.
@@ -12,15 +12,113 @@ import { Button } from '@/components/ui';
  * that the money goes to them, not through lefta, because that is the whole
  * reason the integration is shaped this way.
  */
+/**
+ * The tenant's own Stripe key.
+ *
+ * Deliberately a stopgap, and the copy says so: once lefta has a Stripe account
+ * of its own, Connect replaces this and nobody has to hand over a secret key.
+ */
+function OwnKeyForm({ hasKey }: { hasKey: boolean }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+
+  async function submit(formData: FormData) {
+    setBusy(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch('/api/settings/stripe-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret_key: String(formData.get('secret_key') ?? '') }),
+      });
+
+      const body = (await response.json()) as { error?: string; testMode?: boolean };
+
+      if (!response.ok) {
+        setMessage({ tone: 'error', text: body.error ?? 'Failed.' });
+        return;
+      }
+
+      setMessage({
+        tone: 'ok',
+        text: body.testMode
+          ? 'Το κλειδί αποθηκεύτηκε. Είναι κλειδί δοκιμών — οι πληρωμές δεν είναι πραγματικές.'
+          : 'Το κλειδί αποθηκεύτηκε.',
+      });
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    setBusy(true);
+    try {
+      await fetch('/api/settings/stripe-key', { method: 'DELETE' });
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form action={submit} className="space-y-4 px-5 py-4">
+      <p className="text-sm leading-relaxed text-ink-600">
+        Επικολλήστε το <strong className="font-semibold text-ink-900">Secret key</strong> του δικού
+        σας λογαριασμού Stripe (Developers → API keys). Οι χρεώσεις δημιουργούνται απευθείας στον
+        λογαριασμό σας — το lefta.app δεν μεσολαβεί στη ροή χρημάτων.
+      </p>
+
+      <Field label="Stripe Secret key" hint="sk_test_… για δοκιμές, sk_live_… για πραγματικές πληρωμές">
+        <input
+          name="secret_key"
+          type="password"
+          autoComplete="off"
+          required={!hasKey}
+          placeholder={hasKey ? '••••••••••••' : 'sk_test_…'}
+          className={inputClass}
+        />
+      </Field>
+
+      {message ? (
+        <p
+          role={message.tone === 'error' ? 'alert' : 'status'}
+          className={`rounded-lg px-3 py-2 text-sm ${
+            message.tone === 'error' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
+          }`}
+        >
+          {message.text}
+        </p>
+      ) : null}
+
+      <div className="flex gap-2">
+        <Button type="submit" disabled={busy}>
+          {busy ? 'Αποθήκευση…' : 'Αποθήκευση'}
+        </Button>
+        {hasKey ? (
+          <Button type="button" variant="secondary" onClick={remove} disabled={busy}>
+            Αφαίρεση
+          </Button>
+        ) : null}
+      </div>
+    </form>
+  );
+}
+
 export function StripeConnect({
   accountId,
   chargesEnabled,
   available,
+  hasOwnKey,
 }: {
   accountId: string | null;
   chargesEnabled: boolean;
   /** False when the platform has no Connect client id configured. */
   available: boolean;
+  /** Whether the tenant has pasted their own key as a stopgap. */
+  hasOwnKey: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -50,14 +148,10 @@ export function StripeConnect({
   }
 
   if (!accountId && !available) {
-    // Better an explicit state than a button that redirects into a 500 because
-    // the platform has no Connect client id.
-    return (
-      <p className="px-5 py-4 text-sm leading-relaxed text-ink-600">
-        Η σύνδεση με Stripe δεν είναι ακόμη διαθέσιμη σε αυτή την εγκατάσταση. Επικοινωνήστε με τον
-        διαχειριστή της πλατφόρμας.
-      </p>
-    );
+    // No platform to run Connect from yet, so the tenant supplies their own key
+    // and charges are created directly on their account with it. Same outcome —
+    // the money is theirs and never passes through lefta.
+    return <OwnKeyForm hasKey={hasOwnKey} />;
   }
 
   if (!accountId) {

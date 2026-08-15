@@ -7,6 +7,7 @@ import { DEFAULT_TEMPLATES, EDITABLE_SLOTS, slotKey } from '@/lib/dunning/templa
 import { DICTIONARIES } from '@/lib/i18n/dictionaries';
 import { getDictionary, LOCALES } from '@/lib/i18n';
 import { connectConfigured, SMS_PACKS } from '@/lib/stripe';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
 
@@ -55,6 +56,16 @@ export default async function SettingsPage({
     .maybeSingle();
 
   if (!profile) redirect('/login');
+
+  // The key column is excluded from the authenticated grant on purpose, so its
+  // mere presence is read with the service role and nothing but a boolean leaves
+  // this function.
+  const { data: keyRow } = await createAdminClient()
+    .from('users')
+    .select('stripe_secret_key_enc')
+    .eq('id', user.id)
+    .maybeSingle();
+  const hasOwnStripeKey = Boolean(keyRow?.stripe_secret_key_enc);
 
   // RLS scopes this to the tenant. A slot with no row keeps the built-in copy.
   const { data: templates } = await supabase
@@ -163,6 +174,7 @@ export default async function SettingsPage({
             accountId={profile.stripe_account_id}
             chargesEnabled={profile.stripe_charges_enabled}
             available={connectConfigured()}
+            hasOwnKey={hasOwnStripeKey}
           />
         </div>
       </Card>

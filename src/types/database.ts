@@ -35,6 +35,8 @@ export type UserRow = {
   stripe_account_id: string | null;
   stripe_charges_enabled: boolean;
   stripe_connected_at: string | null;
+  /** The tenant’s own Stripe key, used until Connect has a platform to run on. */
+  stripe_secret_key_enc: string | null;
   sms_credits: number;
   automation_enabled: boolean;
   reply_to_email: string | null;
