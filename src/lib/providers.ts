@@ -32,7 +32,7 @@ export function emailAvailable(): boolean {
 }
 
 export function smsAvailable(): boolean {
-  return Boolean(optionalEnv('YUBOTO_API_KEY')) || dryRunMode();
+  return Boolean(optionalEnv('BREVO_API_KEY')) || dryRunMode();
 }
 
 /**
