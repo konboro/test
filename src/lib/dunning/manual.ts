@@ -17,6 +17,7 @@
  * whole point of a preview is that it tells the truth about what will happen.
  */
 
+import { contactLimitsDisabled } from '@/lib/limits';
 import { athensDate } from '@/lib/money';
 import { channelAvailable, type Channel } from '@/lib/providers';
 import { normalisePhone, segmentCount } from '@/lib/sms/send';
@@ -154,7 +155,9 @@ export async function previewManualReminder(params: {
 
   const { channels, notes } = resolveChannels(debtor);
 
-  if (await contactedToday(debtor.id)) {
+  if (contactLimitsDisabled()) {
+    notes.push('ΔΟΚΙΜΑΣΤΙΚΗ ΛΕΙΤΟΥΡΓΙΑ: το ημερήσιο όριο επικοινωνίας είναι απενεργοποιημένο.');
+  } else if (await contactedToday(debtor.id)) {
     notes.push('Ο πελάτης έχει ήδη ειδοποιηθεί σήμερα — η αποστολή θα απορριφθεί.');
   }
 
@@ -190,26 +193,38 @@ export async function sendManualReminder(params: {
   }
 
   // Claiming the row is what grants the right to contact this debtor today.
-  const { data: contact, error: contactError } = await supabase
-    .from('dunning_contacts')
-    .insert({
-      user_id: userId,
-      debtor_id: debtor.id,
-      invoice_id: invoice.id,
-      // Null step and manual = true: this is a contact, not a rung. The chosen
-      // wording above does not change that.
-      step: null,
-      manual: true,
-      contact_on: athensDate(),
-    })
-    .select('id')
-    .single();
+  //
+  // With the testing flag on, nothing is claimed at all: the send goes out
+  // unmetered and `dunning_contacts` is left untouched, so ladder bookkeeping is
+  // identical to never having pressed the button. See lib/limits.ts.
+  let contactId: string | null = null;
 
-  if (contactError || !contact) {
-    if (contactError?.code === '23505') {
-      return fail('Ο πελάτης έχει ήδη ειδοποιηθεί σήμερα. Επιτρέπεται μία επικοινωνία ανά ημέρα.');
+  if (!contactLimitsDisabled()) {
+    const { data: contact, error: contactError } = await supabase
+      .from('dunning_contacts')
+      .insert({
+        user_id: userId,
+        debtor_id: debtor.id,
+        invoice_id: invoice.id,
+        // Null step and manual = true: this is a contact, not a rung. The chosen
+        // wording above does not change that.
+        step: null,
+        manual: true,
+        contact_on: athensDate(),
+      })
+      .select('id')
+      .single();
+
+    if (contactError || !contact) {
+      if (contactError?.code === '23505') {
+        return fail(
+          'Ο πελάτης έχει ήδη ειδοποιηθεί σήμερα. Επιτρέπεται μία επικοινωνία ανά ημέρα.',
+        );
+      }
+      return fail(`Δεν ήταν δυνατή η καταχώριση της επικοινωνίας: ${contactError?.message ?? ''}`);
     }
-    return fail(`Δεν ήταν δυνατή η καταχώριση της επικοινωνίας: ${contactError?.message ?? ''}`);
+
+    contactId = contact.id;
   }
 
   const outcome = await dispatchContact({
@@ -220,7 +235,7 @@ export async function sendManualReminder(params: {
     // never suggests a ladder step fired.
     step: null,
     templateStep: step,
-    contactId: contact.id,
+    contactId,
     channels,
     overrides: await loadTemplateOverrides(userId),
   });

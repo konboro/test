@@ -201,6 +201,26 @@ ladder: the contact row is written with `manual = true` and a null step, and the
 `(invoice_id, step)` unique index is partial, so step 2 still fires later on
 schedule. Muted debtors are refused.
 
+Before sending, a dialog shows the message rendered with this invoice's real
+values, which channels will carry it and to what address, the SMS segment count,
+and anything blocking it. The preview is produced by the same code as the send
+and claims nothing, so looking at a message cannot cost the debtor their contact
+for the day. The wording picker selects *copy*, including any ladder step's text
+— it does not move the invoice along the ladder.
+
+### Lifting the limit while setting delivery up
+
+The daily limit also makes it impossible to send the same test message twice.
+`UNSAFE_DISABLE_CONTACT_LIMITS=1` lifts it for **manual sends only**: the
+reminder goes out without claiming a contact row, so `dunning_contacts` is left
+untouched and ladder bookkeeping is unchanged. The automated sweep keeps every
+lock it has — an unbounded cron aimed at real debtors is a different risk from a
+person pressing a button.
+
+Deleting the variable restores the guarantee; there is no migration to undo and
+no state left behind. While it is set, the invoice list carries a banner, because
+a compliance switch nobody can see is one that gets left on.
+
 ## myDATA integration
 
 `RequestTransmittedDocs` is the endpoint used — it returns documents the tenant *issued*

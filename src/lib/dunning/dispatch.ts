@@ -68,7 +68,11 @@ export async function dispatchContact(params: {
    * exact body transmitted is preserved in the log either way.
    */
   templateStep?: TemplateStep;
-  contactId: string;
+  /**
+   * Null only when the contact limits are lifted for testing, in which case no
+   * contact row exists to point at. The message is still logged.
+   */
+  contactId: string | null;
   channels: ReadonlyArray<Channel>;
   overrides: TemplateOverrides;
 }): Promise<DispatchOutcome> {
@@ -181,12 +185,15 @@ export async function dispatchContact(params: {
       if (sent.ok) {
         outcome.smsSent += 1;
       } else {
-        // Refund the reserved credit: nothing was delivered.
+        // Refund the reserved credit: nothing was delivered. The session id is
+        // what makes the grant idempotent, so with no contact row to key on it
+        // has to be unique per attempt — otherwise a second failed send would
+        // hit the unique index and silently skip its refund.
         await supabase.rpc('grant_sms_credits', {
           p_user_id: tenant.id,
           p_credits: 1,
           p_amount_cents: 0,
-          p_session_id: `refund:${contactId}`,
+          p_session_id: `refund:${contactId ?? crypto.randomUUID()}`,
         });
         outcome.errors.push(`sms: ${sent.error}`);
       }

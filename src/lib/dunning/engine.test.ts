@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { contactLimitsDisabled } from '@/lib/limits';
 import { addDays, athensDate, daysBetween, toCents } from '@/lib/money';
 import { emailAvailable, paymentsAvailable, smsAvailable } from '@/lib/providers';
 import { normalisePhone, segmentCount } from '@/lib/sms/send';
@@ -150,6 +151,31 @@ describe('provider availability gates the contact claim', () => {
 
     vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_x');
     expect(paymentsAvailable()).toBe(true);
+  });
+});
+
+describe('contact-limit testing flag', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('is off unless explicitly set to 1', () => {
+    expect(contactLimitsDisabled()).toBe(false);
+
+    vi.stubEnv('UNSAFE_DISABLE_CONTACT_LIMITS', '');
+    expect(contactLimitsDisabled()).toBe(false);
+
+    // Anything truthy-looking but not exactly '1' must not disarm the guarantee.
+    vi.stubEnv('UNSAFE_DISABLE_CONTACT_LIMITS', 'true');
+    expect(contactLimitsDisabled()).toBe(false);
+
+    vi.stubEnv('UNSAFE_DISABLE_CONTACT_LIMITS', '0');
+    expect(contactLimitsDisabled()).toBe(false);
+  });
+
+  it('lifts the limit only on the exact opt-in value', () => {
+    vi.stubEnv('UNSAFE_DISABLE_CONTACT_LIMITS', '1');
+    expect(contactLimitsDisabled()).toBe(true);
   });
 });
 

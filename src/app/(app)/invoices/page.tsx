@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 
 import { Badge, Card, CardHeader, EmptyState } from '@/components/ui';
 import { workflowStatus } from '@/lib/dunning/status';
+import { contactLimitsDisabled } from '@/lib/limits';
 import { athensDate, formatDate, formatMoney } from '@/lib/money';
 import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
@@ -65,6 +66,17 @@ export default async function InvoicesPage({
         </div>
         <CreateInvoiceForm debtors={debtors ?? []} />
       </div>
+
+      {contactLimitsDisabled() ? (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-semibold">Δοκιμαστική λειτουργία — το ημερήσιο όριο είναι ανενεργό.</p>
+          <p className="mt-1 text-xs leading-relaxed">
+            Οι χειροκίνητες υπενθυμίσεις στέλνονται χωρίς περιορισμό και δεν καταγράφονται ως
+            επαφές. Η αυτόματη ροή δεν επηρεάζεται. Αφαιρέστε το{' '}
+            <code>UNSAFE_DISABLE_CONTACT_LIMITS</code> πριν σταλεί οτιδήποτε σε πραγματικό πελάτη.
+          </p>
+        </div>
+      ) : null}
 
       <div className="flex gap-1">
         {FILTERS.map((f) => (
