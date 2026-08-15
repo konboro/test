@@ -42,7 +42,6 @@ export function fromHeader(configured: string | undefined, fromName?: string): s
   // the address early, and any control character could end the header outright.
   const name = fromName
     ?.replace(/["\\<>]/g, '')
-    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();

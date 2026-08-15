@@ -164,7 +164,13 @@ export function StripeConnect({
         </p>
 
         {/* A plain anchor, not a Button: the handshake starts with a full-page
-            redirect to Stripe, so this must be a real navigation. */}
+            redirect to Stripe, so this must be a real navigation.
+
+            The lint rule wants `<Link>` because the root-level `[code]` route
+            makes every path look like a page to it. This one is an API route
+            that answers with a redirect off-site — client-side navigation would
+            simply fail. */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a
           href="/api/stripe/connect/start"
           className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-brand-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm outline-none transition hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"

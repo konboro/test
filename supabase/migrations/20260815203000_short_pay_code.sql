@@ -21,7 +21,11 @@ volatile
 as $$
 declare
   alphabet constant text := '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-  bytes    bytea := gen_random_bytes(10);
+  -- Qualified: pgcrypto is installed into the `extensions` schema on Supabase,
+  -- so an unqualified call resolves against a search_path that does not contain
+  -- it and fails with 42883. Same trap as the pay_token default in the initial
+  -- migration.
+  bytes    bytea := extensions.gen_random_bytes(10);
   code     text := '';
   i        int;
 begin
