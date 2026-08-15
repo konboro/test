@@ -1,6 +1,14 @@
 import { sendEmail } from '@/lib/email/send';
 import { appUrl } from '@/lib/env';
 import { athensDate, daysBetween } from '@/lib/money';
+import {
+  channelAvailable,
+  emailAvailable,
+  providerStatus,
+  smsAvailable,
+  type Channel,
+  type ProviderStatus,
+} from '@/lib/providers';
 import { normalisePhone, sendSms } from '@/lib/sms/send';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { DebtorRow, DunningStep, InvoiceRow, UserRow } from '@/types/database';
@@ -42,14 +50,40 @@ export interface DunningRunResult {
   smsSent: number;
   skipped: Array<{ invoiceId: string; reason: string }>;
   errors: Array<{ invoiceId: string; error: string }>;
+  /** What could actually have been delivered during this run. */
+  providers: ProviderStatus;
 }
 
 interface Candidate {
   invoice: InvoiceRow;
   debtor: DebtorRow;
   step: DunningStep;
-  channels: ReadonlyArray<'email' | 'sms'>;
+  channels: ReadonlyArray<Channel>;
   daysOverdue: number;
+}
+
+/** Channels on which this debtor can be reached, ignoring provider setup. */
+export function reachableChannels(
+  channels: ReadonlyArray<Channel>,
+  debtor: { email: string | null; phone: string | null },
+): Channel[] {
+  return channels.filter((channel) =>
+    channel === 'email' ? Boolean(debtor.email) : normalisePhone(debtor.phone) !== null,
+  );
+}
+
+/**
+ * Channels that can carry a message right now: the debtor is reachable on them
+ * *and* the provider behind them is configured.
+ *
+ * The engine consults this before claiming a contact row, never after. A step
+ * that cannot be delivered must not be consumed — see lib/providers.ts.
+ */
+export function deliverableChannels(
+  channels: ReadonlyArray<Channel>,
+  debtor: { email: string | null; phone: string | null },
+): Channel[] {
+  return reachableChannels(channels, debtor).filter(channelAvailable);
 }
 
 /** Which ladder step, if any, an invoice is due for today. */
@@ -88,6 +122,7 @@ export async function runDunningSweep(
     smsSent: 0,
     skipped: [],
     errors: [],
+    providers: providerStatus(),
   };
 
   let tenantQuery = supabase.from('users').select('*').eq('automation_enabled', true);
@@ -154,14 +189,21 @@ async function processTenant(
     // Reachability is per step, not per debtor: a debtor with only a phone
     // number cannot receive the email-only step 1, and claiming a contact for
     // them would burn their one daily slot on a message nobody gets.
-    const deliverable = rung.channels.some((channel) =>
-      channel === 'email' ? Boolean(debtor.email) : normalisePhone(debtor.phone) !== null,
-    );
+    //
+    // The same reasoning covers an unconfigured provider. Claiming a contact is
+    // irreversible — (invoice_id, step) is unique — so a step whose providers
+    // are missing must be left untouched rather than claimed and then recorded
+    // as failed. It will fire on a later run, once the keys exist.
+    const reachable = reachableChannels(rung.channels, debtor);
+    const deliverable = reachable.filter(channelAvailable);
 
-    if (!deliverable) {
+    if (deliverable.length === 0) {
       result.skipped.push({
         invoiceId: invoice.id,
-        reason: `no contact details for ${rung.channels.join('/')}`,
+        reason:
+          reachable.length === 0
+            ? `no contact details for ${rung.channels.join('/')}`
+            : `${reachable.join('/')} provider not configured — step left unconsumed`,
       });
       continue;
     }
@@ -282,7 +324,23 @@ async function deliver(
     payUrl: `${appUrl()}/pay/${invoice.pay_token}`,
   };
 
-  if (candidate.channels.includes('email') && debtor.email) {
+  if (candidate.channels.includes('email') && debtor.email && !emailAvailable()) {
+    // Reached only when another channel carried this contact — the step itself
+    // was never claimed on the strength of an unconfigured provider.
+    await supabase.from('communications_log').insert({
+      user_id: tenant.id,
+      debtor_id: debtor.id,
+      invoice_id: invoice.id,
+      contact_id: contact.id,
+      channel: 'email',
+      step,
+      status: 'skipped',
+      recipient: debtor.email,
+      content: renderEmail(step, ctx).text,
+      error: 'Email provider not configured',
+    });
+    result.skipped.push({ invoiceId: invoice.id, reason: 'email provider not configured' });
+  } else if (candidate.channels.includes('email') && debtor.email) {
     const email = renderEmail(step, ctx);
     const sent = await sendEmail({
       to: debtor.email,
@@ -315,13 +373,32 @@ async function deliver(
   if (candidate.channels.includes('sms') && phone) {
     const body = renderSms(step, ctx);
 
+    // Ask whether the provider exists *before* reserving a credit. Reserving
+    // first would push every message through a reserve-then-refund cycle that
+    // bills nothing but writes a bogus row into the purchase ledger each time.
+    const smsReady = smsAvailable();
+
     // SMS costs a credit. Reserve it first so a provider success can never be
     // delivered without being paid for.
-    const { data: hasCredit } = await supabase.rpc('consume_sms_credit', {
-      p_user_id: tenant.id,
-    });
+    const { data: hasCredit } = smsReady
+      ? await supabase.rpc('consume_sms_credit', { p_user_id: tenant.id })
+      : { data: false };
 
-    if (!hasCredit) {
+    if (!smsReady) {
+      await supabase.from('communications_log').insert({
+        user_id: tenant.id,
+        debtor_id: debtor.id,
+        invoice_id: invoice.id,
+        contact_id: contact.id,
+        channel: 'sms',
+        step,
+        status: 'skipped',
+        recipient: phone,
+        content: body,
+        error: 'SMS provider not configured',
+      });
+      result.skipped.push({ invoiceId: invoice.id, reason: 'sms provider not configured' });
+    } else if (!hasCredit) {
       await supabase.from('communications_log').insert({
         user_id: tenant.id,
         debtor_id: debtor.id,

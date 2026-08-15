@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 
 import { formatDate, formatMoney } from '@/lib/money';
+import { paymentsAvailable } from '@/lib/providers';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 import { PayButton } from './pay-button';
@@ -77,13 +78,21 @@ export default async function PayPage({
                   </>
                 )}
               </div>
-            ) : payable ? (
+            ) : payable && paymentsAvailable() ? (
               <>
                 <PayButton token={token} />
                 <p className="mt-3 text-center text-xs text-ink-500">
                   Ασφαλής πληρωμή με κάρτα μέσω Stripe. Το lefta.app δεν αποθηκεύει στοιχεία κάρτας.
                 </p>
               </>
+            ) : payable ? (
+              // Card payments are not wired up yet. The document details above are
+              // still worth showing — a reminder link must never dead-end on a
+              // button that fails the moment it is pressed.
+              <div className="rounded-lg bg-ink-100 px-4 py-3 text-center text-sm text-ink-600">
+                Η ηλεκτρονική πληρωμή δεν είναι προς το παρόν διαθέσιμη. Επικοινωνήστε με τον εκδότη
+                για την εξόφληση.
+              </div>
             ) : (
               <div className="rounded-lg bg-ink-100 px-4 py-3 text-center text-sm text-ink-600">
                 Το παραστατικό δεν είναι διαθέσιμο για ηλεκτρονική πληρωμή. Επικοινωνήστε με τον
