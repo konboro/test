@@ -172,6 +172,35 @@ Running out of credits degrades to email-only and is recorded as `status = 'skip
 
 ---
 
+### Message copy
+
+The wording of every reminder is editable in *Settings → Κείμενα μηνυμάτων*, per
+(step, channel), plus one slot for the manual reminder. A slot with no row in
+`message_templates` uses the built-in Greek copy, so an untouched account behaves
+exactly as before and any edit is undone by deleting the override.
+
+Bodies are plain text with `{{placeholders}}` — `debtor_name`, `creditor_name`,
+`invoice`, `amount`, `due_date`, `pay_url`. An unknown token is left visible
+rather than blanked, so a typo shows up in the copy instead of quietly eating a
+sentence.
+
+What is *not* editable is the frame. A custom body is escaped into the platform
+shell rather than treated as markup, and the payment button and footer stay put:
+a template is copy, not a way to author arbitrary HTML in a message that goes out
+on someone else's behalf. The ladder's timing is not editable either — that is
+the compliance story, and it is not text.
+
+### Sending a reminder by hand
+
+Each open invoice has a **Υπενθύμιση** button that sends immediately, which is
+also the quickest way to test delivery without waiting for the 07:00 sweep.
+
+It is a real contact and obeys the once-per-debtor-per-day limit — that promise
+says nothing about who pressed the button. It does not consume a rung of the
+ladder: the contact row is written with `manual = true` and a null step, and the
+`(invoice_id, step)` unique index is partial, so step 2 still fires later on
+schedule. Muted debtors are refused.
+
 ## myDATA integration
 
 `RequestTransmittedDocs` is the endpoint used — it returns documents the tenant *issued*
