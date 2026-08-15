@@ -208,6 +208,77 @@ curl -X POST "https://<host>/api/cron/dunning?dryRun=1" \
 
 ---
 
+## Deploying to Vercel
+
+The build succeeds with **no environment variables set**, so the first deploy will go
+green before anything is configured. Every page will still fail at runtime until Supabase
+is wired up — the build passing is not a signal that the app works.
+
+Order matters: create the Supabase project first, because three of the Vercel variables
+come from it.
+
+**1. Supabase**
+
+```bash
+supabase link --project-ref <project-ref>
+supabase db push
+```
+
+From *Project Settings → API*, collect the project URL, the `anon` key, and the
+`service_role` key.
+
+**2. Import the repo** into Vercel (`konboro/test`). Framework preset **Next.js**;
+build command, output directory and install command are all defaults — nothing to
+override.
+
+**3. Environment variables.** Set these for Production *and* Preview, otherwise preview
+deploys crash on every request:
+
+| Variable                        | Where it comes from                          |
+| ------------------------------- | -------------------------------------------- |
+| `NEXT_PUBLIC_APP_URL`           | the deployment's own URL                      |
+| `NEXT_PUBLIC_SUPABASE_URL`      | Supabase → Project Settings → API             |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Project Settings → API             |
+| `SUPABASE_SERVICE_ROLE_KEY`     | Supabase → Project Settings → API (secret)    |
+| `ENCRYPTION_KEY`                | `openssl rand -base64 32`                     |
+| `CRON_SECRET`                   | `openssl rand -hex 32`                        |
+| `STRIPE_SECRET_KEY`             | Stripe → Developers → API keys                |
+| `STRIPE_WEBHOOK_SECRET`         | created in step 5                             |
+| `RESEND_API_KEY`, `EMAIL_FROM`  | Resend (required in production)               |
+| `YUBOTO_API_KEY`, `SMS_SENDER_ID` | Yuboto (required in production)             |
+
+`ENCRYPTION_KEY` cannot be rotated casually: it decrypts stored myDATA subscription keys,
+so changing it orphans every credential already saved. Generate it once, keep it.
+
+**4. Supabase auth URLs.** In *Authentication → URL Configuration* set the site URL to
+the deployment and add `https://<host>/auth/callback` as a redirect URL, or email
+confirmation links will bounce.
+
+**5. Stripe webhook.** Add an endpoint at `https://<host>/api/stripe/webhook` subscribed
+to `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
+`checkout.session.async_payment_failed` and `checkout.session.expired`. Copy the signing
+secret into `STRIPE_WEBHOOK_SECRET` and redeploy.
+
+**6. Cron.** `vercel.json` already registers the daily 07:00 UTC job; Vercel picks it up
+on deploy and sends `Authorization: Bearer $CRON_SECRET` automatically. Note that the
+Hobby plan caps cron at one run per day, which is exactly what this schedule needs.
+
+**Smoke test after deploying:**
+
+```bash
+# expect 401 — proves the cron endpoint rejects unauthenticated callers
+curl -si https://<host>/api/cron/dunning | head -1
+
+# expect 200 and a summary with zero contacts on an empty database
+curl -s -X POST "https://<host>/api/cron/dunning?dryRun=1" \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+
+Then register an account, add a debtor with a real email, create a manual invoice due
+2 days ago, and run the dry-run again — it should report one contact.
+
+---
+
 ## Security notes
 
 - Every table is tenant-scoped by `auth.uid()` through RLS.
