@@ -242,29 +242,95 @@ function toParagraphs(text: string): string {
     .filter(Boolean)
     .map(
       (block) =>
-        `<p style="margin:0 0 16px;line-height:1.6;">${escapeHtml(block).replace(/\n/g, '<br />')}</p>`,
+        // Colour and line-height repeated on every paragraph: several clients
+        // drop inheritance into block elements.
+        `<p style="margin:0 0 16px;font-size:15px;line-height:1.65;color:#334155;">${escapeHtml(block).replace(/\n/g, '<br />')}</p>`,
     )
     .join('\n');
 }
 
-function shell(bodyHtml: string, payUrl: string, creditorName: string): string {
+/**
+ * The email frame.
+ *
+ * Table-based and fully inline-styled on purpose: Gmail strips <style> blocks,
+ * Outlook renders with Word's engine, and neither supports flex or grid. The
+ * palette mirrors the app — slate text, brand blue for the one action — so a
+ * reminder looks like it came from the same product as the payment page it
+ * links to.
+ */
+function shell(
+  bodyHtml: string,
+  payUrl: string,
+  creditorName: string,
+  preheader: string,
+): string {
+  const safeUrl = escapeHtml(payUrl);
+
   return `<!doctype html>
 <html lang="el">
-  <body style="margin:0;padding:24px;background:#f6f7f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#111827;">
-    <table role="presentation" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>${escapeHtml(creditorName)}</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+    <!-- Inbox preview line. Hidden in the message body itself. -->
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">${escapeHtml(preheader)}</div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f1f5f9;">
       <tr>
-        <td style="padding:32px;">
-          ${bodyHtml}
-          <p style="margin:28px 0 0;">
-            <a href="${escapeHtml(payUrl)}" style="display:inline-block;background:#111827;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:600;">
-              Πληρωμή τώρα
-            </a>
-          </p>
-          <p style="margin:24px 0 0;font-size:12px;color:#6b7280;line-height:1.6;">
-            Αν έχετε ήδη εξοφλήσει, αγνοήστε αυτό το μήνυμα.<br />
-            Το μήνυμα αποστέλλεται για λογαριασμό της ${escapeHtml(creditorName)}
-            μέσω της πλατφόρμας lefta.app.
-          </p>
+        <td align="center" style="padding:32px 16px;">
+
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
+            <tr>
+              <td style="padding:0 4px 14px;font-size:15px;font-weight:600;letter-spacing:-0.01em;color:#0f172a;">
+                lefta<span style="color:#3b6df5;">.app</span>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="padding:32px 32px 8px;font-size:15px;line-height:1.65;color:#334155;">
+                      ${bodyHtml}
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td style="padding:16px 32px 32px;">
+                      <!-- Bulletproof-ish button: a padded table cell, because
+                           Outlook ignores padding on an inline-block anchor. -->
+                      <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                        <tr>
+                          <td bgcolor="#2b55d4" style="border-radius:10px;">
+                            <a href="${safeUrl}" style="display:inline-block;padding:13px 26px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">
+                              Πληρωμή τώρα
+                            </a>
+                          </td>
+                        </tr>
+                      </table>
+
+                      <p style="margin:14px 0 0;font-size:12px;line-height:1.6;color:#64748b;word-break:break-all;">
+                        <a href="${safeUrl}" style="color:#2b55d4;text-decoration:none;">${safeUrl}</a>
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:18px 8px 0;font-size:12px;line-height:1.7;color:#64748b;">
+                Αν έχετε ήδη εξοφλήσει, αγνοήστε αυτό το μήνυμα.<br />
+                Αποστέλλεται για λογαριασμό της
+                <span style="color:#334155;">${escapeHtml(creditorName)}</span>
+                μέσω της πλατφόρμας lefta.app.
+              </td>
+            </tr>
+          </table>
+
         </td>
       </tr>
     </table>
@@ -284,10 +350,18 @@ export function renderEmail(
   );
   const text = applyPlaceholders(template.body, ctx);
 
+  // The inbox preview line. The greeting is the same on every reminder, so the
+  // second paragraph carries the actual news and makes the more useful preview.
+  const blocks = text
+    .split(/\n{2,}/)
+    .map((b) => b.trim().replace(/\s+/g, ' '))
+    .filter(Boolean);
+  const preheader = blocks[1] ?? blocks[0] ?? subject;
+
   return {
     subject,
     text,
-    html: shell(toParagraphs(text), ctx.payUrl, ctx.creditorName),
+    html: shell(toParagraphs(text), ctx.payUrl, ctx.creditorName, preheader),
   };
 }
 

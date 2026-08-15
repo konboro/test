@@ -37,7 +37,7 @@ export function PayButton({ token }: { token: string }) {
 
   return (
     <>
-      <Button onClick={pay} disabled={busy} className="w-full py-3 text-base">
+      <Button onClick={pay} disabled={busy} variant="brand" className="w-full py-3 text-base">
         {busy ? 'Ανακατεύθυνση…' : 'Πληρωμή τώρα'}
       </Button>
       {error ? (

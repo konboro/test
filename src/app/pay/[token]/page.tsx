@@ -46,9 +46,11 @@ export default async function PayPage({
         </p>
 
         <div className="mt-4 overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-sm">
-          <div className="border-b border-ink-200 px-6 py-6 text-center">
-            <p className="text-xs uppercase tracking-wide text-ink-500">Οφειλόμενο ποσό</p>
-            <p className="tabular mt-1 text-4xl font-semibold text-ink-900">
+          <div className="border-b border-ink-200 bg-linear-to-b from-brand-50 to-white px-6 py-7 text-center">
+            <p className="text-xs font-medium uppercase tracking-wide text-brand-700">
+              Οφειλόμενο ποσό
+            </p>
+            <p className="tabular mt-1.5 text-4xl font-semibold tracking-tight text-ink-900">
               {formatMoney(invoice.amount_cents, invoice.currency)}
             </p>
           </div>
@@ -103,9 +105,12 @@ export default async function PayPage({
         </div>
 
         <p className="mt-6 text-center text-xs leading-relaxed text-ink-500">
-          Η σελίδα παρέχεται από την πλατφόρμα lefta.app για λογαριασμό της{' '}
-          {invoice.creditor_name}. Για ερωτήματα σχετικά με το παραστατικό, απευθυνθείτε απευθείας
-          στον εκδότη.
+          Η σελίδα παρέχεται από την πλατφόρμα{' '}
+          <span className="font-semibold text-ink-700">
+            lefta<span className="text-brand-500">.app</span>
+          </span>{' '}
+          για λογαριασμό της {invoice.creditor_name}. Για ερωτήματα σχετικά με το παραστατικό,
+          απευθυνθείτε απευθείας στον εκδότη.
         </p>
       </div>
     </main>

@@ -76,11 +76,13 @@ export function Badge({
   );
 }
 
+export type ButtonVariant = 'primary' | 'brand' | 'secondary' | 'danger';
+
 export function Button({
   variant = 'primary',
   className = '',
   ...props
-}: ComponentProps<'button'> & { variant?: 'primary' | 'secondary' | 'danger' }) {
+}: ComponentProps<'button'> & { variant?: ButtonVariant }) {
   return <button {...props} className={`${buttonClass(variant)} ${className}`} />;
 }
 
@@ -88,21 +90,32 @@ export function ButtonLink({
   variant = 'primary',
   className = '',
   ...props
-}: ComponentProps<typeof Link> & { variant?: 'primary' | 'secondary' | 'danger' }) {
+}: ComponentProps<typeof Link> & { variant?: ButtonVariant }) {
   return <Link {...props} className={`${buttonClass(variant)} ${className}`} />;
 }
 
-function buttonClass(variant: 'primary' | 'secondary' | 'danger') {
+/**
+ * Two families of action, deliberately different colours.
+ *
+ * `primary` (ink) is for running the business — save, record, create. `brand`
+ * (blue) is reserved for the money path the debtor walks: it is the colour of
+ * the button in the reminder email, so the payment page they land on looks like
+ * the message they clicked rather than a different site.
+ */
+function buttonClass(variant: ButtonVariant) {
   const base =
-    'inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50';
+    'inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 
   if (variant === 'primary') {
-    return `${base} bg-ink-900 text-white hover:bg-ink-800`;
+    return `${base} bg-ink-900 text-white hover:bg-ink-800 focus-visible:ring-ink-400`;
+  }
+  if (variant === 'brand') {
+    return `${base} bg-brand-600 text-white shadow-sm hover:bg-brand-700 focus-visible:ring-brand-500`;
   }
   if (variant === 'danger') {
-    return `${base} bg-red-600 text-white hover:bg-red-700`;
+    return `${base} bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-400`;
   }
-  return `${base} border border-ink-300 bg-white text-ink-700 hover:bg-ink-50`;
+  return `${base} border border-ink-300 bg-white text-ink-700 hover:bg-ink-50 focus-visible:ring-ink-300`;
 }
 
 export function Field({
@@ -124,7 +137,23 @@ export function Field({
 }
 
 export const inputClass =
-  'mt-1.5 w-full rounded-lg border border-ink-300 bg-white px-3 py-2 text-sm text-ink-900 outline-none placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100';
+  'mt-1.5 w-full rounded-lg border border-ink-300 bg-white px-3 py-2 text-sm text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100';
+
+/**
+ * Link styling, in two weights.
+ *
+ * `linkClass` is the actionable one — brand blue, the same colour as the payment
+ * button in the emails, so "this does something" reads the same everywhere.
+ * `subtleLinkClass` is for secondary row actions that should not compete with it.
+ *
+ * Both underline only on hover: in a dense table, permanently underlined links
+ * turn every row into visual noise.
+ */
+export const linkClass =
+  'font-medium text-brand-600 underline-offset-2 transition hover:text-brand-700 hover:underline focus-visible:underline disabled:opacity-50';
+
+export const subtleLinkClass =
+  'font-medium text-ink-500 underline-offset-2 transition hover:text-ink-800 hover:underline focus-visible:underline disabled:opacity-50';
 
 export function EmptyState({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
   return (

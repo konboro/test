@@ -157,6 +157,17 @@ describe('email rendering', () => {
     }).html;
 
     expect(html).toContain('πρώτη<br />δεύτερη');
-    expect((html.match(/<p style="margin:0 0 16px;line-height:1.6;">/g) ?? []).length).toBe(2);
+    expect((html.match(/<p style="margin:0 0 16px;/g) ?? []).length).toBe(2);
+  });
+
+  it('uses the second paragraph as the inbox preview line', () => {
+    // Every reminder opens with the same greeting, so previewing it would tell
+    // the recipient nothing.
+    const html = renderEmail(null, ctx, {
+      'manual:email': { subject: 'θέμα', body: 'Αγαπητοί συνεργάτες,\n\nτο ποσό είναι {{amount}}.' },
+    }).html;
+
+    expect(html).toContain('το ποσό είναι 1.240,00');
+    expect(html).toContain('mso-hide:all');
   });
 });
