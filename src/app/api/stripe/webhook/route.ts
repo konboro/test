@@ -41,6 +41,13 @@ export async function POST(request: Request) {
         await handleAccountUpdated(event.data.object);
         break;
 
+      case 'account.application.deauthorized':
+        // The tenant disconnected us from their own Stripe dashboard rather
+        // than from Settings here. Without this we would go on believing they
+        // are connected and keep offering debtors a payment button that fails.
+        await handleDeauthorized(event.account ?? null);
+        break;
+
       case 'checkout.session.expired':
       case 'checkout.session.async_payment_failed':
         // Nothing to undo: the invoice was never marked paid.
@@ -90,6 +97,21 @@ function verify(payload: string, signature: string): Stripe.Event | null {
 
   console.error('[stripe:webhook] signature matched none of the configured secrets');
   return null;
+}
+
+async function handleDeauthorized(account: string | null) {
+  if (!account) return;
+
+  const { error } = await createAdminClient()
+    .from('users')
+    .update({
+      stripe_account_id: null,
+      stripe_charges_enabled: false,
+      stripe_connected_at: null,
+    })
+    .eq('stripe_account_id', account);
+
+  if (error) throw new Error(`Clearing a deauthorized account: ${error.message}`);
 }
 
 async function handleAccountUpdated(account: Stripe.Account) {
