@@ -139,7 +139,7 @@ export default async function InvoicesPage({
                         <div className="flex items-center justify-end gap-3">
                           {invoice.status === 'pending' ? (
                             <>
-                              <RemindButton invoiceId={invoice.id} />
+                              <RemindButton invoiceId={invoice.id} label={label} />
                               <CopyPayLink token={invoice.pay_token} />
                               <form action={markInvoicePaid}>
                                 <input type="hidden" name="id" value={invoice.id} />

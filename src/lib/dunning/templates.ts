@@ -72,6 +72,35 @@ export function parseSlotKey(
   return slot ? { step: slot.step, channel: slot.channel } : null;
 }
 
+/**
+ * Wordings offered when sending a reminder by hand.
+ *
+ * This picks the *copy*, not a position on the ladder. Sending the step 3 text
+ * today does not mark step 3 as done — a manual contact never consumes a rung,
+ * so the automated escalation still runs its course afterwards.
+ */
+export const REMINDER_CHOICES: ReadonlyArray<{
+  value: string;
+  step: TemplateStep;
+  label: string;
+}> = [
+  { value: 'manual', step: null, label: 'Χειροκίνητη υπενθύμιση' },
+  { value: 'pre_due', step: 'pre_due', label: 'Κείμενο βήματος 1 — πριν τη λήξη' },
+  { value: 'overdue_2', step: 'overdue_2', label: 'Κείμενο βήματος 2 — ληξιπρόθεσμο' },
+  { value: 'overdue_10', step: 'overdue_10', label: 'Κείμενο βήματος 3 — τελική υπενθύμιση' },
+];
+
+/**
+ * Resolves a picker value to the template step it renders with.
+ *
+ * Returns `undefined` — not `null` — for an unknown value, because `null` is a
+ * legitimate step meaning "the manual slot" and the two must not be confused.
+ */
+export function parseReminderChoice(value: string): TemplateStep | undefined {
+  const choice = REMINDER_CHOICES.find((c) => c.value === value);
+  return choice ? choice.step : undefined;
+}
+
 export interface PlaceholderInfo {
   token: string;
   label: string;

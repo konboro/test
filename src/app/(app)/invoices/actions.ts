@@ -3,7 +3,12 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
-import { sendManualReminder } from '@/lib/dunning/manual';
+import {
+  previewManualReminder,
+  sendManualReminder,
+  type ReminderPreview,
+} from '@/lib/dunning/manual';
+import { parseReminderChoice } from '@/lib/dunning/templates';
 import { toCents } from '@/lib/money';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
@@ -28,13 +33,16 @@ export async function sendReminder(
   const id = String(formData.get('id') ?? '');
   if (!id) return { error: 'Λείπει το παραστατικό.' };
 
+  const step = parseReminderChoice(String(formData.get('choice') ?? 'manual'));
+  if (step === undefined) return { error: 'Άγνωστο πρότυπο.' };
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: 'Μη εξουσιοδοτημένη ενέργεια.' };
 
-  const result = await sendManualReminder({ userId: user.id, invoiceId: id });
+  const result = await sendManualReminder({ userId: user.id, invoiceId: id, step });
 
   revalidatePath('/invoices');
   revalidatePath('/logs');
@@ -53,6 +61,28 @@ export async function sendReminder(
   }
 
   return { success: `Η υπενθύμιση στάλθηκε (${delivered.join(' + ')}).` };
+}
+
+/**
+ * Renders what a reminder would look like for this invoice, without sending.
+ *
+ * Read-only: it never claims a contact, so opening the preview cannot cost the
+ * debtor their one contact for the day.
+ */
+export async function previewReminder(
+  invoiceId: string,
+  choice: string,
+): Promise<ReminderPreview> {
+  const step = parseReminderChoice(choice);
+  if (step === undefined) return { ok: false, error: 'Άγνωστο πρότυπο.' };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Μη εξουσιοδοτημένη ενέργεια.' };
+
+  return previewManualReminder({ userId: user.id, invoiceId, step });
 }
 
 /**

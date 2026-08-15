@@ -57,13 +57,25 @@ export async function dispatchContact(params: {
   tenant: UserRow;
   debtor: DebtorRow;
   invoice: InvoiceRow;
-  /** Null for a manual reminder. Recorded on every audit row. */
+  /**
+   * The ladder step this contact *is*, recorded on every audit row. Null for a
+   * manual reminder — the log must not claim a rung fired when none did.
+   */
   step: TemplateStep;
+  /**
+   * The template to render with. Defaults to `step`. A manual send may borrow a
+   * ladder step's wording, which changes the copy but not what it was: the
+   * exact body transmitted is preserved in the log either way.
+   */
+  templateStep?: TemplateStep;
   contactId: string;
   channels: ReadonlyArray<Channel>;
   overrides: TemplateOverrides;
 }): Promise<DispatchOutcome> {
   const { tenant, debtor, invoice, step, contactId, channels, overrides } = params;
+  // `templateStep` may legitimately be null, so distinguish "not passed" from
+  // "passed as null" rather than falling back with ??.
+  const copyStep = params.templateStep !== undefined ? params.templateStep : step;
   const supabase = createAdminClient();
   const ctx = templateContext(tenant, debtor, invoice);
 
@@ -78,7 +90,7 @@ export async function dispatchContact(params: {
   };
 
   if (channels.includes('email') && debtor.email) {
-    const email = renderEmail(step, ctx, overrides);
+    const email = renderEmail(copyStep, ctx, overrides);
 
     if (!emailAvailable()) {
       // Reached only when another channel carried this contact — a step is never
@@ -120,7 +132,7 @@ export async function dispatchContact(params: {
 
   const phone = normalisePhone(debtor.phone);
   if (channels.includes('sms') && phone) {
-    const body = renderSms(step, ctx, overrides);
+    const body = renderSms(copyStep, ctx, overrides);
 
     // Ask whether the provider exists *before* reserving a credit. Reserving
     // first would push every message through a reserve-then-refund cycle that

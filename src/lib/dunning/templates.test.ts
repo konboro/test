@@ -4,7 +4,9 @@ import {
   applyPlaceholders,
   DEFAULT_TEMPLATES,
   EDITABLE_SLOTS,
+  parseReminderChoice,
   parseSlotKey,
+  REMINDER_CHOICES,
   renderEmail,
   renderSms,
   slotKey,
@@ -85,6 +87,24 @@ describe('template resolution', () => {
       expect(DEFAULT_TEMPLATES[slot.key]?.body ?? '').not.toBe('');
       expect(parseSlotKey(slot.key)).toEqual({ step: slot.step, channel: slot.channel });
     }
+  });
+
+  it('resolves every reminder choice to a renderable template', () => {
+    for (const choice of REMINDER_CHOICES) {
+      const step = parseReminderChoice(choice.value);
+      expect(step).toBe(choice.step);
+      // Both channels must render for any choice the picker offers, including
+      // the step-1 wording whose SMS body the ladder itself never uses.
+      expect(renderEmail(step as never, ctx).text).not.toBe('');
+      expect(renderSms(step as never, ctx)).not.toBe('');
+    }
+  });
+
+  it('distinguishes an unknown choice from the manual slot', () => {
+    // `null` is a real step meaning "manual", so a rejection has to be
+    // `undefined` or the two collapse and junk input sends the manual template.
+    expect(parseReminderChoice('manual')).toBeNull();
+    expect(parseReminderChoice('nope')).toBeUndefined();
   });
 
   it('refuses a slot key that is not offered in the editor', () => {

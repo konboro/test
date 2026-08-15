@@ -1,11 +1,19 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { Button, Field, inputClass } from '@/components/ui';
+import type { ReminderPreview } from '@/lib/dunning/manual';
+import { REMINDER_CHOICES } from '@/lib/dunning/templates';
 
-import { createInvoice, sendReminder, type InvoiceFormState, type ReminderState } from './actions';
+import {
+  createInvoice,
+  previewReminder,
+  sendReminder,
+  type InvoiceFormState,
+  type ReminderState,
+} from './actions';
 
 function Submit() {
   const { pending } = useFormStatus();
@@ -95,39 +103,192 @@ export function CreateInvoiceForm({
 }
 
 /**
- * Sends a reminder for this invoice now.
+ * Sends a reminder for this invoice, after choosing the wording and reading
+ * exactly what will go out.
  *
- * The outcome is shown next to the button rather than as a toast: during setup
- * the interesting answer is usually a refusal ("already contacted today", "no
- * provider configured"), and that needs to stay on screen next to the row it
- * belongs to.
+ * The preview is rendered by the same code that does the sending, on the server,
+ * with this invoice's real values substituted — a preview assembled separately
+ * in the browser would eventually disagree with the message, which defeats the
+ * point of having one.
  */
-export function RemindButton({ invoiceId }: { invoiceId: string }) {
-  const [state, action, pending] = useActionState<ReminderState, FormData>(sendReminder, {});
+export function RemindButton({ invoiceId, label }: { invoiceId: string; label: string }) {
+  const [open, setOpen] = useState(false);
+  const [choice, setChoice] = useState('manual');
+  const [preview, setPreview] = useState<ReminderPreview | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [state, action, sending] = useActionState<ReminderState, FormData>(sendReminder, {});
+
+  useEffect(() => {
+    if (!open) return;
+
+    let cancelled = false;
+    setLoading(true);
+
+    previewReminder(invoiceId, choice)
+      .then((result) => {
+        if (!cancelled) setPreview(result);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    // A stale response from the previously selected wording must not overwrite
+    // the current one.
+    return () => {
+      cancelled = true;
+    };
+  }, [open, choice, invoiceId]);
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-sm font-medium text-brand-600 hover:underline"
+        title="Προεπισκόπηση και αποστολή υπενθύμισης"
+      >
+        Υπενθύμιση
+      </button>
+    );
+  }
+
+  const sent = Boolean(state.success);
 
   return (
-    <form action={action} className="flex items-center gap-2">
-      <input type="hidden" name="id" value={invoiceId} />
-      <button
-        type="submit"
-        disabled={pending}
-        className="text-sm font-medium text-brand-600 hover:underline disabled:opacity-50"
-        title="Αποστολή υπενθύμισης τώρα (μία επικοινωνία ανά πελάτη ανά ημέρα)"
-      >
-        {pending ? 'Αποστολή…' : 'Υπενθύμιση'}
+    <>
+      <button type="button" className="text-sm font-medium text-brand-600" disabled>
+        Υπενθύμιση
       </button>
 
-      {state.error ? (
-        <span role="alert" className="max-w-[16rem] text-xs leading-tight text-red-600">
-          {state.error}
-        </span>
-      ) : null}
-      {state.success ? (
-        <span role="status" className="text-xs text-emerald-700">
-          {state.success}
-        </span>
-      ) : null}
-    </form>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Υπενθύμιση για ${label}`}
+        className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-900/40 p-4 sm:items-center"
+      >
+        <div className="w-full max-w-2xl rounded-2xl border border-ink-200 bg-white text-left shadow-xl">
+          <div className="flex items-start justify-between gap-4 border-b border-ink-200 px-5 py-4">
+            <div>
+              <h2 className="text-sm font-semibold text-ink-900">Υπενθύμιση πληρωμής</h2>
+              <p className="mt-0.5 text-xs text-ink-500">Παραστατικό {label}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="text-sm text-ink-500 hover:text-ink-800"
+            >
+              Κλείσιμο
+            </button>
+          </div>
+
+          <div className="space-y-4 px-5 py-4">
+            <Field label="Κείμενο">
+              <select
+                value={choice}
+                onChange={(e) => setChoice(e.target.value)}
+                disabled={sent}
+                className={inputClass}
+              >
+                {REMINDER_CHOICES.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <p className="text-xs text-ink-500">
+              Επιλέγετε μόνο το κείμενο. Η χειροκίνητη αποστολή δεν καταναλώνει βήμα της
+              αυτόματης ροής — το βήμα 2 θα σταλεί κανονικά αργότερα.
+            </p>
+
+            {loading ? (
+              <p className="text-sm text-ink-500">Φόρτωση προεπισκόπησης…</p>
+            ) : preview?.ok ? (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  {preview.willSend?.length ? (
+                    preview.willSend.map((channel) => (
+                      <span
+                        key={channel}
+                        className="rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700"
+                      >
+                        {channel === 'email' ? `Email → ${preview.emailTo}` : `SMS → ${preview.smsTo}`}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="rounded-full bg-red-50 px-2 py-0.5 font-medium text-red-700">
+                      Κανένα διαθέσιμο κανάλι
+                    </span>
+                  )}
+                </div>
+
+                {preview.notes?.length ? (
+                  <ul className="space-y-1 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    {preview.notes.map((note) => (
+                      <li key={note}>{note}</li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                {preview.willSend?.includes('email') ? (
+                  <div className="rounded-lg border border-ink-200">
+                    <div className="border-b border-ink-100 px-3 py-2 text-xs text-ink-500">
+                      Θέμα: <span className="text-ink-800">{preview.subject}</span>
+                    </div>
+                    <pre className="max-h-64 overflow-auto whitespace-pre-wrap px-3 py-3 text-xs leading-relaxed text-ink-800">
+                      {preview.emailBody}
+                    </pre>
+                  </div>
+                ) : null}
+
+                {preview.willSend?.includes('sms') ? (
+                  <div className="rounded-lg border border-ink-200">
+                    <div className="border-b border-ink-100 px-3 py-2 text-xs text-ink-500">
+                      SMS — {preview.smsSegments} τμήμα(τα)
+                    </div>
+                    <pre className="whitespace-pre-wrap px-3 py-3 text-xs leading-relaxed text-ink-800">
+                      {preview.smsBody}
+                    </pre>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                {preview?.error ?? 'Δεν ήταν δυνατή η προεπισκόπηση.'}
+              </p>
+            )}
+
+            {state.error ? (
+              <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                {state.error}
+              </p>
+            ) : null}
+            {state.success ? (
+              <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                {state.success}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="flex justify-end gap-2 border-t border-ink-200 px-5 py-4">
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+              {sent ? 'Κλείσιμο' : 'Άκυρο'}
+            </Button>
+
+            {!sent ? (
+              <form action={action}>
+                <input type="hidden" name="id" value={invoiceId} />
+                <input type="hidden" name="choice" value={choice} />
+                <Button type="submit" disabled={sending || loading || !preview?.willSend?.length}>
+                  {sending ? 'Αποστολή…' : 'Αποστολή τώρα'}
+                </Button>
+              </form>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
