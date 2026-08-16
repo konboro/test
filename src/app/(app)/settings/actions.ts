@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import { parseSlotKey } from '@/lib/dunning/templates';
 import { isLocale, LOCALE_COOKIE } from '@/lib/i18n';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
 export interface SettingsState {
@@ -90,6 +91,37 @@ export async function updateLocale(formData: FormData): Promise<void> {
 
   // The language lives in the layout chrome too, so the whole tree has to go.
   revalidatePath('/', 'layout');
+}
+
+/**
+ * Picks which provider the payment button uses.
+ *
+ * Written with the service role because `payment_provider` is not in the
+ * authenticated update grant — the same treatment every other payment column
+ * gets, so a browser session can never reach across and repoint another
+ * tenant's payments.
+ *
+ * An empty value clears the preference, which resolves to whichever provider is
+ * configured rather than to "none": there is no way to switch payments off from
+ * here by accident.
+ */
+export async function updatePaymentProvider(formData: FormData): Promise<void> {
+  const raw = String(formData.get('payment_provider') ?? '');
+  const provider = raw === 'stripe' || raw === 'viva' ? raw : null;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { error } = await createAdminClient()
+    .from('users')
+    .update({ payment_provider: provider })
+    .eq('id', user.id);
+  if (error) return;
+
+  revalidatePath('/settings');
 }
 
 const templateSchema = z.object({

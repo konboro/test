@@ -11,6 +11,9 @@ export type CommChannel = 'email' | 'sms';
 export type CommStatus = 'sent' | 'failed' | 'skipped';
 export type DunningStep = 'pre_due' | 'overdue_2' | 'overdue_10';
 export type MyDataEnvironment = 'production' | 'sandbox';
+/** Viva runs two separate estates; a credential pair belongs to exactly one. */
+export type VivaEstate = 'demo' | 'production';
+export type PaymentProviderName = 'stripe' | 'viva';
 /** Portal interface language. Reminder copy is unaffected. */
 export type UserLocale = 'el' | 'en';
 
@@ -37,6 +40,14 @@ export type UserRow = {
   stripe_connected_at: string | null;
   /** The tenant’s own Stripe key, used until Connect has a platform to run on. */
   stripe_secret_key_enc: string | null;
+  /** Viva Smart Checkout credentials, same envelope as the Stripe and Elorus ones. */
+  viva_client_id_enc: string | null;
+  viva_client_secret_enc: string | null;
+  /** Null books orders against the account's default source. */
+  viva_source_code: string | null;
+  viva_environment: VivaEstate;
+  /** Preferred provider when both are set up. Null resolves to whichever is. */
+  payment_provider: PaymentProviderName | null;
   sms_credits: number;
   automation_enabled: boolean;
   reply_to_email: string | null;
@@ -77,6 +88,10 @@ export type InvoiceRow = {
   paid_amount_cents: number | null;
   stripe_checkout_session_id: string | null;
   stripe_payment_intent_id: string | null;
+  /** Set when the payment starts; the return route settles only a matching order. */
+  viva_order_code: string | null;
+  /** Set only after the transaction was read back from Viva, never from a redirect. */
+  viva_transaction_id: string | null;
   pay_token: string;
   /** The short public credential the reminder link carries. */
   short_code: string;
