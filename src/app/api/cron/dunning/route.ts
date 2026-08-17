@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { syncBankFeeds } from '@/lib/bank/sync';
 import { safeEqual } from '@/lib/crypto';
 import { runDunningSweep } from '@/lib/dunning/engine';
 import { requireEnv } from '@/lib/env';
@@ -29,9 +30,26 @@ async function handle(request: NextRequest) {
   const dryRun = request.nextUrl.searchParams.get('dryRun') === '1';
 
   try {
+    // Read the bank first, chase second. An invoice paid by transfer yesterday
+    // has to leave the candidate set *before* the sweep considers it, or the
+    // debtor is chased for money that already arrived.
+    //
+    // A dry run skips it: settling an invoice is a real mutation and "dry" has
+    // to mean nothing changed. And a failure here is logged, never fatal — the
+    // ladder is the product, the feed is an improvement on top of it.
+    let bank = null;
+    if (!dryRun) {
+      try {
+        bank = await syncBankFeeds();
+        console.info('[cron:bank]', bank);
+      } catch (cause) {
+        console.error('[cron:bank] failed', String(cause));
+      }
+    }
+
     const result = await runDunningSweep({ dryRun });
     console.info('[cron:dunning]', result);
-    return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json({ ok: true, ...result, bank });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('[cron:dunning] failed', message);

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 
 import { Badge, Card, CardHeader } from '@/components/ui';
+import { bankingConfigured, listAspsps } from '@/lib/bank/client';
 import { LADDER } from '@/lib/dunning/engine';
 
 import { DEFAULT_TEMPLATES, EDITABLE_SLOTS, slotKey } from '@/lib/dunning/templates';
@@ -15,6 +16,7 @@ import type { DunningStep } from '@/types/database';
 
 import { updateLocale } from './actions';
 import { ElorusForm } from './elorus-forms';
+import { BankConnect } from './bank-forms';
 import { CreditPacks, MyDataForm, ProfileForm } from './settings-forms';
 import { StripeConnect } from './stripe-forms';
 import { TemplateEditor, type TemplateSlotView } from './template-forms';
@@ -58,6 +60,20 @@ export default async function SettingsPage({
     .maybeSingle();
 
   if (!profile) redirect('/login');
+
+  const { data: bankConnections } = await supabase
+    .from('bank_connections')
+    .select('*')
+    .order('created_at', { ascending: true });
+
+  // The bank list comes from the provider. A failure there must not take the
+  // settings page down with it — the card just says the service is unavailable.
+  const banks = bankingConfigured()
+    ? await listAspsps('GR').catch((cause) => {
+        console.error('[settings:banks]', String(cause));
+        return [];
+      })
+    : [];
 
   // The key column is excluded from the authenticated grant on purpose, so its
   // mere presence is read with the service role and nothing but a boolean leaves
@@ -178,6 +194,23 @@ export default async function SettingsPage({
             available={connectConfigured()}
             hasOwnKey={hasOwnStripeKey}
           />
+        </div>
+      </Card>
+
+      <Card>
+        <div id="bank" className="scroll-mt-20">
+          <CardHeader
+            title="Τραπεζικός λογαριασμός"
+            subtitle="Εντοπισμός εξοφλήσεων με έμβασμα, ώστε οι υπενθυμίσεις να σταματούν μόνες τους."
+            action={
+              (bankConnections ?? []).some((c) => c.status === 'active') ? (
+                <Badge tone="positive">{t.settings.connected}</Badge>
+              ) : (
+                <Badge tone="warning">{t.settings.notConnected}</Badge>
+              )
+            }
+          />
+          <BankConnect banks={banks} connections={bankConnections ?? []} />
         </div>
       </Card>
 

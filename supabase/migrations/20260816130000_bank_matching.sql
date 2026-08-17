@@ -12,9 +12,13 @@
 -- connections
 -- ---------------------------------------------------------------------------
 -- One row per bank account a creditor has linked through the account
--- information provider. Consent is granted for 90 days at a time and then the
--- feed stops without an error anywhere, so `consent_expires_at` is a
--- first-class column: the panel warns on it and the sweep refuses to rely on it.
+-- information provider.
+--
+-- Consent is finite and we choose its length at authorisation time, capped by
+-- the bank: the Greek banks currently allow 180 days. When it lapses the feed
+-- simply stops returning data — no error, no callback, nothing. So
+-- `consent_expires_at` is a first-class column: the panel warns on it and the
+-- sweep retires the connection rather than reporting an empty statement.
 
 create table public.bank_connections (
   id                 uuid primary key default gen_random_uuid(),
@@ -23,9 +27,9 @@ create table public.bank_connections (
   institution_id     text not null,
   institution_name   text not null,
 
-  -- The provider's handles. `account_id` stays null until the creditor comes
-  -- back from their bank and the requisition resolves to an account.
-  requisition_id     text not null,
+  -- The provider's handles. Both stay null until the creditor comes back from
+  -- their bank and the authorisation resolves to an account.
+  authorization_id   text,
   account_id         text,
 
   status             text not null default 'pending'

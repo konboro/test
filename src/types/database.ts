@@ -144,6 +144,46 @@ export type SmsCreditPurchaseRow = {
   created_at: string;
 }
 
+/** One bank account a creditor has linked for reading their own statement. */
+export type BankConnectionRow = {
+  id: string;
+  user_id: string;
+  institution_id: string;
+  institution_name: string;
+  /** Both stay null until the creditor returns from their bank. */
+  authorization_id: string | null;
+  account_id: string | null;
+  status: 'pending' | 'active' | 'expired' | 'revoked';
+  /** Consent is finite; when it lapses the feed stops without an error. */
+  consent_expires_at: string | null;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** An incoming credit. Debits are dropped before they can be stored. */
+export type BankTransactionRow = {
+  id: string;
+  user_id: string;
+  connection_id: string;
+  provider_tx_id: string;
+  booked_on: string;
+  amount_cents: number;
+  currency: string;
+  remittance: string | null;
+  counterparty_name: string | null;
+  counterparty_iban: string | null;
+  state: 'unmatched' | 'review' | 'settled' | 'dismissed';
+  matched_invoice_id: string | null;
+  /** Which evidence fired: 'reference' | 'name' | 'iban'. */
+  match_signals: string[];
+  matched_at: string | null;
+  /** Null when matched automatically; the operator's id when confirmed by hand. */
+  matched_by: string | null;
+  rejected_invoice_ids: string[];
+  created_at: string;
+}
+
 export type PaymentPageInvoice = {
   invoice_id: string;
   invoice_number: string | null;
@@ -229,6 +269,21 @@ export interface Database {
           'user_id' | 'credits' | 'amount_cents' | 'stripe_checkout_session_id'
         >;
         Update: Partial<SmsCreditPurchaseRow>;
+        Relationships: NoRelationships;
+      };
+      bank_connections: {
+        Row: BankConnectionRow;
+        Insert: InsertOf<BankConnectionRow, 'user_id' | 'institution_id' | 'institution_name'>;
+        Update: Partial<BankConnectionRow>;
+        Relationships: NoRelationships;
+      };
+      bank_transactions: {
+        Row: BankTransactionRow;
+        Insert: InsertOf<
+          BankTransactionRow,
+          'user_id' | 'connection_id' | 'provider_tx_id' | 'booked_on' | 'amount_cents' | 'currency'
+        >;
+        Update: Partial<BankTransactionRow>;
         Relationships: NoRelationships;
       };
     };
