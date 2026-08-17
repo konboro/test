@@ -18,7 +18,9 @@ import { updateLocale } from './actions';
 import { ElorusForm } from './elorus-forms';
 import { BankConnect } from './bank-forms';
 import { CreditPacks, MyDataForm, ProfileForm } from './settings-forms';
+import { ProviderChooser } from './provider-chooser';
 import { StripeConnect } from './stripe-forms';
+import { VivaForm } from './viva-forms';
 import { TemplateEditor, type TemplateSlotView } from './template-forms';
 
 export async function generateMetadata() {
@@ -80,10 +82,11 @@ export default async function SettingsPage({
   // this function.
   const { data: keyRow } = await createAdminClient()
     .from('users')
-    .select('stripe_secret_key_enc')
+    .select('stripe_secret_key_enc, viva_client_id_enc, viva_client_secret_enc, viva_source_code, viva_environment, payment_provider')
     .eq('id', user.id)
     .maybeSingle();
   const hasOwnStripeKey = Boolean(keyRow?.stripe_secret_key_enc);
+  const vivaConfigured = Boolean(keyRow?.viva_client_id_enc && keyRow?.viva_client_secret_enc);
 
   // RLS scopes this to the tenant. A slot with no row keeps the built-in copy.
   const { data: templates } = await supabase
@@ -197,6 +200,44 @@ export default async function SettingsPage({
         </div>
       </Card>
 
+      <Card>
+        <div id="viva" className="scroll-mt-20">
+          <CardHeader
+            title={t.settings.viva}
+            subtitle={t.settings.vivaHint}
+            action={
+              vivaConfigured ? (
+                <Badge tone={keyRow?.viva_environment === 'production' ? 'positive' : 'warning'}>
+                  {keyRow?.viva_environment === 'production'
+                    ? t.settings.vivaProduction
+                    : t.settings.vivaDemo}
+                </Badge>
+              ) : (
+                <Badge tone="warning">{t.settings.notConnected}</Badge>
+              )
+            }
+          />
+          <VivaForm
+            configured={vivaConfigured}
+            environment={keyRow?.viva_environment ?? 'demo'}
+            sourceCode={keyRow?.viva_source_code ?? null}
+          />
+        </div>
+      </Card>
+
+      {/* Only worth asking once there is something to choose between. With one
+          provider set up the answer is forced, and a dropdown with a single
+          real option is a decision the operator does not have to make. */}
+      {vivaConfigured && (hasOwnStripeKey || profile.stripe_account_id) ? (
+        <Card>
+          <CardHeader title={t.settings.providerTitle} subtitle={t.settings.providerHint} />
+          <ProviderChooser current={keyRow?.payment_provider ?? null} />
+        </Card>
+      ) : null}
+
+      {/* Collecting the money and noticing it arrived are separate problems:
+          the cards above take card payments, this one reads the bank so a
+          transfer settles the invoice on its own. */}
       <Card>
         <div id="bank" className="scroll-mt-20">
           <CardHeader
