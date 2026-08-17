@@ -16,6 +16,8 @@ import { matchCredit, type InvoiceCandidate } from './match';
 
 export interface BankSyncResult {
   connectionsChecked: number;
+  /** Rows the bank returned, before debits and unparseable entries are dropped. */
+  fetched: number;
   creditsSeen: number;
   creditsNew: number;
   settled: number;
@@ -35,9 +37,13 @@ export interface BankSyncResult {
 const OVERLAP_DAYS = 7;
 const FIRST_RUN_DAYS = 90;
 
+/** Enough for a very busy 90-day window; a backstop, not a real limit. */
+const MAX_PAGES = 20;
+
 export async function syncBankFeeds(options: { userId?: string } = {}): Promise<BankSyncResult> {
   const result: BankSyncResult = {
     connectionsChecked: 0,
+    fetched: 0,
     creditsSeen: 0,
     creditsNew: 0,
     settled: 0,
@@ -107,16 +113,31 @@ async function syncConnection(connection: ConnectionRow, result: BankSyncResult)
   const supabase = createAdminClient();
   const since = windowStart(connection.last_synced_at);
 
-  const { credits } = await fetchCredits(connection.account_id, since);
-  result.creditsSeen += credits.length;
+  // Follow the pages. The first response carries a continuation key whenever the
+  // bank has more, and reading only page one silently loses the oldest part of
+  // the window — on a busy account that is most of it, with nothing to show that
+  // anything was missed. Bounded so a provider that always returns a key cannot
+  // spin here forever.
+  let continuationKey: string | null = null;
+  let page = 0;
 
-  for (const credit of credits) {
-    const inserted = await ingest(connection, credit);
-    if (!inserted) continue;
+  do {
+    const batch = await fetchCredits(connection.account_id, since, continuationKey);
 
-    result.creditsNew += 1;
-    await reconcile(connection.user_id, inserted, credit, result);
-  }
+    result.fetched += batch.fetched;
+    result.creditsSeen += batch.credits.length;
+
+    for (const credit of batch.credits) {
+      const inserted = await ingest(connection, credit);
+      if (!inserted) continue;
+
+      result.creditsNew += 1;
+      await reconcile(connection.user_id, inserted, credit, result);
+    }
+
+    continuationKey = batch.continuationKey;
+    page += 1;
+  } while (continuationKey && page < MAX_PAGES);
 
   await supabase
     .from('bank_connections')

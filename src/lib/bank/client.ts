@@ -236,14 +236,25 @@ export function toCredit(raw: RawTransaction): IncomingCredit | null {
 export async function fetchCredits(
   accountUid: string,
   since: string,
-): Promise<{ credits: IncomingCredit[]; continuationKey: string | null }> {
+  continuationKey?: string | null,
+): Promise<{ credits: IncomingCredit[]; fetched: number; continuationKey: string | null }> {
   const query = new URLSearchParams({ date_from: since, transaction_status: 'BOOK' });
+  if (continuationKey) query.set('continuation_key', continuationKey);
+
   const body = await call<{ transactions?: RawTransaction[]; continuation_key?: string }>(
     `/accounts/${encodeURIComponent(accountUid)}/transactions?${query}`,
   );
 
+  const raw = body.transactions ?? [];
+
   return {
-    credits: (body.transactions ?? []).map(toCredit).filter((c): c is IncomingCredit => c !== null),
+    credits: raw.map(toCredit).filter((c): c is IncomingCredit => c !== null),
+    // How many the bank returned, before anything was dropped. `toCredit`
+    // returns null whenever a field it needs is missing, so a schema that does
+    // not match would discard every row and look exactly like an empty account.
+    // This one number tells those two apart, which is otherwise unanswerable
+    // without the provider credentials in hand.
+    fetched: raw.length,
     continuationKey: body.continuation_key ?? null,
   };
 }
