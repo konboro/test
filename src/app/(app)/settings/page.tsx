@@ -39,12 +39,68 @@ const STRIPE_NOTICES: Record<string, string> = {
     'Αυτός ο λογαριασμός Stripe χρησιμοποιείται ήδη από άλλον χρήστη του lefta.app.',
 };
 
+/**
+ * What came back from the bank round trip.
+ *
+ * A sync that found nothing is still an answer, and the most likely one: it has
+ * to read as "we looked", not as silence, or the operator presses the button
+ * again believing it failed.
+ */
+function bankNotice(
+  outcome: string | undefined,
+  counts: { seen?: string; settled?: string; queued?: string },
+): { tone: 'ok' | 'warn'; text: string } | null {
+  switch (outcome) {
+    case 'connected':
+      return { tone: 'ok', text: 'Ο τραπεζικός λογαριασμός συνδέθηκε.' };
+    case 'cancelled':
+      return { tone: 'warn', text: 'Η σύνδεση με την τράπεζα ακυρώθηκε.' };
+    case 'no_accounts':
+      return { tone: 'warn', text: 'Η τράπεζα δεν επέστρεψε κανέναν λογαριασμό.' };
+    case 'unavailable':
+      return { tone: 'warn', text: 'Η υπηρεσία τραπεζικής σύνδεσης δεν είναι διαθέσιμη.' };
+    case 'sync_failed':
+      return {
+        tone: 'warn',
+        text: 'Ο έλεγχος δεν ολοκληρώθηκε. Οι τράπεζες περιορίζουν τους ελέγχους ανά ημέρα — δοκιμάστε αργότερα.',
+      };
+    case 'synced': {
+      const found = Number(settledOr(counts.settled));
+      const queued = Number(settledOr(counts.queued));
+      const seen = Number(settledOr(counts.seen));
+
+      if (found || queued) {
+        return {
+          tone: 'ok',
+          text: `Ελέγχθηκαν ${seen} εισπράξεις: ${found} παραστατικά εξοφλήθηκαν αυτόματα, ${queued} χρειάζονται επιβεβαίωση.`,
+        };
+      }
+      return { tone: 'ok', text: `Ελέγχθηκαν ${seen} εισπράξεις. Καμία δεν αντιστοιχεί σε ανοιχτό παραστατικό.` };
+    }
+    case 'error':
+      return { tone: 'warn', text: 'Η σύνδεση με την τράπεζα απέτυχε. Δοκιμάστε ξανά.' };
+    default:
+      return null;
+  }
+}
+
+function settledOr(value: string | undefined): string {
+  return value && /^\d+$/.test(value) ? value : '0';
+}
+
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ credits?: string; stripe?: string }>;
+  searchParams: Promise<{
+    credits?: string;
+    stripe?: string;
+    bank?: string;
+    seen?: string;
+    settled?: string;
+    queued?: string;
+  }>;
 }) {
-  const { credits, stripe } = await searchParams;
+  const { credits, stripe, bank, seen, settled, queued } = await searchParams;
   const t = await getDictionary();
 
   const supabase = await createClient();
@@ -62,6 +118,8 @@ export default async function SettingsPage({
     .maybeSingle();
 
   if (!profile) redirect('/login');
+
+  const bankOutcome = bankNotice(bank, { seen, settled, queued });
 
   const { data: bankConnections } = await supabase
     .from('bank_connections')
@@ -146,6 +204,18 @@ export default async function SettingsPage({
           }`}
         >
           {STRIPE_NOTICES[stripe ?? '']}
+        </div>
+      ) : null}
+
+      {bankOutcome ? (
+        <div
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            bankOutcome.tone === 'ok'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+              : 'border-amber-200 bg-amber-50 text-amber-800'
+          }`}
+        >
+          {bankOutcome.text}
         </div>
       ) : null}
 
