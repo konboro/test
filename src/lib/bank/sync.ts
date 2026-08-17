@@ -11,7 +11,13 @@ import { athensDate } from '@/lib/money';
 import { notifyPaymentReceived } from '@/lib/payments/notify';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-import { BankApiError, bankingConfigured, fetchCredits, type IncomingCredit } from './client';
+import {
+  BankApiError,
+  bankingConfigured,
+  fetchCredits,
+  type IncomingCredit,
+  type PsuContext,
+} from './client';
 import { matchCredit, type InvoiceCandidate } from './match';
 
 export interface BankSyncResult {
@@ -40,7 +46,9 @@ const FIRST_RUN_DAYS = 90;
 /** Enough for a very busy 90-day window; a backstop, not a real limit. */
 const MAX_PAGES = 20;
 
-export async function syncBankFeeds(options: { userId?: string } = {}): Promise<BankSyncResult> {
+export async function syncBankFeeds(
+  options: { userId?: string; psu?: PsuContext | null } = {},
+): Promise<BankSyncResult> {
   const result: BankSyncResult = {
     connectionsChecked: 0,
     fetched: 0,
@@ -82,7 +90,7 @@ export async function syncBankFeeds(options: { userId?: string } = {}): Promise<
     }
 
     try {
-      await syncConnection(connection, result);
+      await syncConnection(connection, result, options.psu);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       result.errors.push({ connectionId: connection.id, error: message });
@@ -107,7 +115,11 @@ interface ConnectionRow {
   last_synced_at: string | null;
 }
 
-async function syncConnection(connection: ConnectionRow, result: BankSyncResult): Promise<void> {
+async function syncConnection(
+  connection: ConnectionRow,
+  result: BankSyncResult,
+  psu?: PsuContext | null,
+): Promise<void> {
   if (!connection.account_id) return;
 
   const supabase = createAdminClient();
@@ -122,7 +134,7 @@ async function syncConnection(connection: ConnectionRow, result: BankSyncResult)
   let page = 0;
 
   do {
-    const batch = await fetchCredits(connection.account_id, since, continuationKey);
+    const batch = await fetchCredits(connection.account_id, since, continuationKey, psu);
 
     result.fetched += batch.fetched;
     result.creditsSeen += batch.credits.length;

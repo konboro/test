@@ -47,6 +47,34 @@ export function signedJwt(now = Date.now()): string {
   return `${input}.${signature}`;
 }
 
+/**
+ * Evidence that a human is waiting on the other end of this request.
+ *
+ * PSD2 splits account access in two. Unattended polling is capped — the banks
+ * choose the number and several settle on four a day — while a request made
+ * because the account holder is sitting there asking for it is exempt. The only
+ * thing that tells the bank which kind it is receiving is `PSU-IP-Address`: set,
+ * and the customer is present; absent, and it counts against the daily quota.
+ *
+ * So this is never inferred or faked. The nightly sweep runs with no PSU context
+ * at all, because nobody is there — asserting otherwise would be a false
+ * statement to the bank about why we are reading someone's account, which is the
+ * one thing this regulation is actually about.
+ */
+export interface PsuContext {
+  ipAddress: string;
+  userAgent?: string | null;
+}
+
+function psuHeaders(psu?: PsuContext | null): Record<string, string> {
+  if (!psu?.ipAddress) return {};
+
+  return {
+    'PSU-IP-Address': psu.ipAddress,
+    ...(psu.userAgent ? { 'PSU-User-Agent': psu.userAgent } : {}),
+  };
+}
+
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20_000);
@@ -237,12 +265,14 @@ export async function fetchCredits(
   accountUid: string,
   since: string,
   continuationKey?: string | null,
+  psu?: PsuContext | null,
 ): Promise<{ credits: IncomingCredit[]; fetched: number; continuationKey: string | null }> {
   const query = new URLSearchParams({ date_from: since, transaction_status: 'BOOK' });
   if (continuationKey) query.set('continuation_key', continuationKey);
 
   const body = await call<{ transactions?: RawTransaction[]; continuation_key?: string }>(
     `/accounts/${encodeURIComponent(accountUid)}/transactions?${query}`,
+    { headers: psuHeaders(psu) },
   );
 
   const raw = body.transactions ?? [];
