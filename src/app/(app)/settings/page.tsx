@@ -48,7 +48,7 @@ const STRIPE_NOTICES: Record<string, string> = {
  */
 function bankNotice(
   outcome: string | undefined,
-  counts: { seen?: string; settled?: string; queued?: string },
+  counts: { seen?: string; settled?: string; queued?: string; reason?: string },
 ): { tone: 'ok' | 'warn'; text: string } | null {
   switch (outcome) {
     case 'connected':
@@ -59,11 +59,27 @@ function bankNotice(
       return { tone: 'warn', text: 'Η τράπεζα δεν επέστρεψε κανέναν λογαριασμό.' };
     case 'unavailable':
       return { tone: 'warn', text: 'Η υπηρεσία τραπεζικής σύνδεσης δεν είναι διαθέσιμη.' };
-    case 'sync_failed':
+    case 'sync_failed': {
+      const reason = counts.reason ?? '';
+
+      // Only call it a rate limit when the provider actually said 429. The
+      // first version asserted it for every failure, which is a confident wrong
+      // answer: it sends the operator away to wait out a limit that may have
+      // had nothing to do with it.
+      if (reason.includes('429')) {
+        return {
+          tone: 'warn',
+          text: 'Οι τράπεζες περιορίζουν τους ελέγχους ανά ημέρα και το όριο εξαντλήθηκε. Δοκιμάστε αύριο — ο αυτόματος έλεγχος συνεχίζεται κανονικά.',
+        };
+      }
+
       return {
         tone: 'warn',
-        text: 'Ο έλεγχος δεν ολοκληρώθηκε. Οι τράπεζες περιορίζουν τους ελέγχους ανά ημέρα — δοκιμάστε αργότερα.',
+        text: reason
+          ? `Ο έλεγχος δεν ολοκληρώθηκε: ${reason}`
+          : 'Ο έλεγχος δεν ολοκληρώθηκε.',
       };
+    }
     case 'synced': {
       const found = Number(settledOr(counts.settled));
       const queued = Number(settledOr(counts.queued));
@@ -95,12 +111,13 @@ export default async function SettingsPage({
     credits?: string;
     stripe?: string;
     bank?: string;
+    reason?: string;
     seen?: string;
     settled?: string;
     queued?: string;
   }>;
 }) {
-  const { credits, stripe, bank, seen, settled, queued } = await searchParams;
+  const { credits, stripe, bank, seen, settled, queued, reason } = await searchParams;
   const t = await getDictionary();
 
   const supabase = await createClient();
@@ -119,7 +136,7 @@ export default async function SettingsPage({
 
   if (!profile) redirect('/login');
 
-  const bankOutcome = bankNotice(bank, { seen, settled, queued });
+  const bankOutcome = bankNotice(bank, { seen, settled, queued, reason });
 
   const { data: bankConnections } = await supabase
     .from('bank_connections')
