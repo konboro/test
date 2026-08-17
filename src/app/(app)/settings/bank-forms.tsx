@@ -2,7 +2,7 @@ import type { Aspsp } from '@/lib/bank/client';
 import { formatDate } from '@/lib/money';
 import type { BankConnectionRow } from '@/types/database';
 
-import { BankSyncButton } from './bank-sync-button';
+import { syncBankNow } from './bank-actions';
 
 /**
  * Linking a bank account so transfers settle themselves.
@@ -31,7 +31,7 @@ export function BankConnect({
                 <dt className="text-ink-700">{connection.institution_name}</dt>
                 <dd className="text-xs text-ink-500">
                   {connection.last_synced_at
-                    ? `Τελευταία ανάγνωση ${formatDate(connection.last_synced_at.slice(0, 10))} · `
+                    ? `Τελευταίος έλεγχος ${formatDate(connection.last_synced_at.slice(0, 10))} · `
                     : ''}
                   {connection.consent_expires_at
                     ? `πρόσβαση έως ${formatDate(connection.consent_expires_at.slice(0, 10))}`
@@ -40,7 +40,17 @@ export function BankConnect({
               </div>
             ))}
           </dl>
-          <BankSyncButton />
+
+          {/* The scheduled read happens once a day inside the dunning sweep.
+              This is for the moment someone is waiting for an answer. */}
+          <form action={syncBankNow}>
+            <button
+              type="submit"
+              className="rounded-lg border border-ink-300 bg-white px-3.5 py-2 text-sm font-medium text-ink-700 outline-none transition hover:bg-ink-50 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+            >
+              Έλεγχος τώρα
+            </button>
+          </form>
         </>
       ) : (
         <p className="text-sm leading-relaxed text-ink-600">

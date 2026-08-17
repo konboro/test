@@ -1,44 +1,66 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 
-import { bankingConfigured } from '@/lib/bank/client';
-import { syncBankFeeds, type BankSyncResult } from '@/lib/bank/sync';
-import { createClient } from '@/lib/supabase/server';
-
-export interface BankSyncState {
-  error?: string;
-  result?: BankSyncResult;
-}
+import { syncBankFeeds } from '@/lib/bank/sync';
+import { getSessionUser } from '@/lib/supabase/server';
 
 /**
- * Reads the bank feed now, for this tenant only.
+ * Reads the bank now, instead of waiting for tomorrow's sweep.
  *
- * The sweep already does this nightly, but nightly is useless while you are
- * setting the connection up: a feed that returns nothing is indistinguishable
- * from one nobody has asked yet, and the answer arrives the next morning.
+ * The scheduled sync runs inside the dunning cron, and a dry run skips it, so
+ * without this there is no way to pull a statement without also mailing every
+ * reminder that happens to be due. That made the feature untestable against a
+ * real account, which is the only way it can be tested at all.
  *
- * Scoped to the caller's own id, so pressing it can never pull another tenant's
- * statement even though the sync itself runs with the service role.
+ * Scoped to the caller's own tenant. `syncBankFeeds` filters on `user_id`, so
+ * pressing this can never reach into another creditor's accounts.
+ *
+ * Banks cap statement reads at roughly four a day per account, and this spends
+ * one. That is the intended trade — a person waiting for an answer is exactly
+ * the case the rate-limit rules exempt — but it is why the result is reported
+ * rather than silently swallowed: someone who has burnt the day's allowance
+ * needs to be told, not left pressing a button that does nothing.
+ *
+ * A failure reports the provider's own words. Guessing at the cause is worse
+ * than saying "this is what came back", because a plausible wrong diagnosis
+ * sends the operator off to fix something that was never broken.
  */
-export async function syncBankNow(): Promise<BankSyncState> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export async function syncBankNow(): Promise<void> {
+  const user = await getSessionUser();
+  if (!user) redirect('/login');
 
-  if (!user) return { error: 'Μη εξουσιοδοτημένη ενέργεια.' };
+  const result = await syncBankFeeds({ userId: user.id });
 
-  if (!bankingConfigured()) {
-    return { error: 'Η υπηρεσία τραπεζικής σύνδεσης δεν είναι ρυθμισμένη.' };
+  if (result.errors.length) {
+    // Say what actually went wrong. The first version of this mapped every
+    // failure to "the banks limit daily checks", which is one possible cause
+    // among many — a confident wrong answer that sends someone away to wait for
+    // a limit that was never the problem. The provider's own message is the
+    // only honest thing to show, and it also reaches the server log.
+    const [first] = result.errors;
+    console.error('[bank:sync]', result.errors);
+
+    const params = new URLSearchParams({
+      bank: 'sync_failed',
+      reason: (first?.error ?? 'unknown').slice(0, 200),
+    });
+    redirect(`/settings?${params}#bank`);
   }
 
-  try {
-    const result = await syncBankFeeds({ userId: user.id });
-    revalidatePath('/settings');
-    revalidatePath('/dashboard');
-    return { result };
-  } catch (cause) {
-    return { error: cause instanceof Error ? cause.message : String(cause) };
-  }
+  const params = new URLSearchParams({
+    bank: 'synced',
+    // What the bank returned before anything was dropped. Carried separately
+    // from `seen` because the two differ for a reason worth naming: `toCredit`
+    // discards a row the moment a field it needs is missing, so a response whose
+    // shape does not match ours yields rows fetched and nothing seen — which
+    // otherwise looks identical to an account with no money coming in.
+    fetched: String(result.fetched),
+    seen: String(result.creditsSeen),
+    settled: String(result.settled),
+    queued: String(result.queued),
+    accounts: String(result.connectionsChecked),
+  });
+
+  redirect(`/settings?${params}#bank`);
 }

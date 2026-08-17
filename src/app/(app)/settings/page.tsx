@@ -39,12 +39,123 @@ const STRIPE_NOTICES: Record<string, string> = {
     'Αυτός ο λογαριασμός Stripe χρησιμοποιείται ήδη από άλλον χρήστη του lefta.app.',
 };
 
+/**
+ * What came back from the bank round trip.
+ *
+ * A sync that found nothing is still an answer, and the most likely one: it has
+ * to read as "we looked", not as silence, or the operator presses the button
+ * again believing it failed.
+ */
+function bankNotice(
+  outcome: string | undefined,
+  counts: {
+    seen?: string;
+    settled?: string;
+    queued?: string;
+    reason?: string;
+    fetched?: string;
+    accounts?: string;
+  },
+): { tone: 'ok' | 'warn'; text: string } | null {
+  switch (outcome) {
+    case 'connected':
+      return { tone: 'ok', text: 'Ο τραπεζικός λογαριασμός συνδέθηκε.' };
+    case 'cancelled':
+      return { tone: 'warn', text: 'Η σύνδεση με την τράπεζα ακυρώθηκε.' };
+    case 'no_accounts':
+      return { tone: 'warn', text: 'Η τράπεζα δεν επέστρεψε κανέναν λογαριασμό.' };
+    case 'unavailable':
+      return { tone: 'warn', text: 'Η υπηρεσία τραπεζικής σύνδεσης δεν είναι διαθέσιμη.' };
+    case 'sync_failed': {
+      const reason = counts.reason ?? '';
+
+      // Only call it a rate limit when the provider actually said 429. The
+      // first version asserted it for every failure, which is a confident wrong
+      // answer: it sends the operator away to wait out a limit that may have
+      // had nothing to do with it.
+      if (reason.includes('429')) {
+        return {
+          tone: 'warn',
+          text: 'Οι τράπεζες περιορίζουν τους ελέγχους ανά ημέρα και το όριο εξαντλήθηκε. Δοκιμάστε αύριο — ο αυτόματος έλεγχος συνεχίζεται κανονικά.',
+        };
+      }
+
+      return {
+        tone: 'warn',
+        text: reason
+          ? `Ο έλεγχος δεν ολοκληρώθηκε: ${reason}`
+          : 'Ο έλεγχος δεν ολοκληρώθηκε.',
+      };
+    }
+    case 'synced': {
+      const found = Number(settledOr(counts.settled));
+      const queued = Number(settledOr(counts.queued));
+      const seen = Number(settledOr(counts.seen));
+      const fetched = Number(settledOr(counts.fetched));
+      const accounts = Number(settledOr(counts.accounts));
+
+      if (found || queued) {
+        return {
+          tone: 'ok',
+          text: `Ελέγχθηκαν ${seen} εισπράξεις: ${found} παραστατικά εξοφλήθηκαν αυτόματα, ${queued} χρειάζονται επιβεβαίωση.`,
+        };
+      }
+
+      // "Nothing found" has three quite different causes and the operator can
+      // act on each. Collapsing them into one sentence is what makes a working
+      // integration look broken — and a broken one look merely quiet.
+      if (accounts === 0) {
+        return {
+          tone: 'warn',
+          text: 'Κανένας ενεργός λογαριασμός προς έλεγχο. Συνδέστε τράπεζα ή ανανεώστε τη ληγμένη άδεια.',
+        };
+      }
+      if (fetched === 0) {
+        return {
+          tone: 'ok',
+          text: 'Η τράπεζα δεν επέστρεψε καμία κίνηση για το διάστημα που ζητήθηκε.',
+        };
+      }
+      if (seen === 0) {
+        return {
+          tone: 'ok',
+          text: `Η τράπεζα επέστρεψε ${fetched} κινήσεις, καμία εισερχόμενη — μόνο χρεώσεις στο διάστημα αυτό.`,
+        };
+      }
+
+      return {
+        tone: 'ok',
+        text: `Ελέγχθηκαν ${seen} εισπράξεις από ${fetched} κινήσεις. Καμία δεν αντιστοιχεί σε ανοιχτό παραστατικό.`,
+      };
+    }
+    case 'error':
+      return { tone: 'warn', text: 'Η σύνδεση με την τράπεζα απέτυχε. Δοκιμάστε ξανά.' };
+    default:
+      return null;
+  }
+}
+
+function settledOr(value: string | undefined): string {
+  return value && /^\d+$/.test(value) ? value : '0';
+}
+
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ credits?: string; stripe?: string }>;
+  searchParams: Promise<{
+    credits?: string;
+    stripe?: string;
+    bank?: string;
+    reason?: string;
+    seen?: string;
+    settled?: string;
+    queued?: string;
+    fetched?: string;
+    accounts?: string;
+  }>;
 }) {
-  const { credits, stripe } = await searchParams;
+  const { credits, stripe, bank, seen, settled, queued, reason, fetched, accounts } =
+    await searchParams;
   const t = await getDictionary();
 
   const supabase = await createClient();
@@ -62,6 +173,8 @@ export default async function SettingsPage({
     .maybeSingle();
 
   if (!profile) redirect('/login');
+
+  const bankOutcome = bankNotice(bank, { seen, settled, queued, reason, fetched, accounts });
 
   const { data: bankConnections } = await supabase
     .from('bank_connections')
@@ -146,6 +259,18 @@ export default async function SettingsPage({
           }`}
         >
           {STRIPE_NOTICES[stripe ?? '']}
+        </div>
+      ) : null}
+
+      {bankOutcome ? (
+        <div
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            bankOutcome.tone === 'ok'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+              : 'border-amber-200 bg-amber-50 text-amber-800'
+          }`}
+        >
+          {bankOutcome.text}
         </div>
       ) : null}
 
