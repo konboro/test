@@ -38,11 +38,22 @@ export default async function InvoicesPage({
   if (filter === 'pending') query = query.eq('status', 'pending');
   else if (filter === 'paid') query = query.eq('status', 'paid');
 
-  const [{ data: invoices }, { data: debtors }, { data: contacts }] = await Promise.all([
-    query.limit(500),
-    supabase.from('debtors').select('id, name, vat_number').order('name'),
-    supabase.from('dunning_contacts').select('invoice_id, step'),
-  ]);
+  const [{ data: invoices }, { data: debtors }, { data: contacts }, { data: bankMatches }] =
+    await Promise.all([
+      query.limit(500),
+      supabase.from('debtors').select('id, name, vat_number').order('name'),
+      supabase.from('dunning_contacts').select('invoice_id, step'),
+      // Which invoices a bank credit settled — that link lives on the
+      // transaction, and it is what tells a detected transfer apart from a
+      // settlement someone typed in by hand.
+      supabase
+        .from('bank_transactions')
+        .select('matched_invoice_id')
+        .eq('state', 'settled')
+        .not('matched_invoice_id', 'is', null),
+    ]);
+
+  const bankSettled = new Set((bankMatches ?? []).map((row) => row.matched_invoice_id));
 
   const debtorsById = new Map((debtors ?? []).map((d) => [d.id, d]));
 
@@ -64,8 +75,11 @@ export default async function InvoicesPage({
   // The actions cell is only ever populated for pending rows, so a paid-only
   // view would render an empty column that just pushes the table wider.
   const showActions = filter !== 'paid';
+  // Same labels the payments timeline uses, so the two screens tell one story.
   const methodLabel = {
-    card: t.invoices.paidMethodCard,
+    card_stripe: t.bank.channels.stripe,
+    card_viva: t.bank.channels.viva,
+    transfer: t.bank.channels.transfer,
     external: t.invoices.paidMethodExternal,
     billing_system: t.invoices.paidMethodBilling,
   } as const;
@@ -214,7 +228,9 @@ export default async function InvoicesPage({
                       {showSettled ? (
                         <td className="px-5 py-3">
                           {(() => {
-                            const method = settlementMethod(invoice);
+                            const method = settlementMethod(invoice, {
+                              settledByBank: bankSettled.has(invoice.id),
+                            });
                             if (!method) return <span className="text-ink-400">—</span>;
                             return (
                               <>
@@ -224,7 +240,9 @@ export default async function InvoicesPage({
                                     : '—'}
                                 </div>
                                 <div className="mt-1">
-                                  <Badge tone={method === 'card' ? 'info' : 'neutral'}>
+                                  <Badge
+                                    tone={method.startsWith('card') ? 'info' : 'neutral'}
+                                  >
                                     <span className="whitespace-nowrap">{methodLabel[method]}</span>
                                   </Badge>
                                 </div>

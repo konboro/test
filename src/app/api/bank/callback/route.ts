@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createSession } from '@/lib/bank/client';
 import { appUrl } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getSessionUser } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -35,6 +36,17 @@ export async function GET(request: NextRequest) {
     .maybeSingle();
 
   if (!connection) return NextResponse.redirect(`${settings}?bank=error`);
+
+  // The state is only a lookup key; the binding to a tenant is the session, the
+  // same way the Stripe Connect callback checks the signed-in user. Without it,
+  // any signed-in account holding another tenant's pending connection id could
+  // finish the handshake and attach its own bank feed to them — and a foreign
+  // feed does not just leak, it settles their invoices.
+  const user = await getSessionUser();
+  if (!user || connection.user_id !== user.id) {
+    console.error('[bank:callback] session does not own this connection', connection.id);
+    return NextResponse.redirect(`${settings}?bank=error`);
+  }
 
   // The creditor declined at the bank, or the bank refused. Leave nothing
   // half-linked behind.
