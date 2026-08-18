@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 
   const { data: invoice } = await admin
     .from('invoices')
-    .select('id, user_id, status, short_code, pay_token')
+    .select('id, user_id, status, short_code, pay_token, amount_cents')
     .eq('viva_order_code', orderCode)
     .maybeSingle();
 
@@ -93,6 +93,11 @@ export async function GET(request: NextRequest) {
       .update({
         status: 'paid',
         paid_at: new Date().toISOString(),
+        // The order was created from the stored amount and Viva can only charge
+        // what the order says, so this is exact. Recorded rather than left null
+        // so every settled invoice answers "how much arrived" the same way,
+        // whichever provider took it.
+        paid_amount_cents: invoice.amount_cents,
         viva_transaction_id: transaction.transactionId,
       })
       .eq('id', invoice.id)
