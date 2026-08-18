@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { Badge, Card, CardHeader, EmptyState, subtleLinkClass } from '@/components/ui';
@@ -349,8 +350,16 @@ export default async function InvoicesPage({
                         </div>
                       </td>
                       <td className="px-5 py-3">
-                        {customer ? (
-                          <div className="text-ink-800">{customer}</div>
+                        {/* Straight through to the customer's profile: from a row
+                            that is chasing them, the next question is almost always
+                            who they are and what else they owe. A debtor with no
+                            name yet links too — the profile is where it gets fixed. */}
+                        {debtor ? (
+                          <Link href={`/debtors/${debtor.id}`} className={`block ${subtleLinkClass}`}>
+                            {customer ?? (
+                              <span className="italic text-ink-400">{t.debtors.nameMissing}</span>
+                            )}
+                          </Link>
                         ) : (
                           <div className="italic text-ink-400">{t.debtors.nameMissing}</div>
                         )}
