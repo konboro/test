@@ -427,6 +427,19 @@ const el = {
     colOldestDue: 'Λήξη (παλαιότερο)',
     colWorkflow: 'Κατάσταση ροής',
     colLastContact: 'Τελευταία επαφή',
+    funnel: 'Απόδοση υπενθυμίσεων',
+    funnelHint:
+      'Τελευταίες 30 ημέρες, ανά κανάλι· μονάδα το παραστατικό. Εξόφληση = πληρωμή έως 7 ημέρες μετά την υπενθύμιση — ένα έμβασμα μετά από SMS μετράει, ας μην πατήθηκε ποτέ ο σύνδεσμος.',
+    funnelChannel: 'Κανάλι',
+    funnelSent: 'Στάλθηκαν',
+    funnelOpened: 'Άνοιξαν τον σύνδεσμο',
+    funnelCheckout: 'Ξεκίνησαν πληρωμή',
+    funnelPaid: 'Εξοφλήθηκαν ≤7 ημ.',
+    funnelEmptyTitle: 'Δεν υπάρχουν ακόμη μετρήσεις',
+    funnelEmptyBody:
+      'Μόλις σταλούν οι πρώτες υπενθυμίσεις, εδώ θα φαίνεται πόσοι άνοιξαν τον σύνδεσμο πληρωμής, πόσοι ξεκίνησαν πληρωμή και πόσοι εξόφλησαν — ανά κανάλι.',
+    funnelUntagged: (n: number) =>
+      `${n} ${n === 1 ? 'επίσκεψη' : 'επισκέψεις'} στον σύνδεσμο χωρίς ετικέτα καναλιού (πληκτρολογημένος ή προωθημένος σύνδεσμος).`,
   },
 
   invoices: {
@@ -1125,6 +1138,19 @@ const en: typeof el = {
     colOldestDue: 'Due (oldest)',
     colWorkflow: 'Workflow',
     colLastContact: 'Last contact',
+    funnel: 'Reminder performance',
+    funnelHint:
+      'Last 30 days, per channel; the unit is the invoice. Paid = settled within 7 days of a reminder — a transfer after an SMS counts, even though no link was ever clicked.',
+    funnelChannel: 'Channel',
+    funnelSent: 'Sent',
+    funnelOpened: 'Opened the link',
+    funnelCheckout: 'Started paying',
+    funnelPaid: 'Paid ≤7 d',
+    funnelEmptyTitle: 'No measurements yet',
+    funnelEmptyBody:
+      'As soon as the first reminders go out, this shows how many opened the payment link, started paying, and settled — per channel.',
+    funnelUntagged: (n: number) =>
+      `${n} ${n === 1 ? 'visit' : 'visits'} to the link carried no channel tag (typed or forwarded link).`,
   },
 
   invoices: {

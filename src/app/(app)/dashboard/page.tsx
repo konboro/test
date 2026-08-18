@@ -27,6 +27,12 @@ export default async function DashboardPage() {
 
   const today = athensDate();
 
+  // The funnel window: how far back reminders and link activity are counted.
+  const FUNNEL_DAYS = 30;
+  /** An invoice counts as converted when it settles this soon after a contact. */
+  const ATTRIBUTION_DAYS = 7;
+  const funnelSince = new Date(Date.now() - FUNNEL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
   // RLS scopes every one of these to the signed-in tenant.
   const [
     { data: profile },
@@ -34,6 +40,8 @@ export default async function DashboardPage() {
     { data: debtors },
     { data: contacts },
     { data: recentPayments },
+    { data: recentComms },
+    { data: funnelEvents },
   ] = await Promise.all([
       supabase
         .from('users')
@@ -44,7 +52,7 @@ export default async function DashboardPage() {
         .maybeSingle(),
       supabase
         .from('invoices')
-        .select('id, debtor_id, amount_cents, currency, due_date, status, invoice_number, series, mark')
+        .select('id, debtor_id, amount_cents, currency, due_date, status, paid_at, invoice_number, series, mark')
         .in('status', ['pending', 'paid'])
         .order('due_date', { ascending: true }),
       supabase.from('debtors').select('id, name, vat_number, email, phone, muted'),
@@ -56,6 +64,17 @@ export default async function DashboardPage() {
         .not('stripe_checkout_session_id', 'is', null)
         .order('paid_at', { ascending: false })
         .limit(8),
+      supabase
+        .from('communications_log')
+        .select('invoice_id, channel, status, sent_at')
+        .eq('status', 'sent')
+        .gte('sent_at', funnelSince)
+        .limit(5000),
+      supabase
+        .from('funnel_events')
+        .select('invoice_id, channel, event')
+        .gte('occurred_at', funnelSince)
+        .limit(5000),
     ]);
 
   const allInvoices = invoices ?? [];
@@ -80,6 +99,53 @@ export default async function DashboardPage() {
     const own = pending.filter((i) => bucket.match(daysBetween(i.due_date, today)));
     return { ...bucket, count: own.length, cents: own.reduce((sum, i) => sum + i.amount_cents, 0) };
   });
+
+  // The reminder funnel, per channel, over the last FUNNEL_DAYS. Every count is
+  // distinct invoices — a refreshed page or a resent message is not engagement
+  // growth. "Paid" is an invoice settled within ATTRIBUTION_DAYS of a sent
+  // contact on that channel; a debtor who reads the SMS and pays by transfer
+  // never clicks anything, which is why payment timing is counted per channel
+  // rather than clicks alone (docs/funnel-analytics.md).
+  const paidAtByInvoice = new Map(
+    allInvoices
+      .filter((i) => i.status === 'paid' && i.paid_at)
+      .map((i) => [i.id, new Date(i.paid_at as string).getTime()]),
+  );
+
+  const funnelRows = (['email', 'sms'] as const).map((channel) => {
+    const sentInvoices = new Map<string, number>();
+    for (const comm of recentComms ?? []) {
+      if (comm.channel !== channel || !comm.invoice_id) continue;
+      const at = new Date(comm.sent_at).getTime();
+      const earliest = sentInvoices.get(comm.invoice_id);
+      if (earliest === undefined || at < earliest) sentInvoices.set(comm.invoice_id, at);
+    }
+
+    const opened = new Set<string>();
+    const checkout = new Set<string>();
+    for (const event of funnelEvents ?? []) {
+      if (event.channel !== channel) continue;
+      if (event.event === 'page_view') opened.add(event.invoice_id);
+      if (event.event === 'checkout_started') checkout.add(event.invoice_id);
+    }
+
+    let paid = 0;
+    const attributionMs = ATTRIBUTION_DAYS * 24 * 60 * 60 * 1000;
+    for (const [invoiceId, sentAt] of sentInvoices) {
+      const paidAt = paidAtByInvoice.get(invoiceId);
+      if (paidAt !== undefined && paidAt >= sentAt && paidAt <= sentAt + attributionMs) paid += 1;
+    }
+
+    return { channel, sent: sentInvoices.size, opened: opened.size, checkout: checkout.size, paid };
+  });
+
+  const funnelHasData =
+    funnelRows.some((row) => row.sent > 0) || (funnelEvents?.length ?? 0) > 0;
+  const untaggedViews = new Set(
+    (funnelEvents ?? [])
+      .filter((event) => event.event === 'page_view' && event.channel === 'other')
+      .map((event) => event.invoice_id),
+  ).size;
 
   // Steps already fired, per invoice. Manual reminders carry no step — they are
   // contacts, not rungs, and must not move an invoice along the ladder.
@@ -231,6 +297,66 @@ export default async function DashboardPage() {
           </div>
         </Card>
       ) : null}
+
+      <Card>
+        <CardHeader title={t.dashboard.funnel} subtitle={t.dashboard.funnelHint} />
+
+        {!funnelHasData ? (
+          <EmptyState title={t.dashboard.funnelEmptyTitle} body={t.dashboard.funnelEmptyBody} />
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-500">
+                    <th className="px-5 py-2.5 font-medium">{t.dashboard.funnelChannel}</th>
+                    <th className="px-5 py-2.5 text-right font-medium">{t.dashboard.funnelSent}</th>
+                    <th className="px-5 py-2.5 text-right font-medium">{t.dashboard.funnelOpened}</th>
+                    <th className="px-5 py-2.5 text-right font-medium">
+                      {t.dashboard.funnelCheckout}
+                    </th>
+                    <th className="px-5 py-2.5 text-right font-medium">{t.dashboard.funnelPaid}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {funnelRows.map((row) => {
+                    const pct = (part: number) =>
+                      row.sent > 0 ? `${Math.round((part / row.sent) * 100)}%` : null;
+
+                    const cell = (value: number, share: string | null) => (
+                      <td className="px-5 py-3 text-right">
+                        <div className="tabular font-medium text-ink-900">{value}</div>
+                        {share !== null ? (
+                          <div className="tabular text-xs text-ink-400">{share}</div>
+                        ) : null}
+                      </td>
+                    );
+
+                    return (
+                      <tr key={row.channel} className="border-b border-ink-100 last:border-0">
+                        <td className="px-5 py-3">
+                          <Badge tone={row.channel === 'sms' ? 'info' : 'neutral'}>
+                            {row.channel === 'sms' ? t.common.sms : t.common.email}
+                          </Badge>
+                        </td>
+                        {cell(row.sent, null)}
+                        {cell(row.opened, pct(row.opened))}
+                        {cell(row.checkout, pct(row.checkout))}
+                        {cell(row.paid, pct(row.paid))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {untaggedViews > 0 ? (
+              <p className="border-t border-ink-100 px-5 py-3 text-xs text-ink-500">
+                {t.dashboard.funnelUntagged(untaggedViews)}
+              </p>
+            ) : null}
+          </>
+        )}
+      </Card>
 
       <Card>
         <CardHeader title={t.recentPayments.title} subtitle={t.recentPayments.subtitle} />

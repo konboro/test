@@ -4,6 +4,7 @@ import { LeftaLogo, LeftaWordmark } from '@/components/logo';
 import { formatDate, formatMoney } from '@/lib/money';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+import { FunnelBeacon } from './beacon';
 import { PayButton } from './pay-button';
 
 /**
@@ -31,6 +32,7 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-12">
+      <FunnelBeacon credential={credential} />
       <div className="w-full max-w-md">
         {/* The mark, not just the word. This is the most-branded surface the
             product has — a debtor arriving from an email needs to recognise
