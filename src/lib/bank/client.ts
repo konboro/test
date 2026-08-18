@@ -226,6 +226,15 @@ export interface ReadDiagnostic {
   indicators: Record<string, number>;
   /** Top-level keys seen on the first row. */
   keys: string[];
+  /**
+   * How many rows carry each field that could name the payer.
+   *
+   * Eurobank leaves `debtor` empty on every row, exactly as it does the id, so
+   * the panel shows no payer. Whether that identity lives under another key or
+   * is simply not disclosed is a question about the response, and counting is
+   * the only honest way to answer it. Counts, never values.
+   */
+  populated: Record<string, number>;
 }
 
 export function diagnose(raw: RawTransaction[]): ReadDiagnostic {
@@ -238,6 +247,11 @@ export function diagnose(raw: RawTransaction[]): ReadDiagnostic {
     nonPositive: 0,
     indicators: {},
     keys: raw.length ? Object.keys(raw[0] as object).sort() : [],
+    populated: {},
+  };
+
+  const bump = (field: string, present: unknown) => {
+    if (present) d.populated[field] = (d.populated[field] ?? 0) + 1;
   };
 
   for (const row of raw) {
@@ -248,6 +262,13 @@ export function diagnose(raw: RawTransaction[]): ReadDiagnostic {
 
     const amount = row.transaction_amount?.amount;
     if (amount && toMinorUnits(amount) <= 0) d.nonPositive += 1;
+
+    bump('debtor.name', row.debtor?.name);
+    bump('creditor.name', row.creditor?.name);
+    bump('debtor_account', accountIdentification(row.debtor_account));
+    bump('creditor_account', accountIdentification(row.creditor_account));
+    bump('reference_number', row.reference_number);
+    bump('remittance', Array.isArray(row.remittance_information) ? row.remittance_information.length : row.remittance_information);
 
     const indicator = row.credit_debit_indicator ?? '(absent)';
     d.indicators[indicator] = (d.indicators[indicator] ?? 0) + 1;
