@@ -228,6 +228,27 @@ export default async function InvoicesPage({
         ) : (
           <form id="bulk" action={sendBulkReminder}>
           <input type="hidden" name="back" value={back} />
+          {showActions ? (
+            <div className="flex flex-wrap items-center gap-2 border-b border-ink-200 px-5 py-3">
+              <select
+                name="choice"
+                defaultValue="manual"
+                className="rounded-lg border border-ink-300 bg-white px-3 py-1.5 text-sm text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+              >
+                {REMINDER_CHOICES.map((choice) => (
+                  <option key={choice.value} value={choice.value}>
+                    {t.reminder.choices[choice.value] ?? choice.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="submit"
+                className="rounded-lg bg-brand-600 px-3.5 py-1.5 text-sm font-medium text-white shadow-sm outline-none transition hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+              >
+                {t.invoices.bulk.send}
+              </button>
+            </div>
+          ) : null}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -418,27 +439,6 @@ export default async function InvoicesPage({
             </table>
           </div>
 
-          {showActions ? (
-            <div className="flex flex-wrap items-center gap-2 border-t border-ink-200 px-5 py-3">
-              <select
-                name="choice"
-                defaultValue="manual"
-                className="rounded-lg border border-ink-300 bg-white px-3 py-1.5 text-sm text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-              >
-                {REMINDER_CHOICES.map((choice) => (
-                  <option key={choice.value} value={choice.value}>
-                    {t.reminder.choices[choice.value] ?? choice.label}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="submit"
-                className="rounded-lg bg-brand-600 px-3.5 py-1.5 text-sm font-medium text-white shadow-sm outline-none transition hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
-              >
-                {t.invoices.bulk.send}
-              </button>
-            </div>
-          ) : null}
           </form>
         )}
       </Card>
