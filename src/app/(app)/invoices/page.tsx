@@ -13,7 +13,7 @@ import { settlementMethod } from '@/lib/payments/settlement';
 import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
 
-import { markInvoicePaid, sendBulkReminder } from './actions';
+import { markInvoicePaid, runScenarioForSelected, sendBulkReminder } from './actions';
 import { CopyPayLink, CreateInvoiceForm, DueDateButton, RemindButton } from './invoice-forms';
 import { SelectAll } from './select-all';
 
@@ -37,6 +37,7 @@ export default async function InvoicesPage({
     limited?: string;
     skipped?: string;
     failed?: string;
+    notDue?: string;
     left?: string;
   }>;
 }) {
@@ -131,6 +132,7 @@ export default async function InvoicesPage({
   const bulkSkipped = Number(params.skipped ?? 0);
   const bulkFailed = Number(params.failed ?? 0);
   const bulkLeft = Number(params.left ?? 0);
+  const bulkNotDue = Number(params.notDue ?? 0);
 
   // When and how a document was settled. Only worth a column on views that can
   // contain paid rows — the default "open" view would render a column of dashes.
@@ -213,6 +215,7 @@ export default async function InvoicesPage({
               as one would teach the operator to distrust a correct safeguard. */}
           {bulkLimited ? <p className="mt-1 text-xs">{t.invoices.bulk.limited(bulkLimited)}</p> : null}
           {bulkSkipped ? <p className="mt-1 text-xs">{t.invoices.bulk.skipped(bulkSkipped)}</p> : null}
+          {bulkNotDue ? <p className="mt-1 text-xs">{t.invoices.bulk.notDue(bulkNotDue)}</p> : null}
           {bulkFailed ? <p className="mt-1 text-xs">{t.invoices.bulk.failed(bulkFailed)}</p> : null}
           {bulkLeft ? <p className="mt-1 text-xs">{t.invoices.bulk.capped(bulkLeft)}</p> : null}
         </div>
@@ -247,6 +250,16 @@ export default async function InvoicesPage({
                 className="rounded-lg bg-brand-600 px-3.5 py-1.5 text-sm font-medium text-white shadow-sm outline-none transition hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
               >
                 {t.invoices.bulk.send}
+              </button>
+
+              {/* Same selection, but the cadence decides what goes out rather
+                  than the picker beside it. */}
+              <button
+                type="submit"
+                formAction={runScenarioForSelected}
+                className="rounded-lg border border-ink-300 bg-white px-3.5 py-1.5 text-sm font-medium text-ink-700 outline-none transition hover:bg-ink-50 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+              >
+                {t.invoices.bulk.runScenario}
               </button>
             </div>
           ) : null}

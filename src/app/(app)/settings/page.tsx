@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 
 import { Badge, Card, CardHeader } from '@/components/ui';
 import { bankingConfigured, listAspsps } from '@/lib/bank/client';
-import { LADDER } from '@/lib/dunning/engine';
+import { loadScenario } from '@/lib/dunning/engine';
 
 import { DEFAULT_TEMPLATES, EDITABLE_SLOTS, slotKey } from '@/lib/dunning/templates';
 import { DICTIONARIES } from '@/lib/i18n/dictionaries';
@@ -12,11 +12,11 @@ import { paymentsAvailable } from '@/lib/providers';
 import { connectConfigured, SMS_PACKS } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
-import type { DunningStep } from '@/types/database';
 
 import { updateLocale } from './actions';
 import { ElorusForm } from './elorus-forms';
 import { BankConnect } from './bank-forms';
+import { ScenarioForm } from './scenario-forms';
 import { CreditPacks, MyDataForm, ProfileForm } from './settings-forms';
 import { ProviderChooser } from './provider-chooser';
 import { StripeConnect } from './stripe-forms';
@@ -185,6 +185,7 @@ export default async function SettingsPage({
   if (!profile) redirect('/login');
 
   const stripeMessage = stripeNotice(t, stripe);
+  const scenario = await loadScenario(user.id);
   const bankOutcome = bankNotice(t, bank, { seen, settled, queued, reason, fetched, accounts });
 
   const { data: bankConnections } = await supabase
@@ -219,12 +220,6 @@ export default async function SettingsPage({
 
   // Not `t` — that is the dictionary in this scope.
   const overrides = new Map((templates ?? []).map((row) => [slotKey(row.step, row.channel), row]));
-
-  const stepLabels: Record<DunningStep, string> = {
-    pre_due: t.steps.longPreDue,
-    overdue_2: t.steps.longOverdue2,
-    overdue_10: t.steps.longOverdue10,
-  };
 
   const slots: TemplateSlotView[] = EDITABLE_SLOTS.map((slot) => {
     const override = overrides.get(slot.key);
@@ -374,6 +369,13 @@ export default async function SettingsPage({
           the cards above take card payments, this one reads the bank so a
           transfer settles the invoice on its own. */}
       <Card>
+        <div id="scenario" className="scroll-mt-20">
+          <CardHeader title={t.scenario.title} subtitle={t.scenario.hint} />
+          <ScenarioForm scenario={scenario} />
+        </div>
+      </Card>
+
+      <Card>
         <div id="bank" className="scroll-mt-20">
           <CardHeader
             title={t.settings.bankAccount}
@@ -456,43 +458,6 @@ export default async function SettingsPage({
         <TemplateEditor slots={slots} />
       </Card>
 
-      <Card>
-        <CardHeader
-          title={t.settings.flowTitle}
-          subtitle={t.settings.flowHint}
-        />
-        <ol className="divide-y divide-ink-100">
-          {LADDER.map((rung) => (
-            <li key={rung.step} className="flex items-start justify-between gap-4 px-5 py-4">
-              <div>
-                <p className="text-sm font-medium text-ink-900">{stepLabels[rung.step]}</p>
-                <p className="mt-0.5 text-xs text-ink-500">
-                  {rung.offsetFrom < 0
-                    ? t.settings.beforeDue(Math.abs(rung.offsetFrom))
-                    : t.settings.afterDue(rung.offsetFrom)}
-                </p>
-              </div>
-              <div className="flex gap-1.5">
-                {rung.channels.map((channel) => (
-                  <Badge key={channel} tone={channel === 'sms' ? 'info' : 'neutral'}>
-                    {channel === 'sms' ? t.common.sms : t.common.email}
-                  </Badge>
-                ))}
-              </div>
-            </li>
-          ))}
-        </ol>
-        <div className="border-t border-ink-100 bg-ink-50 px-5 py-4 text-xs leading-relaxed text-ink-600">
-          <p>
-            <strong className="font-semibold text-ink-800">{t.settings.rateLimitLabel}</strong>{' '}
-            {t.settings.rateLimitBody}
-          </p>
-          <p className="mt-2">
-            <strong className="font-semibold text-ink-800">{t.settings.autoStopLabel}</strong>{' '}
-            {t.settings.autoStopBody}
-          </p>
-        </div>
-      </Card>
-    </div>
+  </div>
   );
 }

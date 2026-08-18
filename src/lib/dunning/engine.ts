@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import type { DebtorRow, DunningStep, InvoiceRow, UserRow } from '@/types/database';
 
 import { dispatchContact } from './dispatch';
+import { DEFAULT_SCENARIO, rungFor, type Scenario } from './scenario';
 import { loadTemplateOverrides } from './template-store';
 import type { TemplateOverrides } from './templates';
 
@@ -31,9 +32,6 @@ export const LADDER: ReadonlyArray<{
   { step: 'overdue_10', offsetFrom: 10, offsetUntil: Number.POSITIVE_INFINITY, channels: ['email', 'sms'] },
 ] as const;
 
-/** Stop chasing entirely once an invoice is this far past due. */
-const ABANDON_AFTER_DAYS = 120;
-
 export interface DunningRunResult {
   runDate: string;
   tenantsProcessed: number;
@@ -53,6 +51,8 @@ interface Candidate {
   step: DunningStep;
   channels: ReadonlyArray<Channel>;
   daysOverdue: number;
+  /** 0 on the first pass; a repeat of the final step increments it. */
+  cycle: number;
 }
 
 /** Channels on which this debtor can be reached, ignoring provider setup. */
@@ -80,17 +80,51 @@ export function deliverableChannels(
 }
 
 /** Which ladder step, if any, an invoice is due for today. */
-export function stepForInvoice(dueDate: string, today: string) {
-  const daysOverdue = daysBetween(dueDate, today);
+export function stepForInvoice(
+  dueDate: string,
+  today: string,
+  scenario: Scenario = DEFAULT_SCENARIO,
+) {
+  return rungFor(daysBetween(dueDate, today), scenario);
+}
 
-  if (daysOverdue > ABANDON_AFTER_DAYS) return null;
+/**
+ * The tenant's scenario, or the built-in one where they have not set it.
+ *
+ * Falls back per part rather than all-or-nothing: a tenant who has configured
+ * the steps but never touched the repeat should get their steps and the default
+ * repeat, not the whole default back.
+ */
+export async function loadScenario(userId: string): Promise<Scenario> {
+  const supabase = createAdminClient();
 
-  for (const rung of LADDER) {
-    if (daysOverdue >= rung.offsetFrom && daysOverdue <= rung.offsetUntil) {
-      return { ...rung, daysOverdue };
-    }
-  }
-  return null;
+  const [{ data: steps }, { data: settings }] = await Promise.all([
+    supabase.from('dunning_steps').select('*').eq('user_id', userId),
+    supabase.from('dunning_settings').select('*').eq('user_id', userId).maybeSingle(),
+  ]);
+
+  const configured = new Map((steps ?? []).map((row) => [row.step, row]));
+
+  return {
+    steps: DEFAULT_SCENARIO.steps.map((fallback) => {
+      const row = configured.get(fallback.step);
+      if (!row) return { ...fallback };
+
+      return {
+        step: fallback.step,
+        enabled: row.enabled,
+        offsetDays: row.offset_days,
+        channels: row.channels as Channel[],
+      };
+    }),
+    repeat: settings
+      ? {
+          enabled: settings.repeat_enabled,
+          everyDays: settings.repeat_every_days,
+          max: settings.repeat_max,
+        }
+      : { ...DEFAULT_SCENARIO.repeat },
+  };
 }
 
 /**
@@ -140,6 +174,9 @@ async function processTenant(
 ): Promise<void> {
   const supabase = createAdminClient();
 
+  // The cadence this tenant configured, or the built-in one if they never did.
+  const scenario = await loadScenario(tenant.id);
+
   // AUTO-STOP is expressed here: only `pending` invoices are ever loaded. The
   // moment the Stripe webhook flips an invoice to `paid`, it leaves this set and
   // the workflow halts for it.
@@ -176,7 +213,7 @@ async function processTenant(
       continue;
     }
 
-    const rung = stepForInvoice(invoice.due_date, today);
+    const rung = stepForInvoice(invoice.due_date, today, scenario);
     if (!rung) continue;
 
     // Reachability is per step, not per debtor: a debtor with only a phone
@@ -207,6 +244,7 @@ async function processTenant(
       step: rung.step,
       channels: rung.channels,
       daysOverdue: rung.daysOverdue,
+      cycle: rung.cycle,
     });
   }
 
@@ -281,6 +319,9 @@ async function deliver(
       debtor_id: debtor.id,
       invoice_id: invoice.id,
       step,
+      // The guarantee is now "once per invoice per cycle": a repeat of the final
+      // step is a new cycle, and everything else is still cycle 0.
+      cycle: candidate.cycle,
       contact_on: today,
     })
     .select('id')
