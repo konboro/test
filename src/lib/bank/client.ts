@@ -202,6 +202,9 @@ interface RawTransaction {
   debtor_account?: { iban?: string; identification?: string };
   creditor_account?: { iban?: string; identification?: string };
   reference_number?: string;
+  bank_transaction_code?:
+    | string
+    | { code?: string; description?: string; domain?: string; family?: string; sub_family?: string };
   creditor?: { name?: string };
 }
 
@@ -235,6 +238,8 @@ export interface ReadDiagnostic {
    * the only honest way to answer it. Counts, never values.
    */
   populated: Record<string, number>;
+  /** The bank's own movement codes and how often each appeared. */
+  codes: Record<string, number>;
 }
 
 export function diagnose(raw: RawTransaction[]): ReadDiagnostic {
@@ -248,6 +253,7 @@ export function diagnose(raw: RawTransaction[]): ReadDiagnostic {
     indicators: {},
     keys: raw.length ? Object.keys(raw[0] as object).sort() : [],
     populated: {},
+    codes: {},
   };
 
   const bump = (field: string, present: unknown) => {
@@ -270,6 +276,9 @@ export function diagnose(raw: RawTransaction[]): ReadDiagnostic {
     bump('reference_number', row.reference_number);
     bump('remittance', Array.isArray(row.remittance_information) ? row.remittance_information.length : row.remittance_information);
 
+    const code = transactionCode(row);
+    if (code) d.codes[code] = (d.codes[code] ?? 0) + 1;
+
     const indicator = row.credit_debit_indicator ?? '(absent)';
     d.indicators[indicator] = (d.indicators[indicator] ?? 0) + 1;
   }
@@ -279,6 +288,8 @@ export function diagnose(raw: RawTransaction[]): ReadDiagnostic {
 
 export interface IncomingCredit {
   providerTxId: string;
+  /** The bank's own classification, verbatim. Null when it sends none. */
+  bankTransactionCode: string | null;
   amountCents: number;
   currency: string;
   bookedOn: string;
@@ -338,6 +349,26 @@ export function transactionSignature(raw: RawTransaction): string {
   return `derived:${createHash('sha256').update(signature).digest('hex').slice(0, 32)}`;
 }
 
+/**
+ * The bank's own classification, flattened to one string.
+ *
+ * ISO 20022 splits it into domain / family / sub-family; banks also send a
+ * single proprietary code, and some send a human description instead. Kept
+ * verbatim rather than mapped into our own vocabulary — inventing a taxonomy
+ * before seeing real values is exactly how the parser came to discard every
+ * row for a month.
+ */
+export function transactionCode(raw: RawTransaction): string | null {
+  const code = raw.bank_transaction_code;
+  if (!code) return null;
+  if (typeof code === 'string') return code.trim() || null;
+
+  const parts = [code.domain, code.family, code.sub_family].filter(Boolean);
+  if (parts.length) return parts.join('/');
+
+  return code.code?.trim() || code.description?.trim() || null;
+}
+
 /** Banks disagree on the key; both spellings mean the account number. */
 function accountIdentification(
   account: { iban?: string; identification?: string } | undefined,
@@ -367,6 +398,7 @@ export function toCredit(raw: RawTransaction, fallbackId?: string): IncomingCred
     currency,
     bookedOn: bookedOn.slice(0, 10),
     remittance: remittance || null,
+    bankTransactionCode: transactionCode(raw),
     // Which side is the counterparty depends on the direction, and the bank
     // labels from the transaction's perspective rather than the account
     // holder's: on an incoming payment `creditor_account` is *our* account and
