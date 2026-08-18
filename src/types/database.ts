@@ -172,6 +172,9 @@ export type BankConnectionRow = {
   /** Consent is finite; when it lapses the feed stops without an error. */
   consent_expires_at: string | null;
   last_synced_at: string | null;
+  /** What the last successful read returned, before and after parsing. */
+  last_fetched_count: number | null;
+  last_credit_count: number | null;
   created_at: string;
   updated_at: string;
 }

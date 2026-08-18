@@ -33,6 +33,11 @@ export function BankConnect({
                   {connection.last_synced_at
                     ? `Τελευταίος έλεγχος ${formatDate(connection.last_synced_at.slice(0, 10))} · `
                     : ''}
+                  {/* What that read actually returned. An empty table with no
+                      number beside it is the state nobody can act on. */}
+                  {connection.last_fetched_count !== null
+                    ? `${connection.last_fetched_count} κινήσεις / ${connection.last_credit_count ?? 0} εισπράξεις · `
+                    : ''}
                   {connection.consent_expires_at
                     ? `πρόσβαση έως ${formatDate(connection.consent_expires_at.slice(0, 10))}`
                     : '—'}

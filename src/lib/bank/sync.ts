@@ -133,11 +133,18 @@ async function syncConnection(
   let continuationKey: string | null = null;
   let page = 0;
 
+  // Per-connection, because `result` accumulates across every account the tenant
+  // has linked and these are stored on one row.
+  let fetchedHere = 0;
+  let creditsHere = 0;
+
   do {
     const batch = await fetchCredits(connection.account_id, since, continuationKey, psu);
 
     result.fetched += batch.fetched;
     result.creditsSeen += batch.credits.length;
+    fetchedHere += batch.fetched;
+    creditsHere += batch.credits.length;
 
     for (const credit of batch.credits) {
       const inserted = await ingest(connection, credit);
@@ -151,10 +158,26 @@ async function syncConnection(
     page += 1;
   } while (continuationKey && page < MAX_PAGES);
 
+  // Kept so an empty result stays explainable after the fact. Rows fetched but
+  // no credits means either nothing incoming, or a response whose shape the
+  // parser does not recognise — and those look identical everywhere else.
   await supabase
     .from('bank_connections')
-    .update({ last_synced_at: new Date().toISOString() })
+    .update({
+      last_synced_at: new Date().toISOString(),
+      last_fetched_count: fetchedHere,
+      last_credit_count: creditsHere,
+    })
     .eq('id', connection.id);
+
+  console.info('[bank:read]', {
+    connectionId: connection.id,
+    since,
+    pages: page,
+    fetched: fetchedHere,
+    credits: creditsHere,
+    attended: Boolean(psu),
+  });
 }
 
 function windowStart(lastSyncedAt: string | null): string {
