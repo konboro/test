@@ -7,6 +7,7 @@ import { workflowStatus } from '@/lib/dunning/status';
 import { getDictionary } from '@/lib/i18n';
 import { contactLimitsDisabled } from '@/lib/limits';
 import { athensDate, formatDate, formatMoney } from '@/lib/money';
+import { settlementMethod } from '@/lib/payments/settlement';
 import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
 
@@ -56,6 +57,18 @@ export default async function InvoicesPage({
   }
 
   const today = athensDate();
+
+  // When and how a document was settled. Only worth a column on views that can
+  // contain paid rows — the default "open" view would render a column of dashes.
+  const showSettled = filter !== 'pending';
+  // The actions cell is only ever populated for pending rows, so a paid-only
+  // view would render an empty column that just pushes the table wider.
+  const showActions = filter !== 'paid';
+  const methodLabel = {
+    card: t.invoices.paidMethodCard,
+    external: t.invoices.paidMethodExternal,
+    billing_system: t.invoices.paidMethodBilling,
+  } as const;
 
   return (
     <div className="space-y-6">
@@ -114,7 +127,12 @@ export default async function InvoicesPage({
                   <th className="px-5 py-2.5 font-medium">{t.invoices.colDue}</th>
                   <th className="px-5 py-2.5 font-medium">{t.invoices.colAging}</th>
                   <th className="px-5 py-2.5 font-medium">{t.invoices.colStatus}</th>
-                  <th className="px-5 py-2.5 text-right font-medium">{t.invoices.colActions}</th>
+                  {showSettled ? (
+                    <th className="px-5 py-2.5 font-medium">{t.invoices.colPaid}</th>
+                  ) : null}
+                  {showActions ? (
+                    <th className="px-5 py-2.5 text-right font-medium">{t.invoices.colActions}</th>
+                  ) : null}
                 </tr>
               </thead>
               <tbody>
@@ -193,30 +211,50 @@ export default async function InvoicesPage({
                       <td className="px-5 py-3">
                         <Badge tone={status.tone}>{status.label}</Badge>
                       </td>
-                      <td className="px-5 py-3">
-                        <div className="flex items-center justify-end gap-3">
-                          {invoice.status === 'pending' ? (
-                            <>
-                              <RemindButton invoiceId={invoice.id} label={label} />
-                              <CopyPayLink code={invoice.short_code ?? invoice.pay_token} />
-                              <form action={markInvoicePaid}>
-                                <input type="hidden" name="id" value={invoice.id} />
-                                <button
-                                  type="submit"
-                                  className={`text-sm ${subtleLinkClass}`}
-                                  title={t.invoices.markPaidHint}
-                                >
-                                  {t.invoices.markPaid}
-                                </button>
-                              </form>
-                            </>
-                          ) : invoice.paid_at ? (
-                            <span className="tabular text-xs text-ink-500">
-                              {formatDate(invoice.paid_at.slice(0, 10))}
-                            </span>
-                          ) : null}
-                        </div>
-                      </td>
+                      {showSettled ? (
+                        <td className="px-5 py-3">
+                          {(() => {
+                            const method = settlementMethod(invoice);
+                            if (!method) return <span className="text-ink-400">—</span>;
+                            return (
+                              <>
+                                <div className="tabular text-ink-600">
+                                  {invoice.paid_at
+                                    ? new Date(invoice.paid_at).toLocaleString(t.dateTimeTag)
+                                    : '—'}
+                                </div>
+                                <div className="mt-1">
+                                  <Badge tone={method === 'card' ? 'info' : 'neutral'}>
+                                    <span className="whitespace-nowrap">{methodLabel[method]}</span>
+                                  </Badge>
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </td>
+                      ) : null}
+                      {showActions ? (
+                        <td className="px-5 py-3">
+                          <div className="flex items-center justify-end gap-3">
+                            {invoice.status === 'pending' ? (
+                              <>
+                                <RemindButton invoiceId={invoice.id} label={label} />
+                                <CopyPayLink code={invoice.short_code ?? invoice.pay_token} />
+                                <form action={markInvoicePaid}>
+                                  <input type="hidden" name="id" value={invoice.id} />
+                                  <button
+                                    type="submit"
+                                    className={`text-sm ${subtleLinkClass}`}
+                                    title={t.invoices.markPaidHint}
+                                  >
+                                    {t.invoices.markPaid}
+                                  </button>
+                                </form>
+                              </>
+                            ) : null}
+                          </div>
+                        </td>
+                      ) : null}
                     </tr>
                   );
                 })}
