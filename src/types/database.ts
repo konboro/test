@@ -11,6 +11,9 @@ export type CommChannel = 'email' | 'sms';
 export type CommStatus = 'sent' | 'failed' | 'skipped';
 export type DunningStep = 'pre_due' | 'overdue_2' | 'overdue_10';
 export type MyDataEnvironment = 'production' | 'sandbox';
+/** Viva runs two separate estates; a credential pair belongs to exactly one. */
+export type VivaEstate = 'demo' | 'production';
+export type PaymentProviderName = 'stripe' | 'viva';
 /** Portal interface language. Reminder copy is unaffected. */
 export type UserLocale = 'el' | 'en';
 
@@ -37,6 +40,14 @@ export type UserRow = {
   stripe_connected_at: string | null;
   /** The tenant’s own Stripe key, used until Connect has a platform to run on. */
   stripe_secret_key_enc: string | null;
+  /** Viva Smart Checkout credentials, same envelope as the Stripe and Elorus ones. */
+  viva_client_id_enc: string | null;
+  viva_client_secret_enc: string | null;
+  /** Null books orders against the account's default source. */
+  viva_source_code: string | null;
+  viva_environment: VivaEstate;
+  /** Preferred provider when both are set up. Null resolves to whichever is. */
+  payment_provider: PaymentProviderName | null;
   sms_credits: number;
   automation_enabled: boolean;
   reply_to_email: string | null;
@@ -77,6 +88,10 @@ export type InvoiceRow = {
   paid_amount_cents: number | null;
   stripe_checkout_session_id: string | null;
   stripe_payment_intent_id: string | null;
+  /** Set when the payment starts; the return route settles only a matching order. */
+  viva_order_code: string | null;
+  /** Set only after the transaction was read back from Viva, never from a redirect. */
+  viva_transaction_id: string | null;
   pay_token: string;
   /** The short public credential the reminder link carries. */
   short_code: string;
@@ -141,6 +156,51 @@ export type SmsCreditPurchaseRow = {
   amount_cents: number;
   currency: string;
   stripe_checkout_session_id: string;
+  created_at: string;
+}
+
+/** One bank account a creditor has linked for reading their own statement. */
+export type BankConnectionRow = {
+  id: string;
+  user_id: string;
+  institution_id: string;
+  institution_name: string;
+  /** Both stay null until the creditor returns from their bank. */
+  authorization_id: string | null;
+  account_id: string | null;
+  status: 'pending' | 'active' | 'expired' | 'revoked';
+  /** Consent is finite; when it lapses the feed stops without an error. */
+  consent_expires_at: string | null;
+  last_synced_at: string | null;
+  /** What the last successful read returned, before and after parsing. */
+  last_fetched_count: number | null;
+  last_credit_count: number | null;
+  /** Field-presence counts and observed key names. Never any values. */
+  last_read_diagnostic: unknown;
+  created_at: string;
+  updated_at: string;
+}
+
+/** An incoming credit. Debits are dropped before they can be stored. */
+export type BankTransactionRow = {
+  id: string;
+  user_id: string;
+  connection_id: string;
+  provider_tx_id: string;
+  booked_on: string;
+  amount_cents: number;
+  currency: string;
+  remittance: string | null;
+  counterparty_name: string | null;
+  counterparty_iban: string | null;
+  state: 'unmatched' | 'review' | 'settled' | 'dismissed';
+  matched_invoice_id: string | null;
+  /** Which evidence fired: 'reference' | 'name' | 'iban'. */
+  match_signals: string[];
+  matched_at: string | null;
+  /** Null when matched automatically; the operator's id when confirmed by hand. */
+  matched_by: string | null;
+  rejected_invoice_ids: string[];
   created_at: string;
 }
 
@@ -229,6 +289,21 @@ export interface Database {
           'user_id' | 'credits' | 'amount_cents' | 'stripe_checkout_session_id'
         >;
         Update: Partial<SmsCreditPurchaseRow>;
+        Relationships: NoRelationships;
+      };
+      bank_connections: {
+        Row: BankConnectionRow;
+        Insert: InsertOf<BankConnectionRow, 'user_id' | 'institution_id' | 'institution_name'>;
+        Update: Partial<BankConnectionRow>;
+        Relationships: NoRelationships;
+      };
+      bank_transactions: {
+        Row: BankTransactionRow;
+        Insert: InsertOf<
+          BankTransactionRow,
+          'user_id' | 'connection_id' | 'provider_tx_id' | 'booked_on' | 'amount_cents' | 'currency'
+        >;
+        Update: Partial<BankTransactionRow>;
         Relationships: NoRelationships;
       };
     };

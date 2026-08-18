@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { encryptSecret } from '@/lib/crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
+import { getDictionary } from '@/lib/i18n';
 
 export const runtime = 'nodejs';
 
@@ -15,7 +16,7 @@ const schema = z.object({
     .min(10)
     .max(200)
     .refine((k) => k.startsWith('sk_') || k.startsWith('rk_'), {
-      message: 'Το κλειδί πρέπει να ξεκινά με sk_ ή rk_.',
+      message: 'stripeKeyPrefix',
     }),
 });
 
@@ -31,6 +32,7 @@ const schema = z.object({
  * learn of it is a debtor pressing a payment button that breaks.
  */
 export async function POST(request: Request) {
+  const t = await getDictionary();
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -49,7 +51,7 @@ export async function POST(request: Request) {
     await client.balance.retrieve();
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : String(cause);
-    return NextResponse.json({ error: `Το Stripe απέρριψε το κλειδί: ${message}` }, { status: 400 });
+    return NextResponse.json({ error: t.forms.api.stripeRejected(message) }, { status: 400 });
   }
 
   const { error } = await createAdminClient()

@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 
+import { LeftaWordmark } from '@/components/logo';
 import { formatDate, formatMoney } from '@/lib/money';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -105,9 +106,7 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
 
         <p className="mt-6 text-center text-xs leading-relaxed text-ink-500">
           Η σελίδα παρέχεται από την πλατφόρμα{' '}
-          <span className="font-semibold text-ink-700">
-            lefta<span className="text-brand-500">.app</span>
-          </span>{' '}
+          <LeftaWordmark className="text-ink-700" />{' '}
           για λογαριασμό της {invoice.creditor_name}. Για ερωτήματα σχετικά με το παραστατικό,
           απευθυνθείτε απευθείας στον εκδότη.
         </p>

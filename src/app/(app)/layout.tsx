@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { signOut } from '@/app/auth/actions';
+import { LeftaLogo } from '@/components/logo';
 import { getDictionary, getLocale } from '@/lib/i18n';
 import { LocaleProvider } from '@/lib/i18n/provider';
 import { smsCreditsEnforced } from '@/lib/limits';
@@ -17,6 +18,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: '/dashboard', label: t.nav.dashboard },
     { href: '/invoices', label: t.nav.invoices },
     { href: '/debtors', label: t.nav.debtors },
+    { href: '/bank', label: t.nav.bank },
     { href: '/logs', label: t.nav.logs },
     { href: '/settings', label: t.nav.settings },
   ];
@@ -39,8 +41,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <header className="sticky top-0 z-40 border-b border-ink-200/90 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <div className="flex items-center gap-6">
-            <Link href="/dashboard" className="text-base font-semibold tracking-tight">
-              lefta<span className="text-brand-500">.app</span>
+            <Link href="/dashboard" aria-label="lefta.app">
+              <LeftaLogo />
             </Link>
             <nav className="hidden gap-1 md:flex">
               {NAV.map((item) => (

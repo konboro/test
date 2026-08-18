@@ -5,7 +5,9 @@ import { getDictionary } from '@/lib/i18n';
 import { createClient } from '@/lib/supabase/server';
 import type { CommStatus, DunningStep } from '@/types/database';
 
-export const metadata = { title: 'Ιστορικό επικοινωνίας' };
+export async function generateMetadata() {
+  return { title: (await getDictionary()).logs.title };
+}
 export const dynamic = 'force-dynamic';
 
 const STATUS_TONE: Record<CommStatus, 'positive' | 'danger' | 'neutral'> = {

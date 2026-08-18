@@ -316,8 +316,18 @@ function shell(
 
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
             <tr>
-              <td style="padding:0 4px 14px;font-size:15px;font-weight:600;letter-spacing:-0.01em;color:#0f172a;">
-                lefta<span style="color:#3b6df5;">.app</span>
+              <td style="padding:0 4px 14px;">
+                <!-- The mark, drawn with a background colour and a λ glyph rather
+                     than the SVG the app uses: Gmail strips inline SVG, and a
+                     hosted image would be blocked until the reader opts in.
+                     Outlook ignores border-radius and shows a square tile, which
+                     is a fair degradation. -->
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+                  <td width="22" height="22" align="center" valign="middle" style="width:22px;height:22px;background:#4c6ef5;border-radius:5px;font-size:15px;line-height:22px;font-weight:700;color:#ffffff;">&#955;</td>
+                  <td style="padding-left:8px;font-size:15px;font-weight:600;letter-spacing:-0.01em;color:#0f172a;white-space:nowrap;">
+                    lefta<span style="color:#3b6df5;">.app</span>
+                  </td>
+                </tr></table>
               </td>
             </tr>
 

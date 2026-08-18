@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { Button, Field, inputClass } from '@/components/ui';
+import { useT } from '@/lib/i18n/provider';
 
 /**
  * Links the tenant's own Stripe account.
@@ -19,6 +20,7 @@ import { Button, Field, inputClass } from '@/components/ui';
  * of its own, Connect replaces this and nobody has to hand over a secret key.
  */
 function OwnKeyForm({ hasKey }: { hasKey: boolean }) {
+  const t = useT();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
@@ -44,8 +46,8 @@ function OwnKeyForm({ hasKey }: { hasKey: boolean }) {
       setMessage({
         tone: 'ok',
         text: body.testMode
-          ? 'Το κλειδί αποθηκεύτηκε. Είναι κλειδί δοκιμών — οι πληρωμές δεν είναι πραγματικές.'
-          : 'Το κλειδί αποθηκεύτηκε.',
+          ? t.payments.stripe.keySavedTest
+          : t.payments.stripe.keySaved,
       });
       router.refresh();
     } finally {
@@ -66,12 +68,12 @@ function OwnKeyForm({ hasKey }: { hasKey: boolean }) {
   return (
     <form action={submit} className="space-y-4 px-5 py-4">
       <p className="text-sm leading-relaxed text-ink-600">
-        Επικολλήστε το <strong className="font-semibold text-ink-900">Secret key</strong> του δικού
-        σας λογαριασμού Stripe (Developers → API keys). Οι χρεώσεις δημιουργούνται απευθείας στον
-        λογαριασμό σας — το lefta.app δεν μεσολαβεί στη ροή χρημάτων.
+        {t.payments.stripe.pasteIntro}{' '}
+        <strong className="font-semibold text-ink-900">{t.payments.stripe.pasteKeyName}</strong>{' '}
+        {t.payments.stripe.pasteRest}
       </p>
 
-      <Field label="Stripe Secret key" hint="sk_test_… για δοκιμές, sk_live_… για πραγματικές πληρωμές">
+      <Field label="Stripe Secret key" hint={t.payments.stripe.keyHint}>
         <input
           name="secret_key"
           type="password"
@@ -95,12 +97,10 @@ function OwnKeyForm({ hasKey }: { hasKey: boolean }) {
 
       <div className="flex gap-2">
         <Button type="submit" disabled={busy}>
-          {busy ? 'Αποθήκευση…' : 'Αποθήκευση'}
+          {busy ? t.payments.saving : t.payments.save}
         </Button>
         {hasKey ? (
-          <Button type="button" variant="secondary" onClick={remove} disabled={busy}>
-            Αφαίρεση
-          </Button>
+          <Button type="button" variant="secondary" onClick={remove} disabled={busy}>{t.payments.remove}</Button>
         ) : null}
       </div>
     </form>
@@ -120,12 +120,13 @@ export function StripeConnect({
   /** Whether the tenant has pasted their own key as a stopgap. */
   hasOwnKey: boolean;
 }) {
+  const t = useT();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function disconnect() {
-    if (!window.confirm('Αποσύνδεση του λογαριασμού Stripe; Οι πελάτες σας δεν θα μπορούν να πληρώνουν με κάρτα.')) {
+    if (!window.confirm(t.payments.stripe.disconnectConfirm)) {
       return;
     }
 
@@ -137,7 +138,7 @@ export function StripeConnect({
       const body = (await response.json()) as { error?: string };
 
       if (!response.ok) {
-        setError(body.error ?? 'Δεν ήταν δυνατή η αποσύνδεση.');
+        setError(body.error ?? t.payments.stripe.disconnectFailed);
         return;
       }
 
@@ -158,9 +159,9 @@ export function StripeConnect({
     return (
       <div className="px-5 py-4">
         <p className="text-sm leading-relaxed text-ink-600">
-          Συνδέστε τον δικό σας λογαριασμό Stripe για να δέχεστε πληρωμές με κάρτα. Τα χρήματα
-          πηγαίνουν <strong className="font-semibold text-ink-900">απευθείας σε εσάς</strong>· το
-          lefta.app δεν μεσολαβεί στη ροή χρημάτων και δεν κρατά κανένα ποσό.
+          {t.payments.stripe.connectIntro}{' '}
+          <strong className="font-semibold text-ink-900">{t.payments.stripe.connectEmphasis}</strong>
+          {t.payments.stripe.connectRest}
         </p>
 
         {/* A plain anchor, not a Button: the handshake starts with a full-page
@@ -174,9 +175,7 @@ export function StripeConnect({
         <a
           href="/api/stripe/connect/start"
           className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-brand-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm outline-none transition hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
-        >
-          Σύνδεση με Stripe
-        </a>
+        >{t.payments.stripe.connectCta}</a>
       </div>
     );
   }
@@ -185,21 +184,18 @@ export function StripeConnect({
     <div className="space-y-3 px-5 py-4">
       <dl className="space-y-1.5 text-sm">
         <div className="flex justify-between gap-4">
-          <dt className="text-ink-500">Λογαριασμός</dt>
+          <dt className="text-ink-500">{t.payments.account}</dt>
           <dd className="tabular font-medium text-ink-900">{accountId}</dd>
         </div>
       </dl>
 
       {!chargesEnabled ? (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
-          Ο λογαριασμός συνδέθηκε, αλλά το Stripe δεν έχει ολοκληρώσει ακόμη τον έλεγχο των
-          στοιχείων σας. Μέχρι τότε το κουμπί πληρωμής δεν εμφανίζεται στους πελάτες σας.
-          Ολοκληρώστε τα στοιχεία στο Stripe και η κατάσταση ενημερώνεται αυτόματα.
+          {t.payments.stripe.pendingReview}
         </p>
       ) : (
         <p className="text-xs leading-relaxed text-ink-500">
-          Οι πληρωμές χρεώνονται απευθείας στον λογαριασμό σας. Το lefta.app δεν λαμβάνει προμήθεια
-          και δεν εμφανίζεται στη συναλλαγή.
+          {t.payments.stripe.liveNote}
         </p>
       )}
 
@@ -210,7 +206,7 @@ export function StripeConnect({
       ) : null}
 
       <Button type="button" variant="secondary" onClick={disconnect} disabled={busy}>
-        {busy ? 'Αποσύνδεση…' : 'Αποσύνδεση'}
+        {busy ? t.payments.disconnecting : t.payments.disconnect}
       </Button>
     </div>
   );

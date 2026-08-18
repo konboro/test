@@ -27,6 +27,7 @@ import type { DebtorRow, InvoiceRow, TemplateStep, UserRow } from '@/types/datab
 import { dispatchContact, templateContext } from './dispatch';
 import { loadTemplateOverrides } from './template-store';
 import { renderEmail, renderSms } from './templates';
+import { getDictionary, type Dictionary } from '@/lib/i18n';
 
 export interface ManualReminderResult {
   ok: boolean;
@@ -71,6 +72,8 @@ async function loadTarget(
   userId: string,
   invoiceId: string,
 ): Promise<{ ok: true; target: Target } | { ok: false; error: string }> {
+  const t = await getDictionary();
+
   const supabase = createAdminClient();
 
   const { data: invoice } = await supabase
@@ -80,9 +83,9 @@ async function loadTarget(
     .eq('user_id', userId)
     .maybeSingle();
 
-  if (!invoice) return { ok: false, error: 'Το παραστατικό δεν βρέθηκε.' };
+  if (!invoice) return { ok: false, error: t.manual.invoiceNotFound };
   if (invoice.status !== 'pending') {
-    return { ok: false, error: 'Το παραστατικό δεν είναι ανεξόφλητο.' };
+    return { ok: false, error: t.manual.invoiceNotOpen };
   }
 
   const [{ data: debtor }, { data: tenant }] = await Promise.all([
@@ -90,14 +93,14 @@ async function loadTarget(
     supabase.from('users').select('*').eq('id', userId).maybeSingle(),
   ]);
 
-  if (!debtor || !tenant) return { ok: false, error: 'Δεν βρέθηκαν τα στοιχεία του πελάτη.' };
+  if (!debtor || !tenant) return { ok: false, error: t.manual.debtorMissing };
 
   // Muting is the auditable opt-out — disputes, payment plans, people who asked
   // not to be contacted. A manual send must not be the way around it.
   if (debtor.muted) {
     return {
       ok: false,
-      error: 'Ο πελάτης είναι σε σίγαση. Καταργήστε τη σίγαση για να στείλετε υπενθύμιση.',
+      error: t.manual.debtorMuted,
     };
   }
 
@@ -105,17 +108,20 @@ async function loadTarget(
 }
 
 /** Which channels can carry a message right now, and why the others cannot. */
-function resolveChannels(debtor: DebtorRow): { channels: Channel[]; notes: string[] } {
+function resolveChannels(
+  debtor: DebtorRow,
+  t: Dictionary,
+): { channels: Channel[]; notes: string[] } {
   const notes: string[] = [];
   const channels: Channel[] = [];
 
-  if (!debtor.email) notes.push('Ο πελάτης δεν έχει email.');
-  else if (!channelAvailable('email')) notes.push('Δεν έχει ρυθμιστεί πάροχος email (Resend).');
+  if (!debtor.email) notes.push(t.manual.noEmail);
+  else if (!channelAvailable('email')) notes.push(t.manual.noEmailProvider);
   else channels.push('email');
 
   const phone = normalisePhone(debtor.phone);
-  if (!phone) notes.push('Ο πελάτης δεν έχει έγκυρο κινητό.');
-  else if (!channelAvailable('sms')) notes.push('Δεν έχει ρυθμιστεί πάροχος SMS (Brevo).');
+  if (!phone) notes.push(t.manual.noPhone);
+  else if (!channelAvailable('sms')) notes.push(t.manual.noSmsProvider);
   else channels.push('sms');
 
   return { channels, notes };
@@ -143,6 +149,8 @@ export async function previewManualReminder(params: {
   invoiceId: string;
   step: TemplateStep;
 }): Promise<ReminderPreview> {
+  const t = await getDictionary();
+
   const loaded = await loadTarget(params.userId, params.invoiceId);
   if (!loaded.ok) return { ok: false, error: loaded.error };
 
@@ -153,12 +161,12 @@ export async function previewManualReminder(params: {
   const email = renderEmail(params.step, ctx, overrides);
   const sms = renderSms(params.step, ctx, overrides);
 
-  const { channels, notes } = resolveChannels(debtor);
+  const { channels, notes } = resolveChannels(debtor, t);
 
   if (contactLimitsDisabled()) {
-    notes.push('ΔΟΚΙΜΑΣΤΙΚΗ ΛΕΙΤΟΥΡΓΙΑ: το ημερήσιο όριο επικοινωνίας είναι απενεργοποιημένο.');
+    notes.push(t.manual.limitsOff);
   } else if (await contactedToday(debtor.id)) {
-    notes.push('Ο πελάτης έχει ήδη ειδοποιηθεί σήμερα — η αποστολή θα απορριφθεί.');
+    notes.push(t.manual.alreadyContacted);
   }
 
   return {
@@ -179,6 +187,8 @@ export async function sendManualReminder(params: {
   invoiceId: string;
   step: TemplateStep;
 }): Promise<ManualReminderResult> {
+  const t = await getDictionary();
+
   const { userId, invoiceId, step } = params;
   const supabase = createAdminClient();
 
@@ -186,10 +196,10 @@ export async function sendManualReminder(params: {
   if (!loaded.ok) return fail(loaded.error);
 
   const { tenant, debtor, invoice } = loaded.target;
-  const { channels, notes } = resolveChannels(debtor);
+  const { channels, notes } = resolveChannels(debtor, t);
 
   if (channels.length === 0) {
-    return fail(notes.join(' ') || 'Δεν υπάρχει διαθέσιμο κανάλι αποστολής.');
+    return fail(notes.join(' ') || t.manual.noChannel);
   }
 
   // Claiming the row is what grants the right to contact this debtor today.
@@ -218,10 +228,10 @@ export async function sendManualReminder(params: {
     if (contactError || !contact) {
       if (contactError?.code === '23505') {
         return fail(
-          'Ο πελάτης έχει ήδη ειδοποιηθεί σήμερα. Επιτρέπεται μία επικοινωνία ανά ημέρα.',
+          t.manual.dailyLimit,
         );
       }
-      return fail(`Δεν ήταν δυνατή η καταχώριση της επικοινωνίας: ${contactError?.message ?? ''}`);
+      return fail(t.manual.contactFailed(contactError?.message ?? ''));
     }
 
     contactId = contact.id;

@@ -363,7 +363,7 @@ export function CopyPayLink({ code }: { code: string }) {
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // Clipboard access can be denied; fall back to a prompt the user can copy from.
-      window.prompt('Αντιγράψτε τον σύνδεσμο πληρωμής:', url);
+      window.prompt(t.common.copyLinkPrompt, url);
     }
   }
 

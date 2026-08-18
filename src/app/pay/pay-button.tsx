@@ -4,7 +4,13 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui';
 
-/** Starts Stripe Checkout for this invoice. */
+/**
+ * Starts a payment for this invoice.
+ *
+ * Which provider serves it is the server's business. The button asks for a URL
+ * and follows it, so a creditor switching from Stripe to Viva changes nothing
+ * here and the debtor learns the provider only when they land on it.
+ */
 export function PayButton({ token }: { token: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -14,7 +20,7 @@ export function PayButton({ token }: { token: string }) {
     setError(null);
 
     try {
-      const response = await fetch('/api/stripe/pay', {
+      const response = await fetch('/api/pay/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token }),

@@ -9,15 +9,17 @@ const PUBLIC_PREFIXES = [
   '/register',
   '/auth',
   // The debtor-facing payment page reached by an old, long reminder link, and
-  // the Checkout session it starts. Both see anonymous visitors holding only a
-  // payment credential.
+  // the checkout it starts. Both see anonymous visitors holding only a payment
+  // credential.
   '/pay',
-  '/api/stripe/pay',
-  // Where Stripe returns the debtor after Checkout. The visitor is anonymous —
-  // they hold a payment credential, not a session — and for a tenant collecting
-  // on their own key this endpoint is the only settlement path, so gating it
-  // behind auth would swallow the payment confirmation entirely.
+  '/api/pay',
+  // Where the provider sends the debtor back afterwards. These have to be public
+  // for the same reason the payment page does — the visitor has no session and
+  // never will — and they are what settle an invoice for a tenant with no
+  // webhook pointed at us. Gating them turns a completed payment into a bare
+  // "Unauthorized" in the debtor's browser.
   '/api/stripe/confirm',
+  '/api/viva/return',
   // Authenticated by Stripe's signature, not by a session cookie.
   '/api/stripe/webhook',
   // Authenticated by the CRON_SECRET bearer token.

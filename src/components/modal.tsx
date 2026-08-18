@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, type ReactNode } from 'react';
+import { useT } from '@/lib/i18n/provider';
 
 /**
  * The one dialog in the product.
@@ -26,6 +27,7 @@ export function Modal({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  const t = useT();
   const panel = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -71,7 +73,7 @@ export function Modal({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Κλείσιμο"
+            aria-label={t.common.close}
             className="-m-1.5 rounded-lg p-1.5 text-ink-400 transition hover:bg-ink-100 hover:text-ink-700"
           >
             <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">

@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { safeNextPath } from '@/lib/redirects';
 import { createClient } from '@/lib/supabase/server';
+import { formError, getDictionary } from '@/lib/i18n';
 
 export interface AuthState {
   error?: string;
@@ -12,42 +13,46 @@ export interface AuthState {
 }
 
 const credentials = z.object({
-  email: z.string().email('Δώστε ένα έγκυρο email.'),
-  password: z.string().min(8, 'Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες.'),
+  email: z.string().email('emailRequired'),
+  password: z.string().min(8, 'passwordMin'),
 });
 
 export async function signIn(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const t = await getDictionary();
+
   const parsed = credentials.safeParse({
     email: formData.get('email'),
     password: formData.get('password'),
   });
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? 'Μη έγκυρα στοιχεία.' };
+    return { error: formError(t, parsed.error.issues[0]?.message) };
   }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
 
   if (error) {
-    return { error: 'Λάθος email ή κωδικός.' };
+    return { error: t.forms.errors.badCredentials };
   }
 
   redirect(safeNextPath(formData.get('next')));
 }
 
 export async function signUp(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const t = await getDictionary();
+
   const parsed = credentials.safeParse({
     email: formData.get('email'),
     password: formData.get('password'),
   });
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? 'Μη έγκυρα στοιχεία.' };
+    return { error: formError(t, parsed.error.issues[0]?.message) };
   }
 
   const companyName = String(formData.get('company_name') ?? '').trim();
-  if (!companyName) return { error: 'Συμπληρώστε την επωνυμία της επιχείρησης.' };
+  if (!companyName) return { error: t.forms.errors.companyNameRequired };
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
@@ -63,7 +68,7 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
 
   // With email confirmation enabled the user has no session yet.
   if (!data.session) {
-    return { notice: 'Ελέγξτε το email σας για να επιβεβαιώσετε τον λογαριασμό.' };
+    return { notice: t.forms.notices.confirmEmail };
   }
 
   redirect('/dashboard');
