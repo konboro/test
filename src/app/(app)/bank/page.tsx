@@ -96,6 +96,10 @@ export default async function BankPage({
 
   const shown = filter === 'all' ? all : all.filter((r) => r.state === filter);
 
+  // Not "this one has no payer" but "this bank never sends one" — true only when
+  // it holds for the whole statement.
+  const noPayerDisclosed = all.length > 0 && all.every((r) => !r.counterparty_name);
+
   const totals = {
     credited: all.reduce((sum, r) => sum + r.amount_cents, 0),
     settled: all.filter((r) => r.state === 'settled').length,
@@ -148,6 +152,15 @@ export default async function BankPage({
       <Card>
         <CardHeader title={t.bank.count(shown.length)} subtitle={t.bank.readOnly} />
 
+        {/* Said once, not implied by a dash on every row. Some banks disclose no
+            counterparty on an incoming transfer, and an operator looking for a
+            payer deserves to know that rather than assume the panel lost it. */}
+        {noPayerDisclosed ? (
+          <p className="border-b border-ink-100 bg-ink-50 px-5 py-2.5 text-xs leading-relaxed text-ink-600">
+            {t.bank.noPayerNote}
+          </p>
+        ) : null}
+
         {!shown.length ? (
           <EmptyState title={t.bank.emptyTitle} body={t.bank.emptyBody} />
         ) : (
@@ -172,6 +185,11 @@ export default async function BankPage({
                         ))}
                       </div>
 
+                      {/* Reference first, payer only when there is one. Several
+                          banks — Eurobank among them — disclose no counterparty
+                          on an incoming transfer, and a column of dashes on
+                          every row buries the one field that does identify the
+                          payment. */}
                       <dl className="mt-2 grid gap-x-6 gap-y-2 sm:grid-cols-3">
                         <div className="min-w-0">
                           <dt className="text-xs uppercase tracking-wide text-ink-400">
@@ -181,36 +199,40 @@ export default async function BankPage({
                             {formatDate(row.booked_on)}
                           </dd>
                         </div>
-                        <div className="min-w-0">
-                          <dt className="text-xs uppercase tracking-wide text-ink-400">
-                            {t.bank.colPayer}
-                          </dt>
-                          <dd
-                            className={`truncate text-sm ${row.counterparty_name ? 'text-ink-800' : 'text-ink-400'}`}
-                          >
-                            {row.counterparty_name ?? '—'}
-                          </dd>
-                        </div>
-                        <div className="min-w-0">
-                          <dt className="text-xs uppercase tracking-wide text-ink-400">
-                            {t.bank.colIban}
-                          </dt>
-                          <dd
-                            className={`tabular truncate text-sm ${row.counterparty_iban ? 'text-ink-800' : 'text-ink-400'}`}
-                          >
-                            {row.counterparty_iban ?? '—'}
-                          </dd>
-                        </div>
-                      </dl>
 
-                      {row.remittance ? (
-                        <p className="mt-2 break-words text-sm text-ink-600">
-                          <span className="text-xs uppercase tracking-wide text-ink-400">
+                        <div className="min-w-0 sm:col-span-2">
+                          <dt className="text-xs uppercase tracking-wide text-ink-400">
                             {t.bank.colReference}
-                          </span>{' '}
-                          {row.remittance}
-                        </p>
-                      ) : null}
+                          </dt>
+                          <dd
+                            className={`break-words text-sm ${row.remittance ? 'text-ink-800' : 'text-ink-400'}`}
+                          >
+                            {row.remittance ?? '—'}
+                          </dd>
+                        </div>
+
+                        {row.counterparty_name ? (
+                          <div className="min-w-0">
+                            <dt className="text-xs uppercase tracking-wide text-ink-400">
+                              {t.bank.colPayer}
+                            </dt>
+                            <dd className="truncate text-sm text-ink-800">
+                              {row.counterparty_name}
+                            </dd>
+                          </div>
+                        ) : null}
+
+                        {row.counterparty_iban ? (
+                          <div className="min-w-0">
+                            <dt className="text-xs uppercase tracking-wide text-ink-400">
+                              {t.bank.colIban}
+                            </dt>
+                            <dd className="tabular truncate text-sm text-ink-800">
+                              {row.counterparty_iban}
+                            </dd>
+                          </div>
+                        ) : null}
+                      </dl>
                     </div>
 
                     <div className="shrink-0 text-right">
