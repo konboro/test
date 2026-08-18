@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 
-import { LeftaWordmark } from '@/components/logo';
+import { LeftaLogo, LeftaWordmark } from '@/components/logo';
 import { formatDate, formatMoney } from '@/lib/money';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -32,9 +32,12 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
-        <p className="text-center text-base font-semibold tracking-tight text-ink-900">
-          lefta<span className="text-brand-500">.app</span>
-        </p>
+        {/* The mark, not just the word. This is the most-branded surface the
+            product has — a debtor arriving from an email needs to recognise
+            where they landed before they read anything else. */}
+        <div className="flex justify-center">
+          <LeftaLogo />
+        </div>
         <p className="mt-3 text-center text-sm text-ink-500">
           Εξόφληση προς <span className="font-medium text-ink-800">{invoice.creditor_name}</span>
         </p>
