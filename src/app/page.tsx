@@ -2,50 +2,11 @@ import Link from 'next/link';
 
 import { LeftaLogo, LeftaMark } from '@/components/logo';
 import { ButtonLink } from '@/components/ui';
+import { getDictionary } from '@/lib/i18n';
 
-const STEPS = [
-  {
-    title: 'Συνδέετε τα βιβλία σας',
-    body: 'Elorus ή myDATA (ΑΑΔΕ), μία φορά. Πελάτες, ποσά και πραγματικές ημερομηνίες λήξης συγχρονίζονται μόνα τους — δεν πληκτρολογείτε τίποτα δύο φορές.',
-  },
-  {
-    title: 'Οι υπενθυμίσεις φεύγουν μόνες τους',
-    body: 'Τρία σταθερά βήματα, με τα δικά σας κείμενα: ευγενική υπενθύμιση πριν τη λήξη, ειδοποίηση στις 2 ημέρες καθυστέρησης, τελική στις 10.',
-  },
-  {
-    title: 'Ο πελάτης πληρώνει με ένα κλικ',
-    body: 'Κάθε μήνυμα έχει σύνδεσμο πληρωμής με κάρτα. Μόλις εξοφληθεί, η ροή σταματά αυτόματα — κανείς δεν λαμβάνει υπενθύμιση για τιμολόγιο που πλήρωσε.',
-  },
-];
+export default async function HomePage() {
+  const t = await getDictionary();
 
-const FEATURES = [
-  {
-    title: 'Συγχρονισμός τιμολογίων',
-    body: 'Elorus και myDATA. Τα ανεξόφλητα εμφανίζονται με το όνομα του πελάτη, το ποσό και την πραγματική ημερομηνία λήξης του κάθε παραστατικού.',
-  },
-  {
-    title: 'Email και SMS',
-    body: 'Η υπενθύμιση πριν τη λήξη φεύγει με email. Στις καθυστερήσεις προστίθεται και SMS, γιατί διαβάζεται.',
-  },
-  {
-    title: 'Τα δικά σας λόγια',
-    body: 'Επεξεργάζεστε κάθε μήνυμα με ζωντανή προεπισκόπηση. Στα SMS βλέπετε πόσα τμήματα χρεώνονται όσο γράφετε.',
-  },
-  {
-    title: 'Σύντομος σύνδεσμος πληρωμής',
-    body: 'Της μορφής lefta.app/KΩΔΙΚΟΣ — χωρεί σε ένα SMS και δεν μοιάζει με ανεπιθύμητο μήνυμα.',
-  },
-  {
-    title: 'Αντιστοίχιση εμβασμάτων',
-    body: 'Διαβάζει τον λογαριασμό σας και κλείνει τα τιμολόγια που εξηγούν οι εισπράξεις. Τα εμβάσματα σταματούν να είναι το τυφλό σημείο.',
-  },
-  {
-    title: 'Ηλικίωση και πλήρες αρχείο',
-    body: 'Πόσο καθυστερεί κάθε οφειλή, σε μία στήλη. Κάθε μήνυμα που στάλθηκε καταγράφεται με ώρα, παραλήπτη και περιεχόμενο.',
-  },
-];
-
-export default function HomePage() {
   return (
     <div className="min-h-screen">
       <header className="border-b border-ink-200 bg-white">
@@ -56,9 +17,9 @@ export default function HomePage() {
               href="/login"
               className="text-sm font-medium text-ink-600 transition hover:text-ink-900"
             >
-              Σύνδεση
+              {t.landing.signIn}
             </Link>
-            <ButtonLink href="/register">Δωρεάν δοκιμή</ButtonLink>
+            <ButtonLink href="/register">{t.landing.freeTrial}</ButtonLink>
           </div>
         </div>
       </header>
@@ -67,25 +28,23 @@ export default function HomePage() {
         <section className="py-16 text-center sm:py-20">
           <LeftaMark className="mx-auto h-16 w-16 sm:h-20 sm:w-20" />
           <h1 className="mx-auto mt-8 max-w-2xl text-balance text-3xl font-semibold leading-tight tracking-tight text-ink-900 sm:text-5xl">
-            Πληρωθείτε στην ώρα σας, χωρίς δύσκολα τηλεφωνήματα.
+            {t.landing.heroTitle}
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-ink-600 sm:text-lg">
-            Το lefta.app παρακολουθεί τα ανεξόφλητα τιμολόγιά σας, στέλνει τις υπενθυμίσεις για
-            λογαριασμό σας και δίνει στον πελάτη σύνδεσμο άμεσης εξόφλησης. Εσείς ασχολείστε με τη
-            δουλειά σας.
+            {t.landing.heroBody}
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <ButtonLink href="/register" variant="brand" className="px-5 py-2.5 text-base">
-              Ξεκινήστε δωρεάν
+              {t.landing.startFree}
             </ButtonLink>
             <ButtonLink href="/login" variant="secondary" className="px-5 py-2.5 text-base">
-              Έχω λογαριασμό
+              {t.landing.haveAccount}
             </ButtonLink>
           </div>
         </section>
 
         <section className="grid gap-5 pb-16 sm:grid-cols-3 sm:pb-20">
-          {STEPS.map((step, index) => (
+          {t.landing.steps.map((step, index) => (
             <div
               key={step.title}
               className="rounded-xl border border-ink-200 bg-white p-6 shadow-sm"
@@ -101,10 +60,10 @@ export default function HomePage() {
 
         <section className="pb-16 sm:pb-20">
           <h2 className="text-center text-2xl font-semibold tracking-tight text-ink-900">
-            Τι περιλαμβάνει
+            {t.landing.whatsIncluded}
           </h2>
           <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((feature) => (
+            {t.landing.features.map((feature) => (
               <div
                 key={feature.title}
                 className="rounded-xl border border-ink-200 bg-white p-5 shadow-sm"
@@ -121,40 +80,36 @@ export default function HomePage() {
         <section className="mb-16 overflow-hidden rounded-xl border border-brand-100 bg-brand-50 sm:mb-20">
           <div className="p-6 sm:p-8">
             <h2 className="text-lg font-semibold text-ink-900">
-              Τα χρήματα πηγαίνουν απευθείας σε εσάς
+              {t.landing.moneyTitle}
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-ink-700">
-              Συνδέετε τον δικό σας λογαριασμό <strong className="font-semibold">Stripe</strong> ή{' '}
-              <strong className="font-semibold">Viva.com</strong> και οι πληρωμές εισπράττονται εκεί.
-              Το lefta.app δεν μεσολαβεί στη ροή χρημάτων, δεν κρατά προμήθεια και δεν εμφανίζεται
-              στη συναλλαγή. Δεν περιμένετε κανέναν να σας αποδώσει τα δικά σας χρήματα.
+              {t.landing.moneyIntro} <strong className="font-semibold">Stripe</strong>{' '}
+              {t.landing.moneyOr} <strong className="font-semibold">Viva.com</strong>{' '}
+              {t.landing.moneyRest}
             </p>
           </div>
         </section>
 
         <section className="mb-16 rounded-xl border border-ink-200 bg-white p-6 sm:mb-20">
           <h2 className="text-sm font-semibold text-ink-900">
-            Πάροχος λογισμικού, όχι εισπρακτική εταιρεία
+            {t.landing.complianceTitle}
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ink-600">
-            Το lefta.app διαβιβάζει υπενθυμίσεις για λογαριασμό σας. Δεν αναλαμβάνει απαιτήσεις, δεν
-            διαπραγματεύεται οφειλές και δεν ασκεί πίεση. Η ροή είναι σταθερή, με ανώτατο όριο{' '}
-            <strong className="font-semibold text-ink-800">μία επαφή ανά πελάτη ανά ημέρα</strong>,
-            κάθε μήνυμα καταγράφεται σε πλήρες, μη τροποποιήσιμο αρχείο, και μπορείτε ανά πάσα στιγμή
-            να θέσετε έναν πελάτη σε παύση.
+            {t.landing.complianceIntro}{' '}
+            <strong className="font-semibold text-ink-800">{t.landing.complianceLimit}</strong>
+            {t.landing.complianceRest}
           </p>
         </section>
 
         <section className="mb-20 text-center">
           <h2 className="text-2xl font-semibold tracking-tight text-ink-900">
-            Δείτε τι σας χρωστούν σήμερα
+            {t.landing.closingTitle}
           </h2>
           <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-ink-600">
-            Η σύνδεση με τα βιβλία σας παίρνει λίγα λεπτά. Καμία υπενθύμιση δεν φεύγει προτού την
-            εγκρίνετε εσείς.
+            {t.landing.closingBody}
           </p>
           <ButtonLink href="/register" variant="brand" className="mt-6 px-5 py-2.5 text-base">
-            Ξεκινήστε δωρεάν
+            {t.landing.startFree}
           </ButtonLink>
         </section>
       </main>

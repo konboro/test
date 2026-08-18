@@ -15,6 +15,7 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ next?: string }>;
 }) {
+  const t = await getDictionary();
   const { next } = await searchParams;
 
   return (
@@ -23,17 +24,17 @@ export default async function LoginPage({
         <Link href="/" aria-label="lefta.app" className="flex justify-center">
           <LeftaLogo markClassName="h-9 w-9" textClassName="text-xl" />
         </Link>
-        <h1 className="mt-6 text-center text-lg font-semibold text-ink-900">Σύνδεση</h1>
+        <h1 className="mt-6 text-center text-lg font-semibold text-ink-900">{t.auth.signInTitle}</h1>
         <p className="mt-1 text-center text-sm text-ink-500">
-          Διαχειριστείτε τις εισπράξεις σας.
+          {t.auth.tagline}
         </p>
 
         <LoginForm next={next} />
 
         <p className="mt-6 text-center text-sm text-ink-500">
-          Δεν έχετε λογαριασμό;{' '}
+          {t.auth.noAccount}{' '}
           <Link href="/register" className={linkClass}>
-            Δημιουργία
+            {t.auth.createLink}
           </Link>
         </p>
       </div>

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { connectClientId, stripe } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
+import { getDictionary } from '@/lib/i18n';
 
 export const runtime = 'nodejs';
 
@@ -18,6 +19,7 @@ export const runtime = 'nodejs';
  * tenant's own account and remain their record.
  */
 export async function POST() {
+  const t = await getDictionary();
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -44,7 +46,7 @@ export async function POST() {
     const message = String(cause);
     if (!message.includes('not connected')) {
       console.error('[stripe:connect] deauthorize failed', message);
-      return NextResponse.json({ error: 'Δεν ήταν δυνατή η αποσύνδεση.' }, { status: 502 });
+      return NextResponse.json({ error: t.forms.api.disconnectFailed }, { status: 502 });
     }
   }
 

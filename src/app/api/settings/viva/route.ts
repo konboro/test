@@ -5,6 +5,7 @@ import { encryptSecret } from '@/lib/crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
 import { accessToken, type VivaEnvironment } from '@/lib/viva/client';
+import { getDictionary } from '@/lib/i18n';
 
 export const runtime = 'nodejs';
 
@@ -35,6 +36,7 @@ const schema = z.object({
  * one on the strength of a lucky match.
  */
 export async function POST(request: Request) {
+  const t = await getDictionary();
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -63,7 +65,7 @@ export async function POST(request: Request) {
 
   if (!environment) {
     return NextResponse.json(
-      { error: `Η Viva απέρριψε τα στοιχεία: ${lastError}` },
+      { error: t.forms.api.vivaRejected(lastError) },
       { status: 400 },
     );
   }

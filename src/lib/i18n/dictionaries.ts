@@ -71,7 +71,64 @@ const el = {
       returnRest: 'ορίστε ως διεύθυνση επιτυχίας και αποτυχίας της πηγής πληρωμών:',
     },
   },
+
+  fields: {
+    save: 'Αποθήκευση',
+    saving: 'Αποθήκευση…',
+    add: 'Προσθήκη',
+    cancel: 'Άκυρο',
+    close: 'Κλείσιμο',
+    edit: 'Επεξεργασία',
+    newCustomer: 'Νέος πελάτης',
+    companyName: 'Επωνυμία',
+    vat: 'ΑΦΜ',
+    email: 'Email',
+    emailHint: 'Απαραίτητο για τις υπενθυμίσεις email.',
+    mobile: 'Κινητό',
+    mobileHint: 'Μορφή +30 69XXXXXXXX. Απαραίτητο για SMS.',
+    notes: 'Σημειώσεις',
+    replyTo: 'Email απάντησης',
+    replyToHint: 'Εκεί θα απαντούν οι πελάτες στις υπενθυμίσεις.',
+    automationOn: 'Ενεργή αυτοματοποίηση υπενθυμίσεων',
+    automationHint: 'Όταν είναι απενεργοποιημένη, δεν στέλνεται κανένα μήνυμα σε κανέναν πελάτη.',
+    environment: 'Περιβάλλον',
+    envProduction: 'Παραγωγή (mydatapi.aade.gr)',
+    envSandbox: 'Δοκιμαστικό (mydataapidev.aade.gr)',
+    keyStored: 'Αποθηκευμένο και κρυπτογραφημένο. Αφήστε το κενό για να παραμείνει ως έχει.',
+    keyFromAccount: 'Από τον λογαριασμό σας στο myDATA REST API.',
+    verifyAndSave: 'Επαλήθευση και αποθήκευση',
+    verifying: 'Έλεγχος…',
+    disconnect: 'Αποσύνδεση',
+    saveFailed: 'Η αποθήκευση απέτυχε.',
+    credentialsVerified: 'Τα διαπιστευτήρια επαληθεύτηκαν και αποθηκεύτηκαν.',
+    deleteMydataConfirm: 'Να διαγραφούν τα αποθηκευμένα διαπιστευτήρια myDATA;',
+    mydataDisconnected: 'Η σύνδεση με το myDATA διακόπηκε.',
+    checkoutFailed: 'Δεν ήταν δυνατή η έναρξη της πληρωμής.',
+    redirecting: 'Ανακατεύθυνση…',
+    buy: 'Αγορά',
+  },
+  manual: {
+    invoiceNotFound: 'Το παραστατικό δεν βρέθηκε.',
+    invoiceNotOpen: 'Το παραστατικό δεν είναι ανεξόφλητο.',
+    debtorMissing: 'Δεν βρέθηκαν τα στοιχεία του πελάτη.',
+    debtorMuted: 'Ο πελάτης είναι σε σίγαση. Καταργήστε τη σίγαση για να στείλετε υπενθύμιση.',
+    noEmail: 'Ο πελάτης δεν έχει email.',
+    noEmailProvider: 'Δεν έχει ρυθμιστεί πάροχος email (Resend).',
+    noPhone: 'Ο πελάτης δεν έχει έγκυρο κινητό.',
+    noSmsProvider: 'Δεν έχει ρυθμιστεί πάροχος SMS (Brevo).',
+    limitsOff: 'ΔΟΚΙΜΑΣΤΙΚΗ ΛΕΙΤΟΥΡΓΙΑ: το ημερήσιο όριο επικοινωνίας είναι απενεργοποιημένο.',
+    alreadyContacted: 'Ο πελάτης έχει ήδη ειδοποιηθεί σήμερα — η αποστολή θα απορριφθεί.',
+    noChannel: 'Δεν υπάρχει διαθέσιμο κανάλι αποστολής.',
+    dailyLimit: 'Ο πελάτης έχει ήδη ειδοποιηθεί σήμερα. Επιτρέπεται μία επικοινωνία ανά ημέρα.',
+    contactFailed: (detail: string) => `Δεν ήταν δυνατή η καταχώριση της επικοινωνίας: ${detail}`,
+  },
   forms: {
+    api: {
+      stripeKeyPrefix: 'Το κλειδί πρέπει να ξεκινά με sk_ ή rk_.',
+      stripeRejected: (detail: string) => `Το Stripe απέρριψε το κλειδί: ${detail}`,
+      vivaRejected: (detail: string) => `Η Viva απέρριψε τα στοιχεία: ${detail}`,
+      disconnectFailed: 'Δεν ήταν δυνατή η αποσύνδεση.',
+    },
     errors: {
       unauthorized: 'Μη εξουσιοδοτημένη ενέργεια.',
       invalidData: 'Μη έγκυρα στοιχεία.',
@@ -113,7 +170,76 @@ const el = {
       confirmEmail: 'Ελέγξτε το email σας για να επιβεβαιώσετε τον λογαριασμό.',
     },
   },
+
+  landing: {
+    signIn: 'Σύνδεση',
+    freeTrial: 'Δωρεάν δοκιμή',
+    heroTitle: 'Πληρωθείτε στην ώρα σας, χωρίς δύσκολα τηλεφωνήματα.',
+    heroBody:
+      'Το lefta.app παρακολουθεί τα ανεξόφλητα τιμολόγιά σας, στέλνει τις υπενθυμίσεις για λογαριασμό σας και δίνει στον πελάτη σύνδεσμο άμεσης εξόφλησης. Εσείς ασχολείστε με τη δουλειά σας.',
+    startFree: 'Ξεκινήστε δωρεάν',
+    haveAccount: 'Έχω λογαριασμό',
+    whatsIncluded: 'Τι περιλαμβάνει',
+    moneyTitle: 'Τα χρήματα πηγαίνουν απευθείας σε εσάς',
+    moneyIntro: 'Συνδέετε τον δικό σας λογαριασμό',
+    moneyOr: 'ή',
+    moneyRest:
+      'και οι πληρωμές εισπράττονται εκεί. Το lefta.app δεν μεσολαβεί στη ροή χρημάτων, δεν κρατά προμήθεια και δεν εμφανίζεται στη συναλλαγή. Δεν περιμένετε κανέναν να σας αποδώσει τα δικά σας χρήματα.',
+    complianceTitle: 'Πάροχος λογισμικού, όχι εισπρακτική εταιρεία',
+    complianceIntro:
+      'Το lefta.app διαβιβάζει υπενθυμίσεις για λογαριασμό σας. Δεν αναλαμβάνει απαιτήσεις, δεν διαπραγματεύεται οφειλές και δεν ασκεί πίεση. Η ροή είναι σταθερή, με ανώτατο όριο',
+    complianceLimit: 'μία επαφή ανά πελάτη ανά ημέρα',
+    complianceRest:
+      ', κάθε μήνυμα καταγράφεται σε πλήρες, μη τροποποιήσιμο αρχείο, και μπορείτε ανά πάσα στιγμή να θέσετε έναν πελάτη σε παύση.',
+    closingTitle: 'Δείτε τι σας χρωστούν σήμερα',
+    closingBody:
+      'Η σύνδεση με τα βιβλία σας παίρνει λίγα λεπτά. Καμία υπενθύμιση δεν φεύγει προτού την εγκρίνετε εσείς.',
+    steps: [
+      {
+        title: 'Συνδέετε τα βιβλία σας',
+        body: 'Elorus ή myDATA (ΑΑΔΕ), μία φορά. Πελάτες, ποσά και πραγματικές ημερομηνίες λήξης συγχρονίζονται μόνα τους — δεν πληκτρολογείτε τίποτα δύο φορές.',
+      },
+      {
+        title: 'Οι υπενθυμίσεις φεύγουν μόνες τους',
+        body: 'Τρία σταθερά βήματα, με τα δικά σας κείμενα: ευγενική υπενθύμιση πριν τη λήξη, ειδοποίηση στις 2 ημέρες καθυστέρησης, τελική στις 10.',
+      },
+      {
+        title: 'Ο πελάτης πληρώνει με ένα κλικ',
+        body: 'Κάθε μήνυμα έχει σύνδεσμο πληρωμής με κάρτα. Μόλις εξοφληθεί, η ροή σταματά αυτόματα — κανείς δεν λαμβάνει υπενθύμιση για τιμολόγιο που πλήρωσε.',
+      },
+    ],
+    features: [
+      {
+        title: 'Συγχρονισμός τιμολογίων',
+        body: 'Elorus και myDATA. Τα ανεξόφλητα εμφανίζονται με το όνομα του πελάτη, το ποσό και την πραγματική ημερομηνία λήξης του κάθε παραστατικού.',
+      },
+      {
+        title: 'Email και SMS',
+        body: 'Η υπενθύμιση πριν τη λήξη φεύγει με email. Στις καθυστερήσεις προστίθεται και SMS, γιατί διαβάζεται.',
+      },
+      {
+        title: 'Τα δικά σας λόγια',
+        body: 'Επεξεργάζεστε κάθε μήνυμα με ζωντανή προεπισκόπηση. Στα SMS βλέπετε πόσα τμήματα χρεώνονται όσο γράφετε.',
+      },
+      {
+        title: 'Σύντομος σύνδεσμος πληρωμής',
+        body: 'Της μορφής lefta.app/KΩΔΙΚΟΣ — χωρεί σε ένα SMS και δεν μοιάζει με ανεπιθύμητο μήνυμα.',
+      },
+      {
+        title: 'Αντιστοίχιση εμβασμάτων',
+        body: 'Διαβάζει τον λογαριασμό σας και κλείνει τα τιμολόγια που εξηγούν οι εισπράξεις. Τα εμβάσματα σταματούν να είναι το τυφλό σημείο.',
+      },
+      {
+        title: 'Ηλικίωση και πλήρες αρχείο',
+        body: 'Πόσο καθυστερεί κάθε οφειλή, σε μία στήλη. Κάθε μήνυμα που στάλθηκε καταγράφεται με ώρα, παραλήπτη και περιεχόμενο.',
+      },
+    ],
+  },
   common: {
+    appTitle: 'lefta.app — Αυτοματοποιημένες εισπράξεις',
+    appDescription:
+      'Συνδέεται με το myDATA, στέλνει αυτόματες υπενθυμίσεις πληρωμής και δίνει στους πελάτες σας σύνδεσμο άμεσης εξόφλησης.',
+    copyLinkPrompt: 'Αντιγράψτε τον σύνδεσμο πληρωμής:',
     save: 'Αποθήκευση',
     saving: 'Αποθήκευση…',
     cancel: 'Άκυρο',
@@ -216,6 +342,13 @@ const el = {
   },
 
   auth: {
+    tagline: 'Διαχειριστείτε τις εισπράξεις σας.',
+    createLink: 'Δημιουργία',
+    signingIn: 'Σύνδεση…',
+    creating: 'Δημιουργία…',
+    password: 'Κωδικός',
+    passwordHint: 'Τουλάχιστον 8 χαρακτήρες.',
+    companyName: 'Επωνυμία επιχείρησης',
     signInTitle: 'Σύνδεση',
     registerTitle: 'Εγγραφή',
     noAccount: 'Δεν έχετε λογαριασμό;',
@@ -225,6 +358,8 @@ const el = {
   },
 
   dashboard: {
+    muted: 'σε παύση',
+    noContact: 'χωρίς στοιχεία',
     title: 'Επισκόπηση',
     lastSync: (when: string) => `Τελευταίος συγχρονισμός myDATA: ${when}`,
     neverSynced: 'Δεν έχει γίνει ακόμη συγχρονισμός με το myDATA.',
@@ -558,7 +693,64 @@ const en: typeof el = {
       returnRest: 'page, set the success and failure address of the payment source to:',
     },
   },
+
+  fields: {
+    save: 'Save',
+    saving: 'Saving…',
+    add: 'Add',
+    cancel: 'Cancel',
+    close: 'Close',
+    edit: 'Edit',
+    newCustomer: 'New customer',
+    companyName: 'Name',
+    vat: 'VAT number',
+    email: 'Email',
+    emailHint: 'Required for email reminders.',
+    mobile: 'Mobile',
+    mobileHint: 'Format +30 69XXXXXXXX. Required for SMS.',
+    notes: 'Notes',
+    replyTo: 'Reply-to email',
+    replyToHint: 'Where customers reply to reminders.',
+    automationOn: 'Reminder automation on',
+    automationHint: 'While it is off, no message goes to any customer.',
+    environment: 'Environment',
+    envProduction: 'Production (mydatapi.aade.gr)',
+    envSandbox: 'Sandbox (mydataapidev.aade.gr)',
+    keyStored: 'Stored and encrypted. Leave empty to keep it as it is.',
+    keyFromAccount: 'From your myDATA REST API account.',
+    verifyAndSave: 'Verify and save',
+    verifying: 'Checking…',
+    disconnect: 'Disconnect',
+    saveFailed: 'Saving failed.',
+    credentialsVerified: 'Credentials verified and saved.',
+    deleteMydataConfirm: 'Delete the stored myDATA credentials?',
+    mydataDisconnected: 'Disconnected from myDATA.',
+    checkoutFailed: 'The payment could not be started.',
+    redirecting: 'Redirecting…',
+    buy: 'Buy',
+  },
+  manual: {
+    invoiceNotFound: 'Invoice not found.',
+    invoiceNotOpen: 'That invoice is not outstanding.',
+    debtorMissing: 'The customer details could not be found.',
+    debtorMuted: 'This customer is muted. Unmute them to send a reminder.',
+    noEmail: 'The customer has no email address.',
+    noEmailProvider: 'No email provider is configured (Resend).',
+    noPhone: 'The customer has no valid mobile number.',
+    noSmsProvider: 'No SMS provider is configured (Brevo).',
+    limitsOff: 'TEST MODE: the daily contact limit is switched off.',
+    alreadyContacted: 'This customer has already been contacted today — the send will be refused.',
+    noChannel: 'No delivery channel is available.',
+    dailyLimit: 'This customer has already been contacted today. One contact per day is allowed.',
+    contactFailed: (detail: string) => `The contact could not be recorded: ${detail}`,
+  },
   forms: {
+    api: {
+      stripeKeyPrefix: 'The key has to start with sk_ or rk_.',
+      stripeRejected: (detail: string) => `Stripe rejected the key: ${detail}`,
+      vivaRejected: (detail: string) => `Viva rejected the credentials: ${detail}`,
+      disconnectFailed: 'The account could not be disconnected.',
+    },
     errors: {
       unauthorized: 'You are not allowed to do that.',
       invalidData: 'Some details are not valid.',
@@ -600,7 +792,76 @@ const en: typeof el = {
       confirmEmail: 'Check your email to confirm the account.',
     },
   },
+
+  landing: {
+    signIn: 'Sign in',
+    freeTrial: 'Try it free',
+    heroTitle: 'Get paid on time, without the awkward phone calls.',
+    heroBody:
+      'lefta.app watches your unpaid invoices, sends the reminders on your behalf, and gives your customer a link that settles the invoice on the spot. You get on with the work.',
+    startFree: 'Start free',
+    haveAccount: 'I have an account',
+    whatsIncluded: "What's included",
+    moneyTitle: 'The money goes straight to you',
+    moneyIntro: 'You connect your own',
+    moneyOr: 'or',
+    moneyRest:
+      'account and payments are collected there. lefta.app never sits in the flow of money, takes no commission and does not appear in the transaction. You are not waiting on anyone to pass your own money back to you.',
+    complianceTitle: 'A software provider, not a collections agency',
+    complianceIntro:
+      'lefta.app passes on reminders for you. It does not take over claims, negotiate debts or apply pressure. The cadence is fixed, capped at',
+    complianceLimit: 'one contact per customer per day',
+    complianceRest:
+      ', every message is written to a complete, tamper-proof record, and you can mute a customer at any moment.',
+    closingTitle: 'See what you are owed today',
+    closingBody:
+      'Connecting your books takes a few minutes. No reminder goes out until you have approved it.',
+    steps: [
+      {
+        title: 'Connect your books',
+        body: 'Elorus or myDATA (AADE), once. Customers, amounts and real due dates sync themselves — you never type anything twice.',
+      },
+      {
+        title: 'Reminders send themselves',
+        body: 'Three fixed steps, in your own words: a polite nudge before the due date, a notice two days late, a final one at ten.',
+      },
+      {
+        title: 'Your customer pays in one click',
+        body: 'Every message carries a card payment link. The moment it is settled the sequence stops by itself — nobody is chased for an invoice they have already paid.',
+      },
+    ],
+    features: [
+      {
+        title: 'Invoice sync',
+        body: 'Elorus and myDATA. Outstanding invoices appear with the customer name, the amount and the real due date of each document.',
+      },
+      {
+        title: 'Email and SMS',
+        body: 'The pre-due reminder goes by email. Once an invoice is late, SMS joins in — because SMS gets read.',
+      },
+      {
+        title: 'Your own words',
+        body: 'Edit every message with a live preview. For SMS you can see how many segments you are paying for as you type.',
+      },
+      {
+        title: 'A short payment link',
+        body: 'It looks like lefta.app/CODE — it fits in a single SMS and does not read like spam.',
+      },
+      {
+        title: 'Bank transfers matched',
+        body: 'Reads your account and closes the invoices your incoming payments explain. Transfers stop being the blind spot.',
+      },
+      {
+        title: 'Ageing and a full record',
+        body: 'How late every debt is, in one column. Every message sent is logged with its time, recipient and content.',
+      },
+    ],
+  },
   common: {
+    appTitle: 'lefta.app — automated receivables',
+    appDescription:
+      'Connects to myDATA, sends payment reminders by itself, and gives your customers a link that settles the invoice on the spot.',
+    copyLinkPrompt: 'Copy the payment link:',
     save: 'Save',
     saving: 'Saving…',
     cancel: 'Cancel',
@@ -703,6 +964,13 @@ const en: typeof el = {
   },
 
   auth: {
+    tagline: 'Run your receivables.',
+    createLink: 'Create one',
+    signingIn: 'Signing in…',
+    creating: 'Creating…',
+    password: 'Password',
+    passwordHint: 'At least 8 characters.',
+    companyName: 'Company name',
     signInTitle: 'Sign in',
     registerTitle: 'Create account',
     noAccount: 'No account yet?',
@@ -712,6 +980,8 @@ const en: typeof el = {
   },
 
   dashboard: {
+    muted: 'muted',
+    noContact: 'no contact details',
     title: 'Overview',
     lastSync: (when: string) => `Last myDATA sync: ${when}`,
     neverSynced: 'No myDATA sync has run yet.',
