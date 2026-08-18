@@ -75,7 +75,12 @@ export default async function DebtorsPage() {
             {t.debtors.subtitle}
           </p>
         </div>
-        <CreateDebtorForm />
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/debtors/import" className={`text-sm ${subtleLinkClass}`}>
+            Import z pliku
+          </Link>
+          <CreateDebtorForm />
+        </div>
       </div>
 
       <Card>

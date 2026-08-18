@@ -63,6 +63,8 @@ export type DebtorRow = {
   name: string;
   /** Stable id in the billing system, when the customer came from there. */
   elorus_contact_id: string | null;
+  /** The customer id in the system they were imported from. */
+  external_ref: string | null;
   vat_number: string | null;
   email: string | null;
   phone: string | null;
@@ -95,9 +97,11 @@ export type InvoiceRow = {
   pay_token: string;
   /** The short public credential the reminder link carries. */
   short_code: string;
-  source: 'mydata' | 'manual' | 'elorus';
+  source: 'mydata' | 'manual' | 'elorus' | 'import';
   /** Stable id in the billing system; its own numbers repeat across sequences. */
   elorus_invoice_id: string | null;
+  /** Identifier from wherever an imported debt came from. Keeps re-imports idempotent. */
+  external_ref: string | null;
   created_at: string;
   updated_at: string;
 }
