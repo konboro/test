@@ -210,6 +210,17 @@ export type BankTransactionRow = {
   created_at: string;
 }
 
+export type FunnelEventRow = {
+  id: string;
+  user_id: string;
+  invoice_id: string;
+  debtor_id: string | null;
+  /** Read off the ?c= tag the dispatch stamps per channel; null when untagged. */
+  channel: 'email' | 'sms' | 'other' | null;
+  event: 'page_view' | 'checkout_started';
+  occurred_at: string;
+}
+
 export type PaymentPageInvoice = {
   invoice_id: string;
   invoice_number: string | null;
@@ -310,6 +321,12 @@ export interface Database {
           'user_id' | 'connection_id' | 'provider_tx_id' | 'booked_on' | 'amount_cents' | 'currency'
         >;
         Update: Partial<BankTransactionRow>;
+        Relationships: NoRelationships;
+      };
+      funnel_events: {
+        Row: FunnelEventRow;
+        Insert: InsertOf<FunnelEventRow, 'user_id' | 'invoice_id' | 'event'>;
+        Update: Partial<FunnelEventRow>;
         Relationships: NoRelationships;
       };
     };

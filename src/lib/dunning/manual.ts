@@ -17,6 +17,7 @@
  * whole point of a preview is that it tells the truth about what will happen.
  */
 
+import { channelTaggedUrl } from '@/lib/funnel/events';
 import { contactLimitsDisabled } from '@/lib/limits';
 import { athensDate } from '@/lib/money';
 import { channelAvailable, type Channel } from '@/lib/providers';
@@ -158,8 +159,18 @@ export async function previewManualReminder(params: {
   const overrides = await loadTemplateOverrides(params.userId);
   const ctx = templateContext(tenant, debtor, invoice);
 
-  const email = renderEmail(params.step, ctx, overrides);
-  const sms = renderSms(params.step, ctx, overrides);
+  // Tagged exactly as the send will be, so the preview tells the truth down to
+  // the URL — including the four characters the tag costs an SMS segment.
+  const email = renderEmail(
+    params.step,
+    { ...ctx, payUrl: channelTaggedUrl(ctx.payUrl, 'email') },
+    overrides,
+  );
+  const sms = renderSms(
+    params.step,
+    { ...ctx, payUrl: channelTaggedUrl(ctx.payUrl, 'sms') },
+    overrides,
+  );
 
   const { channels, notes } = resolveChannels(debtor, t);
 

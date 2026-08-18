@@ -23,7 +23,13 @@ export function PayButton({ token }: { token: string }) {
       const response = await fetch('/api/pay/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({
+          token,
+          // The channel tag the reminder link carried, for the funnel's
+          // checkout_started event. Annotation only — the server ignores it for
+          // everything except statistics.
+          c: new URLSearchParams(window.location.search).get('c'),
+        }),
       });
 
       const body = (await response.json()) as { url?: string; error?: string };

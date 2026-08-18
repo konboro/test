@@ -3,6 +3,7 @@ import type Stripe from 'stripe';
 import { z } from 'zod';
 
 import { appUrl } from '@/lib/env';
+import { channelFromTag, recordFunnelEvent } from '@/lib/funnel/events';
 import { PAY_CODE_LENGTH, payCredentialColumn, payPath } from '@/lib/pay-code';
 import { PAYMENT_COLUMNS, providerFor, vivaCredentialsFor } from '@/lib/payments/provider';
 import { paymentsFor } from '@/lib/stripe';
@@ -19,6 +20,9 @@ const schema = z.object({
     .min(PAY_CODE_LENGTH)
     .max(128)
     .regex(/^[A-Za-z0-9]+$/),
+  // The channel tag the reminder link carried (?c=e / ?c=s). Statistics only:
+  // it labels the funnel's checkout_started event and decides nothing.
+  c: z.string().max(8).nullish(),
 });
 
 /**
@@ -95,6 +99,14 @@ export async function POST(request: Request) {
     // recorded can never settle anything.
     await admin.from('invoices').update({ viva_order_code: orderCode }).eq('id', invoice.id);
 
+    await recordFunnelEvent({
+      userId: invoice.user_id,
+      invoiceId: invoice.id,
+      debtorId: invoice.debtor_id,
+      channel: channelFromTag(parsed.data.c),
+      event: 'checkout_started',
+    });
+
     return NextResponse.json({ url: checkoutUrl(credentials.environment, orderCode) });
   }
 
@@ -145,6 +157,14 @@ export async function POST(request: Request) {
     .from('invoices')
     .update({ stripe_checkout_session_id: session.id })
     .eq('id', invoice.id);
+
+  await recordFunnelEvent({
+    userId: invoice.user_id,
+    invoiceId: invoice.id,
+    debtorId: invoice.debtor_id,
+    channel: channelFromTag(parsed.data.c),
+    event: 'checkout_started',
+  });
 
   return NextResponse.json({ url: session.url });
 }
