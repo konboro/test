@@ -17,6 +17,7 @@ import {
   fetchCredits,
   type IncomingCredit,
   type PsuContext,
+  type ReadDiagnostic,
 } from './client';
 import { matchCredit, type InvoiceCandidate } from './match';
 
@@ -137,12 +138,17 @@ async function syncConnection(
   // has linked and these are stored on one row.
   let fetchedHere = 0;
   let creditsHere = 0;
+  // First page only: it is a shape check, and every page of one response has the
+  // same shape. Keeping the last would just describe whichever page happened to
+  // be last.
+  let diagnostic: ReadDiagnostic | null = null;
 
   do {
     const batch = await fetchCredits(connection.account_id, since, continuationKey, psu);
 
     result.fetched += batch.fetched;
     result.creditsSeen += batch.credits.length;
+    if (!diagnostic) diagnostic = batch.diagnostic;
     fetchedHere += batch.fetched;
     creditsHere += batch.credits.length;
 
@@ -167,6 +173,7 @@ async function syncConnection(
       last_synced_at: new Date().toISOString(),
       last_fetched_count: fetchedHere,
       last_credit_count: creditsHere,
+      last_read_diagnostic: diagnostic,
     })
     .eq('id', connection.id);
 
@@ -176,6 +183,7 @@ async function syncConnection(
     pages: page,
     fetched: fetchedHere,
     credits: creditsHere,
+    shape: diagnostic,
     attended: Boolean(psu),
   });
 }

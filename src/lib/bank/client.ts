@@ -203,6 +203,57 @@ interface RawTransaction {
   creditor?: { name?: string };
 }
 
+/**
+ * Why a batch produced nothing, in names and counts only.
+ *
+ * Deliberately carries no values. The statement names people who never signed up
+ * to this platform, and explaining an empty result is not a reason to copy their
+ * payments somewhere else. Key names are schema rather than data, and they are
+ * the one thing that settles whether the response is shaped the way the mapper
+ * believes — Enable Banking's own documentation says snake_case in one place and
+ * camelCase in another.
+ */
+export interface ReadDiagnostic {
+  total: number;
+  missingId: number;
+  missingAmount: number;
+  missingCurrency: number;
+  missingDate: number;
+  nonPositive: number;
+  /** e.g. { CRDT: 2, DBIT: 17 } — codes, not data. */
+  indicators: Record<string, number>;
+  /** Top-level keys seen on the first row. */
+  keys: string[];
+}
+
+export function diagnose(raw: RawTransaction[]): ReadDiagnostic {
+  const d: ReadDiagnostic = {
+    total: raw.length,
+    missingId: 0,
+    missingAmount: 0,
+    missingCurrency: 0,
+    missingDate: 0,
+    nonPositive: 0,
+    indicators: {},
+    keys: raw.length ? Object.keys(raw[0] as object).sort() : [],
+  };
+
+  for (const row of raw) {
+    if (!(row.entry_reference ?? row.transaction_id)) d.missingId += 1;
+    if (!row.transaction_amount?.amount) d.missingAmount += 1;
+    if (!row.transaction_amount?.currency) d.missingCurrency += 1;
+    if (!(row.booking_date ?? row.value_date)) d.missingDate += 1;
+
+    const amount = row.transaction_amount?.amount;
+    if (amount && toMinorUnits(amount) <= 0) d.nonPositive += 1;
+
+    const indicator = row.credit_debit_indicator ?? '(absent)';
+    d.indicators[indicator] = (d.indicators[indicator] ?? 0) + 1;
+  }
+
+  return d;
+}
+
 export interface IncomingCredit {
   providerTxId: string;
   amountCents: number;
@@ -266,7 +317,12 @@ export async function fetchCredits(
   since: string,
   continuationKey?: string | null,
   psu?: PsuContext | null,
-): Promise<{ credits: IncomingCredit[]; fetched: number; continuationKey: string | null }> {
+): Promise<{
+  credits: IncomingCredit[];
+  fetched: number;
+  continuationKey: string | null;
+  diagnostic: ReadDiagnostic;
+}> {
   const query = new URLSearchParams({ date_from: since, transaction_status: 'BOOK' });
   if (continuationKey) query.set('continuation_key', continuationKey);
 
@@ -278,6 +334,7 @@ export async function fetchCredits(
   const raw = body.transactions ?? [];
 
   return {
+    diagnostic: diagnose(raw),
     credits: raw.map(toCredit).filter((c): c is IncomingCredit => c !== null),
     // How many the bank returned, before anything was dropped. `toCredit`
     // returns null whenever a field it needs is missing, so a schema that does

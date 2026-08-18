@@ -175,6 +175,8 @@ export type BankConnectionRow = {
   /** What the last successful read returned, before and after parsing. */
   last_fetched_count: number | null;
   last_credit_count: number | null;
+  /** Field-presence counts and observed key names. Never any values. */
+  last_read_diagnostic: unknown;
   created_at: string;
   updated_at: string;
 }
