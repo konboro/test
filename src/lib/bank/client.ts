@@ -367,8 +367,30 @@ export function toCredit(raw: RawTransaction, fallbackId?: string): IncomingCred
     currency,
     bookedOn: bookedOn.slice(0, 10),
     remittance: remittance || null,
-    counterpartyName: raw.debtor?.name?.trim() || null,
-    counterpartyIban: accountIdentification(raw.debtor_account),
+    // Which side is the counterparty depends on the direction, and the bank
+    // labels from the transaction's perspective rather than the account
+    // holder's: on an incoming payment `creditor_account` is *our* account and
+    // the payer would be under `debtor`. Measured on a real statement — the 17
+    // debits carried debtor_account, the 2 credits carried creditor_account,
+    // both of them this account. Taking the populated one on sight would file
+    // the creditor's own IBAN as their customer's.
+    //
+    // Only credits are stored, so this resolves to the debtor today. It is
+    // written out anyway because the alternative is a line that happens to be
+    // right for reasons nothing states.
+    ...counterparty(raw),
+  };
+}
+
+function counterparty(raw: RawTransaction): {
+  counterpartyName: string | null;
+  counterpartyIban: string | null;
+} {
+  const outgoing = raw.credit_debit_indicator === 'DBIT';
+
+  return {
+    counterpartyName: (outgoing ? raw.creditor?.name : raw.debtor?.name)?.trim() || null,
+    counterpartyIban: accountIdentification(outgoing ? raw.creditor_account : raw.debtor_account),
   };
 }
 
