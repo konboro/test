@@ -45,7 +45,13 @@ function Detail({
   );
 }
 
-export default async function DebtorsPage() {
+export default async function DebtorsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; sort?: string; dir?: string; show?: string }>;
+}) {
+  const { q = '', sort = 'name', dir = 'asc', show = 'all' } = await searchParams;
+  const descending = dir === 'desc';
   const t = await getDictionary();
   const supabase = await createClient();
   const {
@@ -66,8 +72,92 @@ export default async function DebtorsPage() {
     outstanding.set(invoice.debtor_id, current);
   }
 
+  // Filtering and sorting happen here rather than in SQL: what a customer owes
+  // is summed from their open invoices above, so the database cannot order by it
+  // without a join this page does not otherwise need.
+  const needle = q.trim().toLowerCase();
+  const owed = (id: string) => outstanding.get(id)?.total ?? 0;
+
+  let visible = debtors ?? [];
+  if (show === 'muted') visible = visible.filter((d) => d.muted);
+  if (show === 'unreachable') visible = visible.filter((d) => !d.email && !d.phone);
+  if (needle) {
+    visible = visible.filter((d) =>
+      [d.name, d.email, d.phone, d.vat_number]
+        .filter(Boolean)
+        .some((field) => String(field).toLowerCase().includes(needle)),
+    );
+  }
+
+  visible = [...visible].sort((a, b) => {
+    const order =
+      sort === 'debt'
+        ? owed(b.id) - owed(a.id)
+        : (displayName(a) ?? '').localeCompare(displayName(b) ?? '');
+    return descending ? -order : order;
+  });
+
+  const link = (next: Record<string, string>) =>
+    `/debtors?${new URLSearchParams({ q, sort, dir, show, ...next })}`;
+
+  const SHOW_KEYS = [
+    { key: 'all', label: t.debtors.filterAll },
+    { key: 'muted', label: t.debtors.filterMuted },
+    { key: 'unreachable', label: t.debtors.filterUnreachable },
+  ];
+
   return (
     <div className="space-y-6">
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex gap-1">
+          {SHOW_KEYS.map((option) => (
+            <a
+              key={option.key}
+              href={link({ show: option.key })}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                show === option.key
+                  ? 'bg-ink-900 text-white'
+                  : 'border border-ink-300 bg-white text-ink-600 hover:bg-ink-50'
+              }`}
+            >
+              {option.label}
+            </a>
+          ))}
+        </div>
+
+        <div className="flex gap-1 text-sm">
+          {[
+            { key: 'name', label: t.debtors.sortName },
+            { key: 'debt', label: t.debtors.sortDebt },
+          ].map((option) => (
+            <a
+              key={option.key}
+              href={link({ sort: option.key, dir: sort === option.key && !descending ? 'desc' : 'asc' })}
+              className={`rounded-lg px-2.5 py-1.5 ${
+                sort === option.key ? 'font-medium text-ink-900' : 'text-ink-500 hover:text-ink-800'
+              }`}
+            >
+              {option.label}
+              {sort === option.key ? (descending ? ' ↓' : ' ↑') : ''}
+            </a>
+          ))}
+        </div>
+
+        <form method="get" className="flex-1 sm:max-w-xs">
+          <input type="hidden" name="show" value={show} />
+          <input type="hidden" name="sort" value={sort} />
+          <input type="hidden" name="dir" value={dir} />
+          <input
+            type="search"
+            name="q"
+            defaultValue={q}
+            placeholder={t.debtors.search}
+            aria-label={t.debtors.search}
+            className="w-full rounded-lg border border-ink-300 bg-white px-3 py-1.5 text-sm text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+          />
+        </form>
+      </div>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-ink-900">{t.debtors.title}</h1>
@@ -86,14 +176,14 @@ export default async function DebtorsPage() {
       <Card>
         <CardHeader title={t.debtors.count(debtors?.length ?? 0)} />
 
-        {!debtors?.length ? (
+        {!visible.length ? (
           <EmptyState
             title={t.debtors.emptyTitle}
             body={t.debtors.emptyBody}
           />
         ) : (
           <ul className="divide-y divide-ink-100">
-            {debtors.map((debtor) => {
+            {visible.map((debtor) => {
               const open = outstanding.get(debtor.id);
               const reachable = Boolean(debtor.email || debtor.phone);
               const name = displayName(debtor);

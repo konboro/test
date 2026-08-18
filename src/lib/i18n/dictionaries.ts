@@ -404,6 +404,24 @@ const el = {
   },
 
   invoices: {
+    bulk: {
+      selected: (n: number) => `${n} επιλεγμένα`,
+      selectAll: 'Επιλογή όλων',
+      send: 'Αποστολή υπενθύμισης',
+      nothingSelected: 'Δεν επιλέχθηκε κανένα παραστατικό.',
+      done: (sent: number) => `Στάλθηκαν ${sent} υπενθυμίσεις.`,
+      limited: (n: number) =>
+        `${n} παραλείφθηκαν: ο πελάτης είχε ήδη ειδοποιηθεί σήμερα — επιτρέπεται μία επαφή ανά ημέρα.`,
+      skipped: (n: number) => `${n} χωρίς διαθέσιμο κανάλι επικοινωνίας.`,
+      failed: (n: number) => `${n} απέτυχαν.`,
+      capped: (n: number) =>
+        `${n} δεν στάλθηκαν σε αυτή τη δέσμη — επιλέξτε τα ξανά για να συνεχίσετε.`,
+    },
+    search: 'Αναζήτηση παραστατικού ή πελάτη',
+    sortDue: 'Λήξη',
+    sortAmount: 'Ποσό',
+    sortCustomer: 'Πελάτης',
+    sortIssued: 'Έκδοση',
     title: 'Παραστατικά',
     subtitle: 'Συγχρονισμένα από το myDATA ή καταχωρημένα χειροκίνητα.',
     filterOpen: 'Ανοιχτά',
@@ -448,6 +466,15 @@ const el = {
   },
 
   reminder: {
+    // Labels for the template picker. These name a choice in the panel, so they
+    // are interface copy — unlike the reminder bodies themselves, which stay in
+    // the customer's language.
+    choices: {
+      manual: 'Χειροκίνητη υπενθύμιση',
+      pre_due: 'Κείμενο βήματος 1 — πριν τη λήξη',
+      overdue_2: 'Κείμενο βήματος 2 — ληξιπρόθεσμο',
+      overdue_10: 'Κείμενο βήματος 3 — τελική υπενθύμιση',
+    } as Record<string, string>,
     title: 'Υπενθύμιση πληρωμής',
     invoiceLabel: (label: string) => `Παραστατικό ${label}`,
     templateLabel: 'Κείμενο',
@@ -462,6 +489,12 @@ const el = {
   },
 
   debtors: {
+    search: 'Αναζήτηση πελάτη',
+    sortName: 'Επωνυμία',
+    sortDebt: 'Οφειλή',
+    filterAll: 'Όλοι',
+    filterMuted: 'Σε παύση',
+    filterUnreachable: 'Χωρίς στοιχεία',
     title: 'Πελάτες',
     subtitle:
       'Οι πελάτες δημιουργούνται αυτόματα από το myDATA. Συμπληρώστε email και κινητό ώστε να μπορούν να λαμβάνουν υπενθυμίσεις.',
@@ -1042,6 +1075,23 @@ const en: typeof el = {
   },
 
   invoices: {
+    bulk: {
+      selected: (n: number) => `${n} selected`,
+      selectAll: 'Select all',
+      send: 'Send reminder',
+      nothingSelected: 'No invoice was selected.',
+      done: (sent: number) => `${sent} reminders sent.`,
+      limited: (n: number) =>
+        `${n} skipped: the customer had already been contacted today — one contact per day is allowed.`,
+      skipped: (n: number) => `${n} had no channel to reach the customer on.`,
+      failed: (n: number) => `${n} failed.`,
+      capped: (n: number) => `${n} were left out of this batch — select them again to continue.`,
+    },
+    search: 'Search invoice or customer',
+    sortDue: 'Due',
+    sortAmount: 'Amount',
+    sortCustomer: 'Customer',
+    sortIssued: 'Issued',
     title: 'Invoices',
     subtitle: 'Synced from myDATA, or entered by hand.',
     filterOpen: 'Open',
@@ -1085,6 +1135,12 @@ const en: typeof el = {
   },
 
   reminder: {
+    choices: {
+      manual: 'Manual reminder',
+      pre_due: 'Step 1 wording — before the due date',
+      overdue_2: 'Step 2 wording — overdue',
+      overdue_10: 'Step 3 wording — final reminder',
+    } as Record<string, string>,
     title: 'Payment reminder',
     invoiceLabel: (label: string) => `Invoice ${label}`,
     templateLabel: 'Wording',
@@ -1099,6 +1155,12 @@ const en: typeof el = {
   },
 
   debtors: {
+    search: 'Search customer',
+    sortName: 'Name',
+    sortDebt: 'Owed',
+    filterAll: 'All',
+    filterMuted: 'Muted',
+    filterUnreachable: 'No contact details',
     title: 'Customers',
     subtitle:
       'Customers are created automatically from myDATA. Fill in an email and mobile so they can receive reminders.',

@@ -13,6 +13,7 @@ import { toCents } from '@/lib/money';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { formError, getDictionary } from '@/lib/i18n';
+import { redirect } from 'next/navigation';
 
 export interface InvoiceFormState {
   error?: string;
@@ -246,4 +247,82 @@ export async function createInvoice(
   revalidatePath('/invoices');
   revalidatePath('/dashboard');
   return { success: t.forms.success.invoiceCreated };
+}
+
+
+/**
+ * How many invoices one press may send to.
+ *
+ * Each send is an email and an SMS against live providers, so an unbounded loop
+ * would sit past the request timeout and leave nobody knowing what went out. The
+ * remainder is reported rather than dropped quietly — the count comes back in
+ * the redirect so the operator can select the rest and go again.
+ */
+const BULK_LIMIT = 50;
+
+/**
+ * Sends the same reminder to every selected invoice.
+ *
+ * Deliberately the same path as the single send: `sendManualReminder` claims a
+ * contact row before it delivers anything, so the once-per-debtor-per-day
+ * guarantee holds across a bulk press exactly as it does for one. Selecting five
+ * invoices of the same customer therefore sends one reminder and reports four as
+ * limited — that is the safeguard working, not a failure, and the summary keeps
+ * the two apart.
+ */
+export async function sendBulkReminder(formData: FormData): Promise<void> {
+  const ids = formData.getAll('ids').map(String).filter(Boolean);
+  const back = String(formData.get('back') ?? '/invoices');
+  const step = parseReminderChoice(String(formData.get('choice') ?? 'manual'));
+
+  const to = (params: Record<string, string | number>) => {
+    const query = new URLSearchParams(back.split('?')[1] ?? '');
+    for (const [k, v] of Object.entries(params)) query.set(k, String(v));
+    return `${back.split('?')[0]}?${query}`;
+  };
+
+  if (!ids.length) redirect(to({ bulk: 'none' }));
+  if (step === undefined) redirect(to({ bulk: 'unknown_template' }));
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+
+  const batch = ids.slice(0, BULK_LIMIT);
+  let sent = 0;
+  let limited = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  // Sequential on purpose. The daily guarantee is enforced by a unique index, so
+  // concurrent sends to one customer would race each other into it and the
+  // outcome would depend on who lost.
+  for (const id of batch) {
+    const result = await sendManualReminder({ userId: user.id, invoiceId: id, step });
+
+    if (result.error) {
+      if (result.code === 'daily_limit') limited += 1;
+      else failed += 1;
+      continue;
+    }
+
+    if (result.emailsSent + result.smsSent > 0) sent += 1;
+    else skipped += 1;
+  }
+
+  revalidatePath('/invoices');
+  revalidatePath('/logs');
+
+  redirect(
+    to({
+      bulk: 'done',
+      sent,
+      limited,
+      skipped,
+      failed,
+      left: Math.max(0, ids.length - batch.length),
+    }),
+  );
 }

@@ -29,9 +29,20 @@ import { loadTemplateOverrides } from './template-store';
 import { renderEmail, renderSms } from './templates';
 import { getDictionary, type Dictionary } from '@/lib/i18n';
 
+/**
+ * Why a send did not happen, when the caller has to tell the reasons apart.
+ *
+ * A bulk send needs this: several invoices of the same customer will legitimately
+ * hit the one-contact-per-day guarantee, and reporting that as a failure would
+ * make a working safeguard look like a fault. Comparing the translated message
+ * would work only until someone rewords it.
+ */
+export type ManualFailure = 'daily_limit';
+
 export interface ManualReminderResult {
   ok: boolean;
   error?: string;
+  code?: ManualFailure;
   emailsSent: number;
   smsSent: number;
   skipped: string[];
@@ -58,8 +69,8 @@ interface Target {
   invoice: InvoiceRow;
 }
 
-function fail(error: string): ManualReminderResult {
-  return { ok: false, error, emailsSent: 0, smsSent: 0, skipped: [] };
+function fail(error: string, code?: ManualFailure): ManualReminderResult {
+  return { ok: false, error, code, emailsSent: 0, smsSent: 0, skipped: [] };
 }
 
 /**
@@ -227,9 +238,7 @@ export async function sendManualReminder(params: {
 
     if (contactError || !contact) {
       if (contactError?.code === '23505') {
-        return fail(
-          t.manual.dailyLimit,
-        );
+        return fail(t.manual.dailyLimit, 'daily_limit');
       }
       return fail(t.manual.contactFailed(contactError?.message ?? ''));
     }

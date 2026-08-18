@@ -4,6 +4,7 @@ import { Badge, Card, CardHeader, EmptyState, subtleLinkClass } from '@/componen
 import { aging } from '@/lib/aging';
 import { displayName } from '@/lib/debtors';
 import { workflowStatus } from '@/lib/dunning/status';
+import { REMINDER_CHOICES } from '@/lib/dunning/templates';
 import { getDictionary } from '@/lib/i18n';
 import { contactLimitsDisabled } from '@/lib/limits';
 import { athensDate, formatDate, formatMoney } from '@/lib/money';
@@ -11,8 +12,9 @@ import { settlementMethod } from '@/lib/payments/settlement';
 import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
 
-import { markInvoicePaid } from './actions';
+import { markInvoicePaid, sendBulkReminder } from './actions';
 import { CopyPayLink, CreateInvoiceForm, DueDateButton, RemindButton } from './invoice-forms';
+import { SelectAll } from './select-all';
 
 export async function generateMetadata() {
   return { title: (await getDictionary()).invoices.title };
@@ -24,9 +26,22 @@ const FILTER_KEYS = ['pending', 'paid', 'all'] as const;
 export default async function InvoicesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{
+    filter?: string;
+    sort?: string;
+    dir?: string;
+    q?: string;
+    bulk?: string;
+    sent?: string;
+    limited?: string;
+    skipped?: string;
+    failed?: string;
+    left?: string;
+  }>;
 }) {
-  const { filter = 'pending' } = await searchParams;
+  const params = await searchParams;
+  const { filter = 'pending', sort = 'due', dir = 'asc', q = '' } = params;
+  const descending = dir === 'desc';
   const t = await getDictionary();
   const supabase = await createClient();
   const {
@@ -34,7 +49,13 @@ export default async function InvoicesPage({
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  let query = supabase.from('invoices').select('*').order('due_date', { ascending: true });
+  // Customer is not a column here — it lives on the debtor row — so that one
+  // sort is applied after the join below. The rest the database can do.
+  const column = { amount: 'amount_cents', issued: 'issue_date', due: 'due_date' }[sort];
+  let query = supabase
+    .from('invoices')
+    .select('*')
+    .order(column ?? 'due_date', { ascending: column ? !descending : true });
   if (filter === 'pending') query = query.eq('status', 'pending');
   else if (filter === 'paid') query = query.eq('status', 'paid');
 
@@ -68,6 +89,47 @@ export default async function InvoicesPage({
   }
 
   const today = athensDate();
+
+  // Search and the customer sort run here rather than in SQL: the customer name
+  // comes from a separate query, and matching on it in the database would mean a
+  // join this page does not otherwise need.
+  const needle = q.trim().toLowerCase();
+  const nameOf = (id: string) => {
+    const debtor = debtorsById.get(id);
+    return (debtor ? displayName(debtor) : '') ?? '';
+  };
+
+  let visible = invoices ?? [];
+  if (needle) {
+    visible = visible.filter((invoice) =>
+      [invoice.invoice_number, invoice.series, invoice.mark, nameOf(invoice.debtor_id)]
+        .filter(Boolean)
+        .some((field) => String(field).toLowerCase().includes(needle)),
+    );
+  }
+  if (sort === 'customer') {
+    visible = [...visible].sort(
+      (a, b) => nameOf(a.debtor_id).localeCompare(nameOf(b.debtor_id)) * (descending ? -1 : 1),
+    );
+  }
+
+  // Where the bulk action sends the operator back to, filters and all.
+  const back = `/invoices?${new URLSearchParams({ filter, sort, dir, ...(q ? { q } : {}) })}`;
+
+  /** A column header that toggles direction when it is already the active sort. */
+  const sortHref = (key: string) =>
+    `/invoices?${new URLSearchParams({
+      filter,
+      sort: key,
+      dir: sort === key && !descending ? 'desc' : 'asc',
+      ...(q ? { q } : {}),
+    })}`;
+
+  const bulkSent = Number(params.sent ?? 0);
+  const bulkLimited = Number(params.limited ?? 0);
+  const bulkSkipped = Number(params.skipped ?? 0);
+  const bulkFailed = Number(params.failed ?? 0);
+  const bulkLeft = Number(params.left ?? 0);
 
   // When and how a document was settled. Only worth a column on views that can
   // contain paid rows — the default "open" view would render a column of dashes.
@@ -105,6 +167,7 @@ export default async function InvoicesPage({
         </div>
       ) : null}
 
+      <div className="flex flex-wrap items-center gap-3">
       <div className="flex gap-1">
         {FILTER_KEYS.map((key) => (
           <a
@@ -121,24 +184,84 @@ export default async function InvoicesPage({
         ))}
       </div>
 
-      <Card>
-        <CardHeader title={t.invoices.count(invoices?.length ?? 0)} />
+        <form method="get" className="flex-1 sm:max-w-xs">
+          <input type="hidden" name="filter" value={filter} />
+          <input type="hidden" name="sort" value={sort} />
+          <input type="hidden" name="dir" value={dir} />
+          <input
+            type="search"
+            name="q"
+            defaultValue={q}
+            placeholder={t.invoices.search}
+            aria-label={t.invoices.search}
+            className="w-full rounded-lg border border-ink-300 bg-white px-3 py-1.5 text-sm text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+          />
+        </form>
+      </div>
 
-        {!invoices?.length ? (
+      {params.bulk === 'none' ? (
+        <div className="rounded-xl border border-ink-200 bg-white px-4 py-3 text-sm text-ink-600">
+          {t.invoices.bulk.nothingSelected}
+        </div>
+      ) : null}
+
+      {params.bulk === 'done' ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <p className="font-medium">{t.invoices.bulk.done(bulkSent)}</p>
+          {/* The daily guarantee doing its job is not a failure, and reporting it
+              as one would teach the operator to distrust a correct safeguard. */}
+          {bulkLimited ? <p className="mt-1 text-xs">{t.invoices.bulk.limited(bulkLimited)}</p> : null}
+          {bulkSkipped ? <p className="mt-1 text-xs">{t.invoices.bulk.skipped(bulkSkipped)}</p> : null}
+          {bulkFailed ? <p className="mt-1 text-xs">{t.invoices.bulk.failed(bulkFailed)}</p> : null}
+          {bulkLeft ? <p className="mt-1 text-xs">{t.invoices.bulk.capped(bulkLeft)}</p> : null}
+        </div>
+      ) : null}
+
+      <Card>
+        <CardHeader title={t.invoices.count(visible.length)} />
+
+        {!visible.length ? (
           <EmptyState
             title={t.invoices.emptyTitle}
             body={t.invoices.emptyBody}
           />
         ) : (
+          <form id="bulk" action={sendBulkReminder}>
+          <input type="hidden" name="back" value={back} />
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-500">
+                  {showActions ? (
+                    <th className="w-10 px-5 py-2.5">
+                      <SelectAll form="bulk" />
+                    </th>
+                  ) : null}
                   <th className="px-5 py-2.5 font-medium">{t.invoices.colInvoice}</th>
-                  <th className="px-5 py-2.5 font-medium">{t.invoices.colCustomer}</th>
-                  <th className="px-5 py-2.5 text-right font-medium">{t.invoices.colAmount}</th>
-                  <th className="px-5 py-2.5 font-medium">{t.invoices.colIssue}</th>
-                  <th className="px-5 py-2.5 font-medium">{t.invoices.colDue}</th>
+                  <th className="px-5 py-2.5 font-medium">
+                    <a href={sortHref('customer')} className="hover:text-ink-800">
+                      {t.invoices.colCustomer}
+                      {sort === 'customer' ? (descending ? ' ↓' : ' ↑') : ''}
+                    </a>
+                  </th>
+                  <th className="px-5 py-2.5 text-right font-medium">
+                    <a href={sortHref('amount')} className="hover:text-ink-800">
+                      {t.invoices.colAmount}
+                      {sort === 'amount' ? (descending ? ' ↓' : ' ↑') : ''}
+                    </a>
+                  </th>
+                  <th className="px-5 py-2.5 font-medium">
+                    <a href={sortHref('issued')} className="hover:text-ink-800">
+                      {t.invoices.colIssue}
+                      {sort === 'issued' ? (descending ? ' ↓' : ' ↑') : ''}
+                    </a>
+                  </th>
+                  <th className="px-5 py-2.5 font-medium">
+                    <a href={sortHref('due')} className="hover:text-ink-800">
+                      {t.invoices.colDue}
+                      {sort === 'due' ? (descending ? ' ↓' : ' ↑') : ''}
+                    </a>
+                  </th>
                   <th className="px-5 py-2.5 font-medium">{t.invoices.colAging}</th>
                   <th className="px-5 py-2.5 font-medium">{t.invoices.colStatus}</th>
                   {showSettled ? (
@@ -150,7 +273,7 @@ export default async function InvoicesPage({
                 </tr>
               </thead>
               <tbody>
-                {invoices.map((invoice) => {
+                {visible.map((invoice) => {
                   const status = workflowStatus(
                     invoice,
                     stepsByInvoice.get(invoice.id) ?? new Set(),
@@ -170,6 +293,21 @@ export default async function InvoicesPage({
 
                   return (
                     <tr key={invoice.id} className="border-b border-ink-100 last:border-0">
+                      {showActions ? (
+                        <td className="px-5 py-3">
+                          {/* Only an open invoice can be reminded about, so a paid
+                              row offers nothing to select. */}
+                          {invoice.status === 'pending' ? (
+                            <input
+                              type="checkbox"
+                              name="ids"
+                              value={invoice.id}
+                              aria-label={label}
+                              className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500"
+                            />
+                          ) : null}
+                        </td>
+                      ) : null}
                       <td className="px-5 py-3">
                         {number ? (
                           <div className="font-medium text-ink-900">{number}</div>
@@ -279,6 +417,29 @@ export default async function InvoicesPage({
               </tbody>
             </table>
           </div>
+
+          {showActions ? (
+            <div className="flex flex-wrap items-center gap-2 border-t border-ink-200 px-5 py-3">
+              <select
+                name="choice"
+                defaultValue="manual"
+                className="rounded-lg border border-ink-300 bg-white px-3 py-1.5 text-sm text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+              >
+                {REMINDER_CHOICES.map((choice) => (
+                  <option key={choice.value} value={choice.value}>
+                    {t.reminder.choices[choice.value] ?? choice.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="submit"
+                className="rounded-lg bg-brand-600 px-3.5 py-1.5 text-sm font-medium text-white shadow-sm outline-none transition hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+              >
+                {t.invoices.bulk.send}
+              </button>
+            </div>
+          ) : null}
+          </form>
         )}
       </Card>
     </div>
