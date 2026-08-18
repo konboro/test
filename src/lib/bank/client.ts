@@ -10,7 +10,7 @@
  * derived from it do.
  */
 
-import { createSign } from 'node:crypto';
+import { createHash, createSign } from 'node:crypto';
 
 import { optionalEnv, requireEnv } from '@/lib/env';
 
@@ -199,7 +199,9 @@ interface RawTransaction {
   value_date?: string;
   remittance_information?: string[] | string;
   debtor?: { name?: string };
-  debtor_account?: { iban?: string };
+  debtor_account?: { iban?: string; identification?: string };
+  creditor_account?: { iban?: string; identification?: string };
+  reference_number?: string;
   creditor?: { name?: string };
 }
 
@@ -278,8 +280,52 @@ export function toMinorUnits(amount: string): number {
  * Debits are dropped here rather than filtered later: a creditor's outgoing
  * payments are none of this product's business and should never reach storage.
  */
-export function toCredit(raw: RawTransaction): IncomingCredit | null {
-  const providerTxId = raw.entry_reference ?? raw.transaction_id;
+/**
+ * A stable id for a transaction the bank did not identify.
+ *
+ * Eurobank returns `entry_reference` and `transaction_id` empty on every row, and
+ * ingest keys on that id — so without a substitute the whole statement is
+ * discarded, which is exactly what was happening.
+ *
+ * Derived from the fields that describe the movement itself, so the same
+ * transaction hashes the same way on every run and the seven-day overlap
+ * re-reads it without creating a duplicate. `reference_number` is deliberately
+ * not used as an identity: it is the payer's reference, and two payments can
+ * legitimately carry the same one.
+ *
+ * Genuinely identical movements on the same day — same amount, same payer, same
+ * reference — are distinguished by their position in the response. That relies
+ * on booked transactions coming back in a stable order, which they do; the
+ * alternative is collapsing two real payments into one, and losing money is the
+ * worse failure of the two.
+ */
+export function transactionSignature(raw: RawTransaction): string {
+  const signature = [
+    raw.booking_date ?? '',
+    raw.value_date ?? '',
+    raw.transaction_amount?.amount ?? '',
+    raw.transaction_amount?.currency ?? '',
+    raw.credit_debit_indicator ?? '',
+    raw.debtor?.name ?? '',
+    accountIdentification(raw.debtor_account) ?? '',
+    accountIdentification(raw.creditor_account) ?? '',
+    Array.isArray(raw.remittance_information)
+      ? raw.remittance_information.join(' ')
+      : (raw.remittance_information ?? ''),
+  ].join('|');
+
+  return `derived:${createHash('sha256').update(signature).digest('hex').slice(0, 32)}`;
+}
+
+/** Banks disagree on the key; both spellings mean the account number. */
+function accountIdentification(
+  account: { iban?: string; identification?: string } | undefined,
+): string | null {
+  return account?.iban?.trim() || account?.identification?.trim() || null;
+}
+
+export function toCredit(raw: RawTransaction, fallbackId?: string): IncomingCredit | null {
+  const providerTxId = raw.entry_reference?.trim() || raw.transaction_id?.trim() || fallbackId;
   const amount = raw.transaction_amount?.amount;
   const currency = raw.transaction_amount?.currency;
   const bookedOn = raw.booking_date ?? raw.value_date;
@@ -301,8 +347,35 @@ export function toCredit(raw: RawTransaction): IncomingCredit | null {
     bookedOn: bookedOn.slice(0, 10),
     remittance: remittance || null,
     counterpartyName: raw.debtor?.name?.trim() || null,
-    counterpartyIban: raw.debtor_account?.iban?.trim() || null,
+    counterpartyIban: accountIdentification(raw.debtor_account),
   };
+}
+
+/**
+ * Maps a whole response, in the order the bank sent it.
+ *
+ * Order matters because the substitute id counts repeats: two identical rows in
+ * the same statement are the second and third occurrence of that signature, and
+ * only their position separates them. Mapping row by row in isolation could not
+ * see that.
+ */
+export function mapCredits(raw: RawTransaction[]): IncomingCredit[] {
+  const seen = new Map<string, number>();
+  const credits: IncomingCredit[] = [];
+
+  for (const row of raw) {
+    // Counted before the credit/debit test, so a debit still consumes its slot.
+    // Otherwise removing an outgoing payment from the middle of the statement
+    // would renumber everything after it and re-ingest the lot as new.
+    const base = transactionSignature(row);
+    const occurrence = seen.get(base) ?? 0;
+    seen.set(base, occurrence + 1);
+
+    const credit = toCredit(row, `${base}:${occurrence}`);
+    if (credit) credits.push(credit);
+  }
+
+  return credits;
 }
 
 /**
@@ -335,7 +408,7 @@ export async function fetchCredits(
 
   return {
     diagnostic: diagnose(raw),
-    credits: raw.map(toCredit).filter((c): c is IncomingCredit => c !== null),
+    credits: mapCredits(raw),
     // How many the bank returned, before anything was dropped. `toCredit`
     // returns null whenever a field it needs is missing, so a schema that does
     // not match would discard every row and look exactly like an empty account.
