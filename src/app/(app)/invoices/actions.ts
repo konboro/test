@@ -12,6 +12,7 @@ import { parseReminderChoice } from '@/lib/dunning/templates';
 import { toCents } from '@/lib/money';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import { formError, getDictionary } from '@/lib/i18n';
 
 export interface InvoiceFormState {
   error?: string;
@@ -30,17 +31,19 @@ export async function sendReminder(
   _prev: ReminderState,
   formData: FormData,
 ): Promise<ReminderState> {
+  const t = await getDictionary();
+
   const id = String(formData.get('id') ?? '');
-  if (!id) return { error: 'Λείπει το παραστατικό.' };
+  if (!id) return { error: t.forms.errors.missingInvoice };
 
   const step = parseReminderChoice(String(formData.get('choice') ?? 'manual'));
-  if (step === undefined) return { error: 'Άγνωστο πρότυπο.' };
+  if (step === undefined) return { error: t.forms.errors.unknownTemplate };
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: 'Μη εξουσιοδοτημένη ενέργεια.' };
+  if (!user) return { error: t.forms.errors.unauthorized };
 
   const result = await sendManualReminder({ userId: user.id, invoiceId: id, step });
 
@@ -57,10 +60,10 @@ export async function sendReminder(
   if (delivered.length === 0) {
     // Nothing went out and nothing errored: a channel was skipped. Surface the
     // reason verbatim — during setup that is exactly what needs fixing.
-    return { error: `Δεν στάλθηκε μήνυμα (${result.skipped.join(', ') || 'άγνωστος λόγος'}).` };
+    return { error: t.forms.errors.reminderNotSent(result.skipped.join(', ') || t.forms.errors.unknownReason) };
   }
 
-  return { success: `Η υπενθύμιση στάλθηκε (${delivered.join(' + ')}).` };
+  return { success: t.forms.success.reminderSent(delivered.join(' + ')) };
 }
 
 /**
@@ -73,14 +76,16 @@ export async function previewReminder(
   invoiceId: string,
   choice: string,
 ): Promise<ReminderPreview> {
+  const t = await getDictionary();
+
   const step = parseReminderChoice(choice);
-  if (step === undefined) return { ok: false, error: 'Άγνωστο πρότυπο.' };
+  if (step === undefined) return { ok: false, error: t.forms.errors.unknownTemplate };
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: 'Μη εξουσιοδοτημένη ενέργεια.' };
+  if (!user) return { ok: false, error: t.forms.errors.unauthorized };
 
   return previewManualReminder({ userId: user.id, invoiceId, step });
 }
@@ -172,17 +177,17 @@ export async function updateDueDate(
 }
 
 const manualInvoice = z.object({
-  debtor_id: z.string().uuid('Επιλέξτε πελάτη.'),
-  invoice_number: z.string().trim().min(1, 'Ο αριθμός παραστατικού είναι υποχρεωτικός.').max(50),
+  debtor_id: z.string().uuid('chooseCustomer'),
+  invoice_number: z.string().trim().min(1, 'invoiceNumberRequired').max(50),
   series: z
     .string()
     .trim()
     .max(20)
     .optional()
     .transform((v) => (v ? v : null)),
-  amount: z.coerce.number().positive('Το ποσό πρέπει να είναι θετικό.'),
-  issue_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Μη έγκυρη ημερομηνία έκδοσης.'),
-  due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Μη έγκυρη ημερομηνία λήξης.'),
+  amount: z.coerce.number().positive('amountPositive'),
+  issue_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'invalidIssueDate'),
+  due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'invalidDueDate'),
 });
 
 /** Creates an invoice by hand, for documents that never went through myDATA. */
@@ -190,6 +195,8 @@ export async function createInvoice(
   _prev: InvoiceFormState,
   formData: FormData,
 ): Promise<InvoiceFormState> {
+  const t = await getDictionary();
+
   const parsed = manualInvoice.safeParse({
     debtor_id: formData.get('debtor_id'),
     invoice_number: formData.get('invoice_number'),
@@ -199,17 +206,17 @@ export async function createInvoice(
     due_date: formData.get('due_date'),
   });
 
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Μη έγκυρα στοιχεία.' };
+  if (!parsed.success) return { error: formError(t, parsed.error.issues[0]?.message) };
 
   if (parsed.data.due_date < parsed.data.issue_date) {
-    return { error: 'Η ημερομηνία λήξης δεν μπορεί να προηγείται της έκδοσης.' };
+    return { error: t.forms.errors.dueBeforeIssue };
   }
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: 'Μη εξουσιοδοτημένη ενέργεια.' };
+  if (!user) return { error: t.forms.errors.unauthorized };
 
   // RLS confirms the debtor belongs to this tenant: a foreign id simply returns
   // no rows here.
@@ -219,7 +226,7 @@ export async function createInvoice(
     .eq('id', parsed.data.debtor_id)
     .maybeSingle();
 
-  if (!debtor) return { error: 'Ο πελάτης δεν βρέθηκε.' };
+  if (!debtor) return { error: t.forms.errors.debtorNotFound };
 
   const { error } = await supabase.from('invoices').insert({
     user_id: user.id,
@@ -238,5 +245,5 @@ export async function createInvoice(
 
   revalidatePath('/invoices');
   revalidatePath('/dashboard');
-  return { success: 'Το παραστατικό καταχωρήθηκε.' };
+  return { success: t.forms.success.invoiceCreated };
 }

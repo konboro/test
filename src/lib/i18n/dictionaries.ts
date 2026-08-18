@@ -22,6 +22,97 @@ const el = {
   dateTimeTag: 'el-GR',
   languageName: 'Ελληνικά',
 
+
+
+  payments: {
+    save: 'Αποθήκευση',
+    saving: 'Αποθήκευση…',
+    remove: 'Αφαίρεση',
+    disconnect: 'Αποσύνδεση',
+    disconnecting: 'Αποσύνδεση…',
+    account: 'Λογαριασμός',
+    failed: 'Αποτυχία.',
+    stripe: {
+      keySaved: 'Το κλειδί αποθηκεύτηκε.',
+      keySavedTest: 'Το κλειδί αποθηκεύτηκε. Είναι κλειδί δοκιμών — οι πληρωμές δεν είναι πραγματικές.',
+      pasteIntro: 'Επικολλήστε το',
+      pasteKeyName: 'Secret key',
+      pasteRest:
+        'του δικού σας λογαριασμού Stripe (Developers → API keys). Οι χρεώσεις δημιουργούνται απευθείας στον λογαριασμό σας — το lefta.app δεν μεσολαβεί στη ροή χρημάτων.',
+      keyHint: 'sk_test_… για δοκιμές, sk_live_… για πραγματικές πληρωμές',
+      disconnectConfirm:
+        'Αποσύνδεση του λογαριασμού Stripe; Οι πελάτες σας δεν θα μπορούν να πληρώνουν με κάρτα.',
+      disconnectFailed: 'Δεν ήταν δυνατή η αποσύνδεση.',
+      connectIntro: 'Συνδέστε τον δικό σας λογαριασμό Stripe για να δέχεστε πληρωμές με κάρτα. Τα χρήματα πηγαίνουν',
+      connectEmphasis: 'απευθείας σε εσάς',
+      connectRest: '· το lefta.app δεν μεσολαβεί στη ροή χρημάτων και δεν κρατά κανένα ποσό.',
+      connectCta: 'Σύνδεση με Stripe',
+      pendingReview:
+        'Ο λογαριασμός συνδέθηκε, αλλά το Stripe δεν έχει ολοκληρώσει ακόμη τον έλεγχο των στοιχείων σας. Μέχρι τότε το κουμπί πληρωμής δεν εμφανίζεται στους πελάτες σας. Ολοκληρώστε τα στοιχεία στο Stripe και η κατάσταση ενημερώνεται αυτόματα.',
+      liveNote:
+        'Οι πληρωμές χρεώνονται απευθείας στον λογαριασμό σας. Το lefta.app δεν λαμβάνει προμήθεια και δεν εμφανίζεται στη συναλλαγή.',
+    },
+    viva: {
+      savedProduction: 'Τα στοιχεία αποθηκεύτηκαν. Λογαριασμός παραγωγής — οι πληρωμές είναι πραγματικές.',
+      savedDemo: 'Τα στοιχεία αποθηκεύτηκαν. Λογαριασμός demo — οι πληρωμές δεν είναι πραγματικές.',
+      removeConfirm:
+        'Αφαίρεση των στοιχείων Viva; Οι πελάτες σας δεν θα μπορούν να πληρώνουν με κάρτα μέσω Viva.',
+      whereIntro: 'Στο Viva:',
+      wherePath: 'Settings → API Access → Smart Checkout Credentials',
+      whereMiddle: '. Οι πληρωμές εισπράττονται',
+      whereEmphasis: 'απευθείας στον λογαριασμό σας',
+      whereRest: '— το lefta.app δεν μεσολαβεί στη ροή χρημάτων.',
+      production: 'Παραγωγή',
+      demo: 'Demo',
+      sourceHint: 'Προαιρετικό — αφήστε το κενό για την προεπιλεγμένη πηγή πληρωμών του λογαριασμού.',
+      sourcePlaceholder: 'π.χ. 1234',
+      returnIntro: 'Στη σελίδα',
+      returnPage: 'API Access',
+      returnRest: 'ορίστε ως διεύθυνση επιτυχίας και αποτυχίας της πηγής πληρωμών:',
+    },
+  },
+  forms: {
+    errors: {
+      unauthorized: 'Μη εξουσιοδοτημένη ενέργεια.',
+      invalidData: 'Μη έγκυρα στοιχεία.',
+      unknownTemplate: 'Άγνωστο πρότυπο.',
+      missingInvoice: 'Λείπει το παραστατικό.',
+      missingDebtorId: 'Λείπει το αναγνωριστικό πελάτη.',
+      debtorNotFound: 'Ο πελάτης δεν βρέθηκε.',
+      dueBeforeIssue: 'Η ημερομηνία λήξης δεν μπορεί να προηγείται της έκδοσης.',
+      vatTaken: 'Υπάρχει ήδη πελάτης με αυτό το ΑΦΜ.',
+      chooseCustomer: 'Επιλέξτε πελάτη.',
+      invoiceNumberRequired: 'Ο αριθμός παραστατικού είναι υποχρεωτικός.',
+      amountPositive: 'Το ποσό πρέπει να είναι θετικό.',
+      invalidIssueDate: 'Μη έγκυρη ημερομηνία έκδοσης.',
+      invalidDueDate: 'Μη έγκυρη ημερομηνία λήξης.',
+      nameRequired: 'Η επωνυμία είναι υποχρεωτική.',
+      invalidEmail: 'Μη έγκυρο email.',
+      invalidReplyEmail: 'Μη έγκυρο email απάντησης.',
+      invalidPhone: 'Μη έγκυρος αριθμός τηλεφώνου. Χρησιμοποιήστε μορφή +30 69… ',
+      textEmpty: 'Το κείμενο δεν μπορεί να είναι κενό.',
+      textTooLong: 'Το κείμενο είναι πολύ μεγάλο.',
+      invalidText: 'Μη έγκυρο κείμενο.',
+      badCredentials: 'Λάθος email ή κωδικός.',
+      emailRequired: 'Δώστε ένα έγκυρο email.',
+      passwordMin: 'Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες.',
+      companyNameRequired: 'Συμπληρώστε την επωνυμία της επιχείρησης.',
+      reminderNotSent: (reason: string) => `Δεν στάλθηκε μήνυμα (${reason}).`,
+      unknownReason: 'άγνωστος λόγος',
+    },
+    success: {
+      invoiceCreated: 'Το παραστατικό καταχωρήθηκε.',
+      debtorAdded: 'Ο πελάτης προστέθηκε.',
+      debtorUpdated: 'Τα στοιχεία ενημερώθηκαν.',
+      settingsSaved: 'Οι ρυθμίσεις αποθηκεύτηκαν.',
+      templateSaved: 'Το πρότυπο αποθηκεύτηκε.',
+      templateReset: 'Επαναφέρθηκε το προεπιλεγμένο κείμενο.',
+      reminderSent: (channels: string) => `Η υπενθύμιση στάλθηκε (${channels}).`,
+    },
+    notices: {
+      confirmEmail: 'Ελέγξτε το email σας για να επιβεβαιώσετε τον λογαριασμό.',
+    },
+  },
   common: {
     save: 'Αποθήκευση',
     saving: 'Αποθήκευση…',
@@ -45,6 +136,42 @@ const el = {
   },
 
   bank: {
+    card: {
+      lastCheck: (date: string) => `Τελευταίος έλεγχος ${date}`,
+      counts: (movements: number, credits: number) =>
+        `${movements} κινήσεις / ${credits} εισπράξεις`,
+      accessUntil: (date: string) => `πρόσβαση έως ${date}`,
+      checkNow: 'Έλεγχος τώρα',
+      pitch:
+        'Συνδέστε τον τραπεζικό σας λογαριασμό και οι εξοφλήσεις με έμβασμα εντοπίζονται αυτόματα, ώστε οι υπενθυμίσεις να σταματούν χωρίς να χρειάζεται να τις καταχωρήσετε.',
+      pitchReadOnly: 'Η πρόσβαση είναι μόνο για ανάγνωση κινήσεων· δεν είναι δυνατή καμία πληρωμή.',
+      expired:
+        'Η άδεια πρόσβασης έληξε. Οι τράπεζες την περιορίζουν χρονικά και πρέπει να ανανεωθεί, διαφορετικά οι εξοφλήσεις με έμβασμα δεν εντοπίζονται.',
+      bankLabel: 'Τράπεζα',
+      connect: 'Σύνδεση τράπεζας',
+      connectAnother: 'Σύνδεση άλλου λογαριασμού',
+      unavailable: 'Η υπηρεσία τραπεζικής σύνδεσης δεν είναι διαθέσιμη αυτή τη στιγμή.',
+    },
+    notices: {
+      connected: 'Ο τραπεζικός λογαριασμός συνδέθηκε.',
+      cancelled: 'Η σύνδεση με την τράπεζα ακυρώθηκε.',
+      noAccounts: 'Η τράπεζα δεν επέστρεψε κανέναν λογαριασμό.',
+      unavailable: 'Η υπηρεσία τραπεζικής σύνδεσης δεν είναι διαθέσιμη.',
+      failed: 'Η σύνδεση με την τράπεζα απέτυχε. Δοκιμάστε ξανά.',
+      rateLimited:
+        'Η τράπεζα απέρριψε τον έλεγχο ως υπέρβαση του ημερήσιου ορίου. Το όριο αφορά τους αυτόματους ελέγχους και μηδενίζεται τα μεσάνυχτα· ο βραδινός έλεγχος συνεχίζεται κανονικά.',
+      syncFailed: (reason: string) => `Ο έλεγχος δεν ολοκληρώθηκε: ${reason}`,
+      syncFailedPlain: 'Ο έλεγχος δεν ολοκληρώθηκε.',
+      matched: (seen: number, settled: number, queued: number) =>
+        `Ελέγχθηκαν ${seen} εισπράξεις: ${settled} παραστατικά εξοφλήθηκαν αυτόματα, ${queued} χρειάζονται επιβεβαίωση.`,
+      noActiveAccounts:
+        'Κανένας ενεργός λογαριασμός προς έλεγχο. Συνδέστε τράπεζα ή ανανεώστε τη ληγμένη άδεια.',
+      noMovements: 'Η τράπεζα δεν επέστρεψε καμία κίνηση για το διάστημα που ζητήθηκε.',
+      noCredits: (fetched: number) =>
+        `Η τράπεζα επέστρεψε ${fetched} κινήσεις, καμία εισερχόμενη — μόνο χρεώσεις στο διάστημα αυτό.`,
+      nothingMatched: (seen: number, fetched: number) =>
+        `Ελέγχθηκαν ${seen} εισπράξεις από ${fetched} κινήσεις. Καμία δεν αντιστοιχεί σε ανοιχτό παραστατικό.`,
+    },
     title: 'Τραπεζικές κινήσεις',
     subtitle: 'Οι εισπράξεις που διαβάστηκαν από τον λογαριασμό σας και τι εξήγησε η καθεμία.',
     totalCredited: 'Σύνολο εισπράξεων',
@@ -229,6 +356,21 @@ const el = {
   },
 
   settings: {
+    creditsSuccess:
+      'Η πληρωμή ολοκληρώθηκε. Τα SMS πιστώνονται μόλις επιβεβαιωθεί από το Stripe — συνήθως σε λίγα δευτερόλεπτα.',
+    creditsCancelled: 'Η αγορά ακυρώθηκε. Δεν χρεωθήκατε.',
+    stripeNotices: {
+      connected: 'Ο λογαριασμός Stripe συνδέθηκε. Οι πελάτες σας μπορούν πλέον να πληρώνουν με κάρτα.',
+      pending:
+        'Ο λογαριασμός συνδέθηκε, αλλά το Stripe δεν έχει ολοκληρώσει τον έλεγχο. Το κουμπί πληρωμής θα ενεργοποιηθεί αυτόματα μόλις ολοκληρωθεί.',
+      cancelled: 'Η σύνδεση με το Stripe ακυρώθηκε.',
+      failed: 'Η σύνδεση με το Stripe απέτυχε. Δοκιμάστε ξανά.',
+      alreadyLinked:
+        'Αυτός ο λογαριασμός Stripe χρησιμοποιείται ήδη από άλλον χρήστη του lefta.app.',
+    },
+    bankAccount: 'Τραπεζικός λογαριασμός',
+    bankAccountHint:
+      'Εντοπισμός εξοφλήσεων με έμβασμα, ώστε οι υπενθυμίσεις να σταματούν μόνες τους.',
     title: 'Ρυθμίσεις',
     subtitle: 'Στοιχεία επιχείρησης, myDATA, πληρωμές και SMS.',
     business: 'Στοιχεία επιχείρησης',
@@ -368,6 +510,96 @@ const en: typeof el = {
   dateTimeTag: 'en-GB',
   languageName: 'English',
 
+
+
+  payments: {
+    save: 'Save',
+    saving: 'Saving…',
+    remove: 'Remove',
+    disconnect: 'Disconnect',
+    disconnecting: 'Disconnecting…',
+    account: 'Account',
+    failed: 'Failed.',
+    stripe: {
+      keySaved: 'Key saved.',
+      keySavedTest: 'Key saved. It is a test key — payments will not be real.',
+      pasteIntro: 'Paste the',
+      pasteKeyName: 'Secret key',
+      pasteRest:
+        'from your own Stripe account (Developers → API keys). Charges are created directly on your account — lefta.app never sits in the flow of money.',
+      keyHint: 'sk_test_… for testing, sk_live_… for real payments',
+      disconnectConfirm: 'Disconnect the Stripe account? Your customers will not be able to pay by card.',
+      disconnectFailed: 'The account could not be disconnected.',
+      connectIntro: 'Connect your own Stripe account to accept card payments. The money goes',
+      connectEmphasis: 'straight to you',
+      connectRest: '; lefta.app never sits in the flow of money and keeps nothing.',
+      connectCta: 'Connect with Stripe',
+      pendingReview:
+        'The account is connected, but Stripe has not finished reviewing your details. Until it does, the payment button stays hidden from your customers. Complete your details in Stripe and the status updates by itself.',
+      liveNote:
+        'Payments are charged directly to your account. lefta.app takes no commission and does not appear in the transaction.',
+    },
+    viva: {
+      savedProduction: 'Credentials saved. Production account — payments are real.',
+      savedDemo: 'Credentials saved. Demo account — payments are not real.',
+      removeConfirm:
+        'Remove the Viva credentials? Your customers will not be able to pay by card through Viva.',
+      whereIntro: 'In Viva:',
+      wherePath: 'Settings → API Access → Smart Checkout Credentials',
+      whereMiddle: '. Payments are collected',
+      whereEmphasis: 'straight into your account',
+      whereRest: '— lefta.app never sits in the flow of money.',
+      production: 'Production',
+      demo: 'Demo',
+      sourceHint: "Optional — leave empty to use the account's default payment source.",
+      sourcePlaceholder: 'e.g. 1234',
+      returnIntro: 'On the',
+      returnPage: 'API Access',
+      returnRest: 'page, set the success and failure address of the payment source to:',
+    },
+  },
+  forms: {
+    errors: {
+      unauthorized: 'You are not allowed to do that.',
+      invalidData: 'Some details are not valid.',
+      unknownTemplate: 'Unknown template.',
+      missingInvoice: 'The invoice is missing.',
+      missingDebtorId: 'The customer id is missing.',
+      debtorNotFound: 'Customer not found.',
+      dueBeforeIssue: 'The due date cannot fall before the issue date.',
+      vatTaken: 'A customer with that VAT number already exists.',
+      chooseCustomer: 'Choose a customer.',
+      invoiceNumberRequired: 'The invoice number is required.',
+      amountPositive: 'The amount has to be positive.',
+      invalidIssueDate: 'That issue date is not valid.',
+      invalidDueDate: 'That due date is not valid.',
+      nameRequired: 'The name is required.',
+      invalidEmail: 'That email address is not valid.',
+      invalidReplyEmail: 'That reply-to address is not valid.',
+      invalidPhone: 'That phone number is not valid. Use the format +30 69… ',
+      textEmpty: 'The text cannot be empty.',
+      textTooLong: 'The text is too long.',
+      invalidText: 'That text is not valid.',
+      badCredentials: 'Wrong email or password.',
+      emailRequired: 'Enter a valid email address.',
+      passwordMin: 'The password must be at least 8 characters.',
+      companyNameRequired: 'Enter your company name.',
+      reminderNotSent: (reason: string) => `Nothing was sent (${reason}).`,
+      unknownReason: 'reason unknown',
+    },
+    success: {
+      invoiceCreated: 'Invoice saved.',
+      debtorAdded: 'Customer added.',
+      debtorUpdated: 'Details updated.',
+      settingsSaved: 'Settings saved.',
+      templateSaved: 'Template saved.',
+      templateReset: 'The default text has been restored.',
+      reminderSent: (channels: string) => `Reminder sent (${channels}).`,
+    },
+    notices: {
+      confirmEmail: 'Check your email to confirm the account.',
+    },
+  },
   common: {
     save: 'Save',
     saving: 'Saving…',
@@ -391,6 +623,42 @@ const en: typeof el = {
   },
 
   bank: {
+    card: {
+      lastCheck: (date: string) => `Last checked ${date}`,
+      counts: (movements: number, credits: number) =>
+        `${movements} movements / ${credits} incoming`,
+      accessUntil: (date: string) => `access until ${date}`,
+      checkNow: 'Check now',
+      pitch:
+        'Connect your bank account and settlements made by transfer are spotted automatically, so reminders stop without you having to record them.',
+      pitchReadOnly: 'Read-only access to movements; no payment can be made from here.',
+      expired:
+        'Access has expired. Banks grant it for a limited time and it has to be renewed, otherwise settlements by transfer go unnoticed.',
+      bankLabel: 'Bank',
+      connect: 'Connect bank',
+      connectAnother: 'Connect another account',
+      unavailable: 'The bank connection service is unavailable right now.',
+    },
+    notices: {
+      connected: 'Bank account connected.',
+      cancelled: 'The bank connection was cancelled.',
+      noAccounts: 'The bank returned no accounts.',
+      unavailable: 'The bank connection service is unavailable.',
+      failed: 'The bank connection failed. Please try again.',
+      rateLimited:
+        'The bank refused the check as exceeding its daily limit. That limit applies to automated checks and resets at midnight; the nightly check continues as normal.',
+      syncFailed: (reason: string) => `The check did not complete: ${reason}`,
+      syncFailedPlain: 'The check did not complete.',
+      matched: (seen: number, settled: number, queued: number) =>
+        `Checked ${seen} incoming payments: ${settled} invoices settled automatically, ${queued} need confirmation.`,
+      noActiveAccounts:
+        'No active account to check. Connect a bank, or renew the expired consent.',
+      noMovements: 'The bank returned no movements for the period requested.',
+      noCredits: (fetched: number) =>
+        `The bank returned ${fetched} movements, none of them incoming — only debits in this period.`,
+      nothingMatched: (seen: number, fetched: number) =>
+        `Checked ${seen} incoming payments out of ${fetched} movements. None matches an open invoice.`,
+    },
     title: 'Bank transactions',
     subtitle: 'Incoming payments read from your account, and what each one explained.',
     totalCredited: 'Total received',
@@ -573,6 +841,20 @@ const en: typeof el = {
   },
 
   settings: {
+    creditsSuccess:
+      'Payment complete. The SMS credits appear as soon as Stripe confirms — usually within seconds.',
+    creditsCancelled: 'The purchase was cancelled. You have not been charged.',
+    stripeNotices: {
+      connected: 'Stripe account connected. Your customers can now pay by card.',
+      pending:
+        'The account is connected, but Stripe has not finished its checks. The payment button switches on by itself once they are done.',
+      cancelled: 'The Stripe connection was cancelled.',
+      failed: 'The Stripe connection failed. Please try again.',
+      alreadyLinked: 'That Stripe account is already used by another lefta.app user.',
+    },
+    bankAccount: 'Bank account',
+    bankAccountHint:
+      'Spots settlements made by transfer, so reminders stop on their own.',
     title: 'Settings',
     subtitle: 'Business details, myDATA, payments and SMS.',
     business: 'Business details',

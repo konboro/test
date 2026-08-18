@@ -44,3 +44,17 @@ export async function getDictionary(): Promise<Dictionary> {
 export function dictionaryFor(locale: Locale): Dictionary {
   return DICTIONARIES[locale];
 }
+
+/**
+ * A validation message by key.
+ *
+ * Schemas are built once at module load, long before a request exists, so they
+ * cannot hold translated text. They carry keys instead and this resolves them
+ * when the failure is actually reported. An unknown key degrades to the generic
+ * message rather than showing the key itself to a customer.
+ */
+export function formError(t: Dictionary, key: string | undefined): string {
+  const errors = t.forms.errors as Record<string, unknown>;
+  const value = key ? errors[key] : undefined;
+  return typeof value === 'string' ? value : t.forms.errors.invalidData;
+}

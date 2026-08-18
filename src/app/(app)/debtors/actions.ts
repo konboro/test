@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { normalisePhone } from '@/lib/sms/send';
 import { createClient } from '@/lib/supabase/server';
+import { formError, getDictionary } from '@/lib/i18n';
 
 export interface DebtorFormState {
   error?: string;
@@ -13,7 +14,7 @@ export interface DebtorFormState {
 
 const debtorSchema = z
   .object({
-    name: z.string().trim().min(1, 'Η επωνυμία είναι υποχρεωτική.').max(200),
+    name: z.string().trim().min(1, 'nameRequired').max(200),
     vat_number: z
       .string()
       .trim()
@@ -27,7 +28,7 @@ const debtorSchema = z
       .optional()
       .transform((v) => (v ? v : null))
       .refine((v) => v === null || z.string().email().safeParse(v).success, {
-        message: 'Μη έγκυρο email.',
+        message: 'invalidEmail',
       }),
     phone: z
       .string()
@@ -43,7 +44,7 @@ const debtorSchema = z
       .transform((v) => (v ? v : null)),
   })
   .refine((d) => d.phone === null || normalisePhone(d.phone) !== null, {
-    message: 'Μη έγκυρος αριθμός τηλεφώνου. Χρησιμοποιήστε μορφή +30 69… ',
+    message: 'invalidPhone',
     path: ['phone'],
   });
 
@@ -61,14 +62,16 @@ export async function createDebtor(
   _prev: DebtorFormState,
   formData: FormData,
 ): Promise<DebtorFormState> {
+  const t = await getDictionary();
+
   const parsed = debtorSchema.safeParse(read(formData));
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Μη έγκυρα στοιχεία.' };
+  if (!parsed.success) return { error: formError(t, parsed.error.issues[0]?.message) };
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: 'Μη εξουσιοδοτημένη ενέργεια.' };
+  if (!user) return { error: t.forms.errors.unauthorized };
 
   const phone = parsed.data.phone ? normalisePhone(parsed.data.phone) : null;
 
@@ -82,25 +85,27 @@ export async function createDebtor(
 
   if (error) {
     if (error.code === '23505') {
-      return { error: 'Υπάρχει ήδη πελάτης με αυτό το ΑΦΜ.' };
+      return { error: t.forms.errors.vatTaken };
     }
     return { error: error.message };
   }
 
   revalidatePath('/debtors');
   revalidatePath('/dashboard');
-  return { success: 'Ο πελάτης προστέθηκε.' };
+  return { success: t.forms.success.debtorAdded };
 }
 
 export async function updateDebtor(
   _prev: DebtorFormState,
   formData: FormData,
 ): Promise<DebtorFormState> {
+  const t = await getDictionary();
+
   const id = String(formData.get('id') ?? '');
-  if (!id) return { error: 'Λείπει το αναγνωριστικό πελάτη.' };
+  if (!id) return { error: t.forms.errors.missingDebtorId };
 
   const parsed = debtorSchema.safeParse(read(formData));
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Μη έγκυρα στοιχεία.' };
+  if (!parsed.success) return { error: formError(t, parsed.error.issues[0]?.message) };
 
   const supabase = await createClient();
   const phone = parsed.data.phone ? normalisePhone(parsed.data.phone) : null;
@@ -114,7 +119,7 @@ export async function updateDebtor(
 
   revalidatePath('/debtors');
   revalidatePath('/dashboard');
-  return { success: 'Τα στοιχεία ενημερώθηκαν.' };
+  return { success: t.forms.success.debtorUpdated };
 }
 
 /** Pauses or resumes automated reminders for one debtor. */
