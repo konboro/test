@@ -227,10 +227,21 @@ export default async function InvoicesPage({
             body={t.invoices.emptyBody}
           />
         ) : (
-          <form id="bulk" action={sendBulkReminder}>
-          <input type="hidden" name="back" value={back} />
+          <>
+          {/* This form wraps only its own controls. It used to wrap the whole
+              table, which put each row's "mark paid" form inside it — nested
+              forms are invalid HTML, so the browser dropped the inner one, the
+              DOM stopped matching what React had rendered, and hydration failed,
+              taking every interactive control on the page with it. The checkboxes
+              join this form by id instead: that is what the `form` attribute is
+              for, and what SelectAll already assumed. */}
           {showActions ? (
-            <div className="flex flex-wrap items-center gap-2 border-b border-ink-200 px-5 py-3">
+            <form
+              id="bulk"
+              action={sendBulkReminder}
+              className="flex flex-wrap items-center gap-2 border-b border-ink-200 px-5 py-3"
+            >
+              <input type="hidden" name="back" value={back} />
               <select
                 name="choice"
                 defaultValue="manual"
@@ -248,7 +259,7 @@ export default async function InvoicesPage({
               >
                 {t.invoices.bulk.send}
               </button>
-            </div>
+            </form>
           ) : null}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -322,6 +333,7 @@ export default async function InvoicesPage({
                           {invoice.status === 'pending' ? (
                             <input
                               type="checkbox"
+                              form="bulk"
                               name="ids"
                               value={invoice.id}
                               aria-label={label}
@@ -447,8 +459,7 @@ export default async function InvoicesPage({
               </tbody>
             </table>
           </div>
-
-          </form>
+          </>
         )}
       </Card>
     </div>
