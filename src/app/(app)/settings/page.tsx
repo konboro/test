@@ -6,7 +6,7 @@ import { LADDER } from '@/lib/dunning/engine';
 
 import { DEFAULT_TEMPLATES, EDITABLE_SLOTS, slotKey } from '@/lib/dunning/templates';
 import { DICTIONARIES } from '@/lib/i18n/dictionaries';
-import { getDictionary, LOCALES } from '@/lib/i18n';
+import { getDictionary, LOCALES, type Dictionary } from '@/lib/i18n';
 import { smsCreditsEnforced } from '@/lib/limits';
 import { paymentsAvailable } from '@/lib/providers';
 import { connectConfigured, SMS_PACKS } from '@/lib/stripe';
@@ -29,15 +29,24 @@ export async function generateMetadata() {
 export const dynamic = 'force-dynamic';
 
 /** Outcomes of the Connect round trip, reported back on the redirect. */
-const STRIPE_NOTICES: Record<string, string> = {
-  connected: 'Ο λογαριασμός Stripe συνδέθηκε. Οι πελάτες σας μπορούν πλέον να πληρώνουν με κάρτα.',
-  pending:
-    'Ο λογαριασμός συνδέθηκε, αλλά το Stripe δεν έχει ολοκληρώσει τον έλεγχο. Το κουμπί πληρωμής θα ενεργοποιηθεί αυτόματα μόλις ολοκληρωθεί.',
-  cancelled: 'Η σύνδεση με το Stripe ακυρώθηκε.',
-  failed: 'Η σύνδεση με το Stripe απέτυχε. Δοκιμάστε ξανά.',
-  'already-linked':
-    'Αυτός ο λογαριασμός Stripe χρησιμοποιείται ήδη από άλλον χρήστη του lefta.app.',
-};
+function stripeNotice(t: Dictionary, outcome: string | undefined): string | null {
+  const notices = t.settings.stripeNotices;
+
+  switch (outcome) {
+    case 'connected':
+      return notices.connected;
+    case 'pending':
+      return notices.pending;
+    case 'cancelled':
+      return notices.cancelled;
+    case 'failed':
+      return notices.failed;
+    case 'already-linked':
+      return notices.alreadyLinked;
+    default:
+      return null;
+  }
+}
 
 /**
  * What came back from the bank round trip.
@@ -47,6 +56,7 @@ const STRIPE_NOTICES: Record<string, string> = {
  * again believing it failed.
  */
 function bankNotice(
+  t: Dictionary,
   outcome: string | undefined,
   counts: {
     seen?: string;
@@ -59,13 +69,13 @@ function bankNotice(
 ): { tone: 'ok' | 'warn'; text: string } | null {
   switch (outcome) {
     case 'connected':
-      return { tone: 'ok', text: 'Ο τραπεζικός λογαριασμός συνδέθηκε.' };
+      return { tone: 'ok', text: t.bank.notices.connected };
     case 'cancelled':
-      return { tone: 'warn', text: 'Η σύνδεση με την τράπεζα ακυρώθηκε.' };
+      return { tone: 'warn', text: t.bank.notices.cancelled };
     case 'no_accounts':
-      return { tone: 'warn', text: 'Η τράπεζα δεν επέστρεψε κανέναν λογαριασμό.' };
+      return { tone: 'warn', text: t.bank.notices.noAccounts };
     case 'unavailable':
-      return { tone: 'warn', text: 'Η υπηρεσία τραπεζικής σύνδεσης δεν είναι διαθέσιμη.' };
+      return { tone: 'warn', text: t.bank.notices.unavailable };
     case 'sync_failed': {
       const reason = counts.reason ?? '';
 
@@ -76,15 +86,15 @@ function bankNotice(
       if (reason.includes('429')) {
         return {
           tone: 'warn',
-          text: 'Η τράπεζα απέρριψε τον έλεγχο ως υπέρβαση του ημερήσιου ορίου. Το όριο αφορά τους αυτόματους ελέγχους και μηδενίζεται τα μεσάνυχτα· ο βραδινός έλεγχος συνεχίζεται κανονικά.',
+          text: t.bank.notices.rateLimited,
         };
       }
 
       return {
         tone: 'warn',
         text: reason
-          ? `Ο έλεγχος δεν ολοκληρώθηκε: ${reason}`
-          : 'Ο έλεγχος δεν ολοκληρώθηκε.',
+          ? t.bank.notices.syncFailed(reason)
+          : t.bank.notices.syncFailedPlain,
       };
     }
     case 'synced': {
@@ -97,7 +107,7 @@ function bankNotice(
       if (found || queued) {
         return {
           tone: 'ok',
-          text: `Ελέγχθηκαν ${seen} εισπράξεις: ${found} παραστατικά εξοφλήθηκαν αυτόματα, ${queued} χρειάζονται επιβεβαίωση.`,
+          text: t.bank.notices.matched(seen, found, queued),
         };
       }
 
@@ -107,29 +117,29 @@ function bankNotice(
       if (accounts === 0) {
         return {
           tone: 'warn',
-          text: 'Κανένας ενεργός λογαριασμός προς έλεγχο. Συνδέστε τράπεζα ή ανανεώστε τη ληγμένη άδεια.',
+          text: t.bank.notices.noActiveAccounts,
         };
       }
       if (fetched === 0) {
         return {
           tone: 'ok',
-          text: 'Η τράπεζα δεν επέστρεψε καμία κίνηση για το διάστημα που ζητήθηκε.',
+          text: t.bank.notices.noMovements,
         };
       }
       if (seen === 0) {
         return {
           tone: 'ok',
-          text: `Η τράπεζα επέστρεψε ${fetched} κινήσεις, καμία εισερχόμενη — μόνο χρεώσεις στο διάστημα αυτό.`,
+          text: t.bank.notices.noCredits(fetched),
         };
       }
 
       return {
         tone: 'ok',
-        text: `Ελέγχθηκαν ${seen} εισπράξεις από ${fetched} κινήσεις. Καμία δεν αντιστοιχεί σε ανοιχτό παραστατικό.`,
+        text: t.bank.notices.nothingMatched(seen, fetched),
       };
     }
     case 'error':
-      return { tone: 'warn', text: 'Η σύνδεση με την τράπεζα απέτυχε. Δοκιμάστε ξανά.' };
+      return { tone: 'warn', text: t.bank.notices.failed };
     default:
       return null;
   }
@@ -174,7 +184,8 @@ export default async function SettingsPage({
 
   if (!profile) redirect('/login');
 
-  const bankOutcome = bankNotice(bank, { seen, settled, queued, reason, fetched, accounts });
+  const stripeMessage = stripeNotice(t, stripe);
+  const bankOutcome = bankNotice(t, bank, { seen, settled, queued, reason, fetched, accounts });
 
   const { data: bankConnections } = await supabase
     .from('bank_connections')
@@ -238,17 +249,16 @@ export default async function SettingsPage({
 
       {credits === 'success' ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Η πληρωμή ολοκληρώθηκε. Τα SMS πιστώνονται μόλις επιβεβαιωθεί από το Stripe — συνήθως
-          σε λίγα δευτερόλεπτα.
+          {t.settings.creditsSuccess}
         </div>
       ) : null}
       {credits === 'cancelled' ? (
         <div className="rounded-xl border border-ink-200 bg-white px-4 py-3 text-sm text-ink-600">
-          Η αγορά ακυρώθηκε. Δεν χρεωθήκατε.
+          {t.settings.creditsCancelled}
         </div>
       ) : null}
 
-      {STRIPE_NOTICES[stripe ?? ''] ? (
+      {stripeMessage ? (
         <div
           className={`rounded-xl border px-4 py-3 text-sm ${
             stripe === 'connected'
@@ -258,7 +268,7 @@ export default async function SettingsPage({
                 : 'border-ink-200 bg-white text-ink-600'
           }`}
         >
-          {STRIPE_NOTICES[stripe ?? '']}
+          {stripeMessage}
         </div>
       ) : null}
 
@@ -366,8 +376,8 @@ export default async function SettingsPage({
       <Card>
         <div id="bank" className="scroll-mt-20">
           <CardHeader
-            title="Τραπεζικός λογαριασμός"
-            subtitle="Εντοπισμός εξοφλήσεων με έμβασμα, ώστε οι υπενθυμίσεις να σταματούν μόνες τους."
+            title={t.settings.bankAccount}
+            subtitle={t.settings.bankAccountHint}
             action={
               (bankConnections ?? []).some((c) => c.status === 'active') ? (
                 <Badge tone="positive">{t.settings.connected}</Badge>
@@ -376,7 +386,7 @@ export default async function SettingsPage({
               )
             }
           />
-          <BankConnect banks={banks} connections={bankConnections ?? []} />
+          <BankConnect banks={banks} connections={bankConnections ?? []} t={t} />
         </div>
       </Card>
 

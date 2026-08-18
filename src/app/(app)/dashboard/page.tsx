@@ -268,10 +268,10 @@ export default async function DashboardPage() {
                         {debtor.name}
                       </Link>
                       <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-500">
-                        {debtor.vat_number ? <span>ΑΦΜ {debtor.vat_number}</span> : null}
-                        {debtor.muted ? <Badge tone="neutral">σε παύση</Badge> : null}
+                        {debtor.vat_number ? <span>{t.debtors.vat} {debtor.vat_number}</span> : null}
+                        {debtor.muted ? <Badge tone="neutral">{t.dashboard.muted}</Badge> : null}
                         {!debtor.email && !debtor.phone ? (
-                          <Badge tone="danger">χωρίς στοιχεία</Badge>
+                          <Badge tone="danger">{t.dashboard.noContact}</Badge>
                         ) : null}
                       </div>
                     </td>

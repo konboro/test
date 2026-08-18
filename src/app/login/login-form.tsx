@@ -5,17 +5,20 @@ import { useFormStatus } from 'react-dom';
 
 import { signIn, type AuthState } from '@/app/auth/actions';
 import { Button, Field, inputClass } from '@/components/ui';
+import { useT } from '@/lib/i18n/provider';
 
 function Submit() {
+  const t = useT();
   const { pending } = useFormStatus();
   return (
     <Button type="submit" disabled={pending} className="w-full">
-      {pending ? 'Σύνδεση…' : 'Σύνδεση'}
+      {pending ? t.auth.signingIn : t.auth.signInTitle}
     </Button>
   );
 }
 
 export function LoginForm({ next }: { next?: string }) {
+  const t = useT();
   const [state, action] = useActionState<AuthState, FormData>(signIn, {});
 
   return (
@@ -26,7 +29,7 @@ export function LoginForm({ next }: { next?: string }) {
         <input name="email" type="email" required autoComplete="email" className={inputClass} />
       </Field>
 
-      <Field label="Κωδικός">
+      <Field label={t.auth.password}>
         <input
           name="password"
           type="password"

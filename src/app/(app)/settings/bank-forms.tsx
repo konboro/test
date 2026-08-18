@@ -1,4 +1,5 @@
 import type { Aspsp } from '@/lib/bank/client';
+import type { Dictionary } from '@/lib/i18n';
 import { formatDate } from '@/lib/money';
 import type { BankConnectionRow } from '@/types/database';
 
@@ -14,12 +15,15 @@ import { syncBankNow } from './bank-actions';
 export function BankConnect({
   banks,
   connections,
+  t,
 }: {
   banks: Aspsp[];
   connections: BankConnectionRow[];
+  t: Dictionary;
 }) {
   const active = connections.filter((c) => c.status === 'active');
   const expired = connections.filter((c) => c.status === 'expired');
+  const copy = t.bank.card;
 
   return (
     <div className="space-y-4 px-5 py-4">
@@ -30,17 +34,24 @@ export function BankConnect({
               <div key={connection.id} className="flex items-center justify-between gap-4">
                 <dt className="text-ink-700">{connection.institution_name}</dt>
                 <dd className="text-xs text-ink-500">
-                  {connection.last_synced_at
-                    ? `Τελευταίος έλεγχος ${formatDate(connection.last_synced_at.slice(0, 10))} · `
-                    : ''}
-                  {/* What that read actually returned. An empty table with no
-                      number beside it is the state nobody can act on. */}
-                  {connection.last_fetched_count !== null
-                    ? `${connection.last_fetched_count} κινήσεις / ${connection.last_credit_count ?? 0} εισπράξεις · `
-                    : ''}
-                  {connection.consent_expires_at
-                    ? `πρόσβαση έως ${formatDate(connection.consent_expires_at.slice(0, 10))}`
-                    : '—'}
+                  {[
+                    connection.last_synced_at
+                      ? copy.lastCheck(formatDate(connection.last_synced_at.slice(0, 10)))
+                      : null,
+                    // What that read actually returned. An empty table with no
+                    // number beside it is the state nobody can act on.
+                    connection.last_fetched_count !== null
+                      ? copy.counts(
+                          connection.last_fetched_count,
+                          connection.last_credit_count ?? 0,
+                        )
+                      : null,
+                    connection.consent_expires_at
+                      ? copy.accessUntil(formatDate(connection.consent_expires_at.slice(0, 10)))
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ') || '—'}
                 </dd>
               </div>
             ))}
@@ -53,24 +64,20 @@ export function BankConnect({
               type="submit"
               className="rounded-lg border border-ink-300 bg-white px-3.5 py-2 text-sm font-medium text-ink-700 outline-none transition hover:bg-ink-50 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
             >
-              Έλεγχος τώρα
+              {copy.checkNow}
             </button>
           </form>
         </>
       ) : (
         <p className="text-sm leading-relaxed text-ink-600">
-          Συνδέστε τον τραπεζικό σας λογαριασμό και οι εξοφλήσεις με έμβασμα εντοπίζονται
-          αυτόματα, ώστε οι υπενθυμίσεις να σταματούν χωρίς να χρειάζεται να τις καταχωρήσετε.{' '}
-          <span className="font-medium text-ink-800">
-            Η πρόσβαση είναι μόνο για ανάγνωση κινήσεων· δεν είναι δυνατή καμία πληρωμή.
-          </span>
+          {copy.pitch}{' '}
+          <span className="font-medium text-ink-800">{copy.pitchReadOnly}</span>
         </p>
       )}
 
       {expired.length ? (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
-          Η άδεια πρόσβασης έληξε. Οι τράπεζες την περιορίζουν χρονικά και πρέπει να ανανεωθεί,
-          διαφορετικά οι εξοφλήσεις με έμβασμα δεν εντοπίζονται.
+          {copy.expired}
         </p>
       ) : null}
 
@@ -78,7 +85,7 @@ export function BankConnect({
         <form action="/api/bank/connect/start" method="get" className="flex flex-wrap gap-2">
           <input type="hidden" name="country" value="GR" />
           <label className="sr-only" htmlFor="aspsp">
-            Τράπεζα
+            {copy.bankLabel}
           </label>
           <select
             id="aspsp"
@@ -95,13 +102,11 @@ export function BankConnect({
             type="submit"
             className="rounded-lg bg-brand-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm outline-none transition hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
           >
-            {active.length ? 'Σύνδεση άλλου λογαριασμού' : 'Σύνδεση τράπεζας'}
+            {active.length ? copy.connectAnother : copy.connect}
           </button>
         </form>
       ) : (
-        <p className="text-xs text-ink-500">
-          Η υπηρεσία τραπεζικής σύνδεσης δεν είναι διαθέσιμη αυτή τη στιγμή.
-        </p>
+        <p className="text-xs text-ink-500">{copy.unavailable}</p>
       )}
     </div>
   );

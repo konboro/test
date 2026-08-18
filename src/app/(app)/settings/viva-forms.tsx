@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { Badge, Button, Field, inputClass } from '@/components/ui';
+import { useT } from '@/lib/i18n/provider';
 
 /**
  * The tenant's own Viva.com Smart Checkout credentials.
@@ -26,6 +27,7 @@ export function VivaForm({
   environment: string;
   sourceCode: string | null;
 }) {
+  const t = useT();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
@@ -48,7 +50,7 @@ export function VivaForm({
       const body = (await response.json()) as { error?: string; environment?: string };
 
       if (!response.ok) {
-        setMessage({ tone: 'error', text: body.error ?? 'Αποτυχία.' });
+        setMessage({ tone: 'error', text: body.error ?? t.payments.failed });
         return;
       }
 
@@ -56,8 +58,8 @@ export function VivaForm({
         tone: 'ok',
         text:
           body.environment === 'production'
-            ? 'Τα στοιχεία αποθηκεύτηκαν. Λογαριασμός παραγωγής — οι πληρωμές είναι πραγματικές.'
-            : 'Τα στοιχεία αποθηκεύτηκαν. Λογαριασμός demo — οι πληρωμές δεν είναι πραγματικές.',
+            ? t.payments.viva.savedProduction
+            : t.payments.viva.savedDemo,
       });
       router.refresh();
     } finally {
@@ -66,7 +68,7 @@ export function VivaForm({
   }
 
   async function remove() {
-    if (!window.confirm('Αφαίρεση των στοιχείων Viva; Οι πελάτες σας δεν θα μπορούν να πληρώνουν με κάρτα μέσω Viva.')) {
+    if (!window.confirm(t.payments.viva.removeConfirm)) {
       return;
     }
 
@@ -82,16 +84,17 @@ export function VivaForm({
   return (
     <form action={submit} className="space-y-4 px-5 py-4">
       <p className="text-sm leading-relaxed text-ink-600">
-        Στο Viva: <strong className="font-semibold text-ink-900">Settings → API Access →
-        Smart Checkout Credentials</strong>. Οι πληρωμές εισπράττονται{' '}
-        <strong className="font-semibold text-ink-900">απευθείας στον λογαριασμό σας</strong> — το
-        lefta.app δεν μεσολαβεί στη ροή χρημάτων.
+        {t.payments.viva.whereIntro}{' '}
+        <strong className="font-semibold text-ink-900">{t.payments.viva.wherePath}</strong>
+        {t.payments.viva.whereMiddle}{' '}
+        <strong className="font-semibold text-ink-900">{t.payments.viva.whereEmphasis}</strong>{' '}
+        {t.payments.viva.whereRest}
       </p>
 
       {configured ? (
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={environment === 'production' ? 'positive' : 'warning'}>
-            {environment === 'production' ? 'Παραγωγή' : 'Demo'}
+            {environment === 'production' ? t.payments.viva.production : t.payments.viva.demo}
           </Badge>
           {sourceCode ? <Badge tone="neutral">Source {sourceCode}</Badge> : null}
         </div>
@@ -120,13 +123,13 @@ export function VivaForm({
 
       <Field
         label="Source code"
-        hint="Προαιρετικό — αφήστε το κενό για την προεπιλεγμένη πηγή πληρωμών του λογαριασμού."
+        hint={t.payments.viva.sourceHint}
       >
         <input
           name="source_code"
           autoComplete="off"
           defaultValue={sourceCode ?? ''}
-          placeholder="π.χ. 1234"
+          placeholder={t.payments.viva.sourcePlaceholder}
           className={inputClass}
         />
       </Field>
@@ -144,18 +147,16 @@ export function VivaForm({
 
       <div className="flex gap-2">
         <Button type="submit" disabled={busy}>
-          {busy ? 'Αποθήκευση…' : 'Αποθήκευση'}
+          {busy ? t.payments.saving : t.payments.save}
         </Button>
         {configured ? (
-          <Button type="button" variant="secondary" onClick={remove} disabled={busy}>
-            Αφαίρεση
-          </Button>
+          <Button type="button" variant="secondary" onClick={remove} disabled={busy}>{t.payments.remove}</Button>
         ) : null}
       </div>
 
       <p className="text-xs leading-relaxed text-ink-500">
-        Στη σελίδα <strong>API Access</strong> ορίστε ως διεύθυνση επιτυχίας και αποτυχίας της πηγής
-        πληρωμών: <code className="rounded bg-ink-100 px-1 py-0.5">https://lefta.app/api/viva/return</code>
+        {t.payments.viva.returnIntro} <strong>{t.payments.viva.returnPage}</strong>{' '}
+        {t.payments.viva.returnRest} <code className="rounded bg-ink-100 px-1 py-0.5">https://lefta.app/api/viva/return</code>
       </p>
     </form>
   );

@@ -5,7 +5,7 @@ import { cookies } from 'next/headers';
 import { z } from 'zod';
 
 import { parseSlotKey } from '@/lib/dunning/templates';
-import { isLocale, LOCALE_COOKIE } from '@/lib/i18n';
+import { formError, getDictionary, isLocale, LOCALE_COOKIE } from '@/lib/i18n';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
@@ -15,7 +15,7 @@ export interface SettingsState {
 }
 
 const profileSchema = z.object({
-  company_name: z.string().trim().min(1, 'Η επωνυμία είναι υποχρεωτική.').max(200),
+  company_name: z.string().trim().min(1, 'nameRequired').max(200),
   vat_number: z
     .string()
     .trim()
@@ -29,7 +29,7 @@ const profileSchema = z.object({
     .optional()
     .transform((v) => (v ? v : null))
     .refine((v) => v === null || z.string().email().safeParse(v).success, {
-      message: 'Μη έγκυρο email απάντησης.',
+      message: 'invalidReplyEmail',
     }),
   automation_enabled: z.boolean(),
 });
@@ -38,6 +38,8 @@ export async function updateProfile(
   _prev: SettingsState,
   formData: FormData,
 ): Promise<SettingsState> {
+  const t = await getDictionary();
+
   const parsed = profileSchema.safeParse({
     company_name: formData.get('company_name'),
     vat_number: formData.get('vat_number'),
@@ -45,13 +47,13 @@ export async function updateProfile(
     automation_enabled: formData.get('automation_enabled') === 'on',
   });
 
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Μη έγκυρα στοιχεία.' };
+  if (!parsed.success) return { error: formError(t, parsed.error.issues[0]?.message) };
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: 'Μη εξουσιοδοτημένη ενέργεια.' };
+  if (!user) return { error: t.forms.errors.unauthorized };
 
   // Only the columns granted to `authenticated` are touched here; credentials
   // and balances are unreachable from this path by construction.
@@ -60,7 +62,7 @@ export async function updateProfile(
 
   revalidatePath('/settings');
   revalidatePath('/dashboard');
-  return { success: 'Οι ρυθμίσεις αποθηκεύτηκαν.' };
+  return { success: t.forms.success.settingsSaved };
 }
 
 /**
@@ -135,8 +137,8 @@ const templateSchema = z.object({
   body: z
     .string()
     .trim()
-    .min(1, 'Το κείμενο δεν μπορεί να είναι κενό.')
-    .max(4000, 'Το κείμενο είναι πολύ μεγάλο.'),
+    .min(1, 'textEmpty')
+    .max(4000, 'textTooLong'),
 });
 
 /**
@@ -151,22 +153,24 @@ export async function saveTemplate(
   _prev: SettingsState,
   formData: FormData,
 ): Promise<SettingsState> {
+  const t = await getDictionary();
+
   const parsed = templateSchema.safeParse({
     slot: formData.get('slot'),
     subject: formData.get('subject'),
     body: formData.get('body'),
   });
 
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Μη έγκυρο κείμενο.' };
+  if (!parsed.success) return { error: formError(t, parsed.error.issues[0]?.message) };
 
   const slot = parseSlotKey(parsed.data.slot);
-  if (!slot) return { error: 'Άγνωστο πρότυπο.' };
+  if (!slot) return { error: t.forms.errors.unknownTemplate };
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: 'Μη εξουσιοδοτημένη ενέργεια.' };
+  if (!user) return { error: t.forms.errors.unauthorized };
 
   const lookup = supabase.from('message_templates').select('id').eq('channel', slot.channel);
   const { data: existing } = await (slot.step === null
@@ -192,7 +196,7 @@ export async function saveTemplate(
   if (error) return { error: error.message };
 
   revalidatePath('/settings');
-  return { success: 'Το πρότυπο αποθηκεύτηκε.' };
+  return { success: t.forms.success.templateSaved };
 }
 
 /** Drops the override, so the slot falls back to the built-in copy. */
@@ -200,14 +204,16 @@ export async function resetTemplate(
   _prev: SettingsState,
   formData: FormData,
 ): Promise<SettingsState> {
+  const t = await getDictionary();
+
   const slot = parseSlotKey(String(formData.get('slot') ?? ''));
-  if (!slot) return { error: 'Άγνωστο πρότυπο.' };
+  if (!slot) return { error: t.forms.errors.unknownTemplate };
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: 'Μη εξουσιοδοτημένη ενέργεια.' };
+  if (!user) return { error: t.forms.errors.unauthorized };
 
   const deletion = supabase.from('message_templates').delete().eq('channel', slot.channel);
   const { error } = await (slot.step === null
@@ -217,5 +223,5 @@ export async function resetTemplate(
   if (error) return { error: error.message };
 
   revalidatePath('/settings');
-  return { success: 'Επαναφέρθηκε το προεπιλεγμένο κείμενο.' };
+  return { success: t.forms.success.templateReset };
 }
