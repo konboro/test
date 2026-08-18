@@ -13,6 +13,9 @@ const PUBLIC_PREFIXES = [
   // credential.
   '/pay',
   '/api/pay',
+  // The pay page's view beacon — fired by the same anonymous visitor the page
+  // itself serves. It answers 204 unconditionally and records a funnel event.
+  '/api/beacon',
   // Where the provider sends the debtor back afterwards. These have to be public
   // for the same reason the payment page does — the visitor has no session and
   // never will — and they are what settle an invoice for a tenant with no

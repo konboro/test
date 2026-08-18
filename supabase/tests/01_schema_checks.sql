@@ -344,5 +344,63 @@ end $$;
 \echo '  ok  anon reads no invoices and no debtors directly'
 
 reset role;
+
+-- --------------------------------------------------------------------------
+-- funnel events: tenant-readable, server-written, invisible to anon
+-- --------------------------------------------------------------------------
+
+insert into public.funnel_events (user_id, invoice_id, debtor_id, channel, event)
+values ('11111111-1111-1111-1111-111111111111', 'bbbbbbbb-0000-0000-0000-000000000001',
+        'aaaaaaaa-0000-0000-0000-000000000001', 'email', 'page_view');
+
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+
+do $$
+declare n integer;
+begin
+  select count(*) into n from public.funnel_events;
+  if n <> 1 then raise exception 'FAIL: tenant A sees % funnel events, expected 1', n; end if;
+
+  begin
+    insert into public.funnel_events (user_id, invoice_id, event)
+    values ('11111111-1111-1111-1111-111111111111', 'bbbbbbbb-0000-0000-0000-000000000001',
+            'page_view');
+    raise exception 'FAIL: a session wrote its own funnel event';
+  exception when insufficient_privilege then
+    null;
+  end;
+end $$;
+\echo '  ok  funnel events are readable by their tenant and writable only by the server'
+
+reset role;
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+set role authenticated;
+
+do $$
+declare n integer;
+begin
+  select count(*) into n from public.funnel_events;
+  if n <> 0 then raise exception 'FAIL: tenant B sees % of tenant A''s funnel events', n; end if;
+end $$;
+\echo '  ok  funnel events do not cross tenants'
+
+reset role;
+
+set role anon;
+
+do $$
+begin
+  -- Stronger than zero rows: anon holds no SELECT grant on this table at all.
+  begin
+    perform count(*) from public.funnel_events;
+    raise exception 'FAIL: anon could select from funnel_events';
+  exception when insufficient_privilege then
+    null;
+  end;
+end $$;
+\echo '  ok  anon cannot read funnel events at all'
+
+reset role;
 \echo ''
 \echo 'ALL SCHEMA CHECKS PASSED'

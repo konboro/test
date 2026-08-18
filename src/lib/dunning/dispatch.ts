@@ -13,6 +13,7 @@
 
 import { sendEmail } from '@/lib/email/send';
 import { appUrl } from '@/lib/env';
+import { channelTaggedUrl } from '@/lib/funnel/events';
 import { payPath } from '@/lib/pay-code';
 import { smsCreditsEnforced } from '@/lib/limits';
 import { emailAvailable, smsAvailable, type Channel } from '@/lib/providers';
@@ -87,6 +88,12 @@ export async function dispatchContact(params: {
   const copyStep = params.templateStep !== undefined ? params.templateStep : step;
   const supabase = createAdminClient();
   const ctx = templateContext(tenant, debtor, invoice);
+  // Each channel carries its own tag on {{pay_url}}, so a visit to the payment
+  // page can say which message brought it there (docs/funnel-analytics.md).
+  const channelCtx = (channel: 'email' | 'sms'): TemplateContext => ({
+    ...ctx,
+    payUrl: channelTaggedUrl(ctx.payUrl, channel),
+  });
 
   const outcome: DispatchOutcome = { emailsSent: 0, smsSent: 0, skipped: [], errors: [] };
 
@@ -99,7 +106,7 @@ export async function dispatchContact(params: {
   };
 
   if (channels.includes('email') && debtor.email) {
-    const email = renderEmail(copyStep, ctx, overrides);
+    const email = renderEmail(copyStep, channelCtx('email'), overrides);
 
     if (!emailAvailable()) {
       // Reached only when another channel carried this contact — a step is never
@@ -144,7 +151,7 @@ export async function dispatchContact(params: {
 
   const phone = normalisePhone(debtor.phone);
   if (channels.includes('sms') && phone) {
-    const body = renderSms(copyStep, ctx, overrides);
+    const body = renderSms(copyStep, channelCtx('sms'), overrides);
 
     // Ask whether the provider exists *before* reserving a credit. Reserving
     // first would push every message through a reserve-then-refund cycle that
