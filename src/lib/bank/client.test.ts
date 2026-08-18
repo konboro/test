@@ -88,7 +88,27 @@ describe('toCredit', () => {
       remittance: 'EXOFLISI TIM 1042',
       counterpartyName: 'PAPADOPOULOS GEORGIOS',
       counterpartyIban: 'GR1601101250000000012300695',
+      // Absent here, because this fixture carries no code. Present in the shape
+      // regardless, so a bank that does send one cannot have it silently dropped.
+      bankTransactionCode: null,
     });
+  });
+
+  it('carries the bank’s own classification through, in either shape', () => {
+    // Of 26 credits read from a real account, 18 were the holder's own card
+    // takings arriving from their acquirer — not customer payments at all. The
+    // code is what separates those from a transfer or a cash deposit, and it
+    // arrives either as a plain string or split ISO 20022 style.
+    expect(toCredit({ ...raw, bank_transaction_code: 'PMNT-RCDT-ESCT' })?.bankTransactionCode).toBe(
+      'PMNT-RCDT-ESCT',
+    );
+
+    expect(
+      toCredit({
+        ...raw,
+        bank_transaction_code: { domain: 'PMNT', family: 'CNTR', sub_family: 'CDPT' },
+      })?.bankTransactionCode,
+    ).toBe('PMNT/CNTR/CDPT');
   });
 
   it('drops outgoing money before it can be stored', () => {

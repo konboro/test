@@ -193,6 +193,8 @@ export type BankTransactionRow = {
   remittance: string | null;
   counterparty_name: string | null;
   counterparty_iban: string | null;
+  /** The bank's own classification of the movement, verbatim. */
+  bank_transaction_code: string | null;
   state: 'unmatched' | 'review' | 'settled' | 'dismissed';
   matched_invoice_id: string | null;
   /** Which evidence fired: 'reference' | 'name' | 'iban'. */

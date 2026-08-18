@@ -214,6 +214,7 @@ async function ingest(connection: ConnectionRow, credit: IncomingCredit): Promis
       remittance: credit.remittance,
       counterparty_name: credit.counterpartyName,
       counterparty_iban: credit.counterpartyIban,
+      bank_transaction_code: credit.bankTransactionCode,
     })
     .select('id')
     .maybeSingle();
