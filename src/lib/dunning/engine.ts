@@ -312,20 +312,36 @@ async function deliver(
   // debtor today. The unique indexes make the check atomic: if another worker,
   // another invoice, or a duplicate cron invocation already claimed it, the
   // insert fails and we send nothing.
-  const { data: contact, error: contactError } = await supabase
+  const claim = {
+    user_id: tenant.id,
+    debtor_id: debtor.id,
+    invoice_id: invoice.id,
+    step,
+    contact_on: today,
+  };
+
+  // The guarantee is now "once per invoice per cycle": a repeat of the final
+  // step is a new cycle, and everything else is still cycle 0.
+  let { data: contact, error: contactError } = await supabase
     .from('dunning_contacts')
-    .insert({
-      user_id: tenant.id,
-      debtor_id: debtor.id,
-      invoice_id: invoice.id,
-      step,
-      // The guarantee is now "once per invoice per cycle": a repeat of the final
-      // step is a new cycle, and everything else is still cycle 0.
-      cycle: candidate.cycle,
-      contact_on: today,
-    })
+    .insert({ ...claim, cycle: candidate.cycle })
     .select('id')
     .single();
+
+  // PGRST204 means the column is not in the schema cache — this deployment is
+  // running ahead of its migration. Claiming the row without a cycle is exactly
+  // the behaviour from before repeats existed: the older unique index still
+  // refuses a second send of the same step, so all that is lost is the repeat.
+  // The alternative is every reminder failing to claim, which stops the ladder
+  // dead for as long as the schema lags.
+  if (contactError?.code === 'PGRST204' && (contactError.message ?? '').includes('cycle')) {
+    console.warn('[dunning] dunning_contacts.cycle missing — migration not applied, repeats disabled');
+    ({ data: contact, error: contactError } = await supabase
+      .from('dunning_contacts')
+      .insert(claim)
+      .select('id')
+      .single());
+  }
 
   if (contactError || !contact) {
     // 23505 = unique_violation. Which index tripped decides what happens next,
