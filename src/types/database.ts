@@ -260,6 +260,30 @@ export type FunnelEventRow = {
   occurred_at: string;
 }
 
+/**
+ * A document dropped on the uploader, and what we managed to read from it.
+ *
+ * A proposal until someone confirms it: `status` stays 'pending' and no invoice
+ * exists yet. See supabase/migrations/20260819150000_invoice_uploads.sql.
+ */
+export type InvoiceUploadRow = {
+  id: string;
+  user_id: string;
+  storage_path: string;
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  /** How the fields were obtained: the PDF's own text, a model, or nothing. */
+  source: 'pdf_text' | 'vision' | 'manual';
+  extracted: Record<string, unknown>;
+  /** Required fields the reader could not find, for the review screen to flag. */
+  missing: string[];
+  status: 'pending' | 'committed' | 'discarded';
+  invoice_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export type PaymentPageInvoice = {
   invoice_id: string;
   invoice_number: string | null;
@@ -372,6 +396,12 @@ export interface Database {
           'user_id' | 'connection_id' | 'provider_tx_id' | 'booked_on' | 'amount_cents' | 'currency'
         >;
         Update: Partial<BankTransactionRow>;
+        Relationships: NoRelationships;
+      };
+      invoice_uploads: {
+        Row: InvoiceUploadRow;
+        Insert: InsertOf<InvoiceUploadRow, 'user_id' | 'storage_path' | 'filename' | 'mime_type' | 'size_bytes' | 'source'>;
+        Update: Partial<InvoiceUploadRow>;
         Relationships: NoRelationships;
       };
       funnel_events: {

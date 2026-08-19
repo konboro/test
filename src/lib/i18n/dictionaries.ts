@@ -831,6 +831,47 @@ const el = {
     statusSkipped: 'Παραλείφθηκε',
   },
 
+  upload: {
+    title: 'Ανέβασμα τιμολογίων',
+    subtitle: 'Σύρετε αρχεία PDF ή φωτογραφίες. Διαβάζουμε τα στοιχεία και τα δείχνουμε για έλεγχο πριν καταχωρηθούν.',
+    dropHere: 'Σύρετε εδώ τα τιμολόγια',
+    dropHint: 'PDF, PNG, JPG ή WEBP — έως 25 αρχεία, έως 20 MB το καθένα',
+    reading: 'Ανάγνωση…',
+    readCount: (n: number) => (n === 1 ? 'Ανάγνωση 1 αρχείου' : `Ανάγνωση ${n} αρχείων`),
+    readDone: (read: number, attention: number) =>
+      attention > 0
+        ? `Διαβάστηκαν ${read}. ${attention} χρειάζονται συμπλήρωση.`
+        : `Διαβάστηκαν ${read}. Ελέγξτε τα και καταχωρήστε τα.`,
+    queue: 'Προς έλεγχο',
+    queueEmpty: 'Δεν υπάρχει τίποτα σε αναμονή.',
+    queueEmptyHint: 'Ό,τι ανεβάσετε εμφανίζεται εδώ πριν γίνει τιμολόγιο.',
+    openFile: 'Άνοιγμα αρχείου',
+    commit: 'Καταχώρηση',
+    committing: 'Καταχώρηση…',
+    discard: 'Απόρριψη',
+    remove: 'Αφαίρεση',
+    sourcePdf: 'Από το κείμενο του PDF',
+    sourceVision: 'Από ανάγνωση σάρωσης',
+    sourceManual: 'Χρειάζεται συμπλήρωση',
+    missingNote: 'Δεν βρέθηκαν: ',
+    problems: {
+      no_text_layer: 'Το PDF δεν περιέχει κείμενο — είναι σάρωση. Συμπληρώστε τα πεδία.',
+      vision_unavailable: 'Η ανάγνωση εικόνων δεν είναι ενεργή. Συμπληρώστε τα πεδία.',
+      unreadable: 'Δεν κατάφερα να διαβάσω το αρχείο. Συμπληρώστε τα πεδία.',
+    } as Record<string, string>,
+    errors: {
+      no_files: 'Δεν επιλέχθηκε αρχείο.',
+      too_many: 'Έως 25 αρχεία τη φορά.',
+      bad_type: 'Δεκτά μόνο PDF, PNG, JPG και WEBP.',
+      too_big: 'Το αρχείο ξεπερνά τα 20 MB.',
+      unauthorized: 'Η σύνδεση έληξε.',
+      missing: 'Η εγγραφή δεν βρέθηκε.',
+      already_done: 'Έχει ήδη καταχωρηθεί.',
+      need_name: 'Συμπληρώστε την επωνυμία του πελάτη.',
+      need_amount: 'Συμπληρώστε το ποσό.',
+      need_issue_date: 'Συμπληρώστε την ημερομηνία έκδοσης.',
+    } as Record<string, string>,
+  },
   settings: {
     creditsSuccess:
       'Η πληρωμή ολοκληρώθηκε. Τα SMS πιστώνονται μόλις επιβεβαιωθεί από το Stripe — συνήθως σε λίγα δευτερόλεπτα.',
@@ -1804,6 +1845,47 @@ const en: typeof el = {
     statusSkipped: 'Skipped',
   },
 
+  upload: {
+    title: 'Upload invoices',
+    subtitle: 'Drop in PDFs or photos. We read the details and show them for checking before anything is created.',
+    dropHere: 'Drop invoices here',
+    dropHint: 'PDF, PNG, JPG or WEBP — up to 25 files, 20 MB each',
+    reading: 'Reading…',
+    readCount: (n: number) => (n === 1 ? 'Read 1 file' : `Read ${n} files`),
+    readDone: (read: number, attention: number) =>
+      attention > 0
+        ? `Read ${read}. ${attention} need filling in.`
+        : `Read ${read}. Check them over and create them.`,
+    queue: 'Waiting for review',
+    queueEmpty: 'Nothing is waiting.',
+    queueEmptyHint: 'Anything you upload appears here before it becomes an invoice.',
+    openFile: 'Open file',
+    commit: 'Create invoice',
+    committing: 'Creating…',
+    discard: 'Discard',
+    remove: 'Remove',
+    sourcePdf: 'From the PDF text',
+    sourceVision: 'Read from a scan',
+    sourceManual: 'Needs filling in',
+    missingNote: 'Not found: ',
+    problems: {
+      no_text_layer: 'This PDF holds no text — it is a scan. Please fill the fields in.',
+      vision_unavailable: 'Reading images is not switched on. Please fill the fields in.',
+      unreadable: 'I could not read this file. Please fill the fields in.',
+    } as Record<string, string>,
+    errors: {
+      no_files: 'No file chosen.',
+      too_many: 'Up to 25 files at a time.',
+      bad_type: 'Only PDF, PNG, JPG and WEBP are accepted.',
+      too_big: 'That file is over 20 MB.',
+      unauthorized: 'Your session has expired.',
+      missing: 'That entry no longer exists.',
+      already_done: 'It has already been created.',
+      need_name: 'Fill in the customer name.',
+      need_amount: 'Fill in the amount.',
+      need_issue_date: 'Fill in the issue date.',
+    } as Record<string, string>,
+  },
   settings: {
     creditsSuccess:
       'Payment complete. The SMS credits appear as soon as Stripe confirms — usually within seconds.',

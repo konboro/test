@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
-import { Badge, Card, CardHeader, EmptyState, subtleLinkClass } from '@/components/ui';
+import { Badge, Card, CardHeader, EmptyState, linkClass, subtleLinkClass } from '@/components/ui';
 import { aging } from '@/lib/aging';
 import { displayName } from '@/lib/debtors';
 import { workflowStatus } from '@/lib/dunning/status';
@@ -199,7 +199,12 @@ export default async function InvoicesPage({
             {t.invoices.subtitle}
           </p>
         </div>
-        <CreateInvoiceForm debtors={debtors ?? []} />
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/invoices/upload" className={`text-sm ${linkClass}`}>
+            {t.upload.title}
+          </Link>
+          <CreateInvoiceForm debtors={debtors ?? []} />
+        </div>
       </div>
 
       {contactLimitsDisabled() ? (
