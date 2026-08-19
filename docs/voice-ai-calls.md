@@ -300,6 +300,34 @@ targets — the pilot runs on CR/Azure voices, the own-voice project can start
 in parallel (actor casting + data assembly first), and swapping the voice
 later is a config change, not a migration.
 
+### Ex-mining GPUs
+
+Owned mining-rig cards change the economics of tiers 2–3 and of self-hosted
+inference — with hard caveats:
+
+- **Only NVIDIA counts.** The whole stack (XTTS/F5/Orpheus training,
+  faster-whisper, TTS serving) assumes CUDA; AMD mining cards (RX 5xx/5700)
+  are effectively scrap for this — sell them and fund the voice actor.
+- **Card tiers:** RTX 3090 (24 GB) is the mining-era gem — trains the tier-2
+  Greek fine-tune outright (1–3 weeks wall-clock vs days on H100; time is
+  cheap, the run is unattended) and serves streaming TTS + STT in real time.
+  3080/3080 Ti: inference and LoRA training. 8–12 GB Turing/Ampere: dev boxes
+  and faster-whisper inference. Pascal (10xx): fp32-only and slow — usable for
+  Piper/VITS training and Whisper int8, nothing bigger.
+- **What it deletes from the budget:** training rental (€1–3k → electricity),
+  the serving GPU (€150–400/mo → ~€30–75/mo of power at ~250–350 W; undervolt
+  — mining habits apply), and Deepgram (~$0.007/min → self-hosted
+  faster-whisper at ~zero marginal). Combined with the in-house transport this
+  puts an answered 3-minute call at **~€0.05–0.10 all-in** (trunk + Claude).
+- **The real benefit is iteration freedom:** the fine-tune project is
+  experiment-heavy, and owned hardware removes per-hour anxiety from every
+  failed run.
+- **Caveats that stay:** production serving wants to live next to the media
+  stack (colo or a business line + UPS — a rig on home internet is jitter on
+  the money path); consumer cards mean no ECC and no HA, acceptable for the
+  pilot and the training lab, not as the only prod box; ex-mining units need
+  fans/paste service and a VRAM stress test before being trusted.
+
 ## Guardrail testing is a deliverable, not a phase
 
 - A **simulator harness**: the same gateway loop driven by text (no telephony),
