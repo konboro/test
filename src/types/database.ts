@@ -232,6 +232,16 @@ export type BankTransactionRow = {
   created_at: string;
 }
 
+/** One minted Viva order. Every press of Pay adds a row; none is ever lost. */
+export type VivaOrderRow = {
+  order_code: string;
+  user_id: string;
+  invoice_id: string;
+  /** What the order was minted for — the amount Viva actually charges. */
+  amount_cents: number;
+  created_at: string;
+}
+
 export type FunnelEventRow = {
   id: string;
   user_id: string;
@@ -361,6 +371,12 @@ export interface Database {
         Row: FunnelEventRow;
         Insert: InsertOf<FunnelEventRow, 'user_id' | 'invoice_id' | 'event'>;
         Update: Partial<FunnelEventRow>;
+        Relationships: NoRelationships;
+      };
+      viva_orders: {
+        Row: VivaOrderRow;
+        Insert: InsertOf<VivaOrderRow, 'order_code' | 'user_id' | 'invoice_id' | 'amount_cents'>;
+        Update: Partial<VivaOrderRow>;
         Relationships: NoRelationships;
       };
     };

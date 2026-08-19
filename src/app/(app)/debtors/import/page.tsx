@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 
 import { ImportForm } from './import-form';
 
-export const metadata = { title: 'Import należności' };
+export const metadata = { title: 'Εισαγωγή απαιτήσεων' };
 export const dynamic = 'force-dynamic';
 
 export default async function ImportPage() {
@@ -27,11 +27,12 @@ export default async function ImportPage() {
     <div className="space-y-6">
       <div>
         <Link href="/debtors" className={`text-sm ${subtleLinkClass}`}>
-          ← Klienci
+          ← Πελάτες
         </Link>
-        <h1 className="mt-2 text-xl font-semibold text-ink-900">Import należności</h1>
+        <h1 className="mt-2 text-xl font-semibold text-ink-900">Εισαγωγή απαιτήσεων</h1>
         <p className="mt-0.5 text-sm text-ink-500">
-          Wgraj tabelę z dłużnikami, jeśli Twoje należności nie są w żadnym z podpiętych systemów.
+          Ανεβάστε έναν πίνακα με τους οφειλέτες σας, αν οι απαιτήσεις σας δεν βρίσκονται σε κανένα
+          από τα συνδεδεμένα συστήματα.
         </p>
       </div>
 

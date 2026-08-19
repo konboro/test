@@ -89,7 +89,7 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
                 <PayButton token={credential} />
                 <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-ink-500">
                   <LockIcon />
-                  Ασφαλής πληρωμή με κάρτα μέσω Stripe. Το lefta.app δεν αποθηκεύει στοιχεία κάρτας.
+                  Ασφαλής πληρωμή με κάρτα. Το lefta.app δεν αποθηκεύει στοιχεία κάρτας.
                 </p>
               </>
             ) : payable ? (

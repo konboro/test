@@ -163,7 +163,7 @@ describe('preview', () => {
 
     expect(preview.rows).toHaveLength(1);
     expect(preview.problems.map((p) => p.line)).toEqual([3, 4, 5]);
-    expect(preview.problems[2]?.message).toContain('dodatnia');
+    expect(preview.problems[2]?.message).toContain('θετικό');
   });
 
   it('counts what it cannot reach without refusing it', () => {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { providerFor, stripeConfigured, vivaConfigured } from './provider';
 import { belongsToOrder, checkoutUrl, hostsFor, isSettled } from '../viva/client';
@@ -43,10 +43,30 @@ describe('stripeConfigured', () => {
 });
 
 describe('vivaConfigured', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('needs both halves of the credential', () => {
     expect(vivaConfigured(VIVA)).toBe(true);
     expect(vivaConfigured({ ...VIVA, viva_client_secret_enc: null })).toBe(false);
     expect(vivaConfigured({ ...VIVA, viva_client_id_enc: null })).toBe(false);
+  });
+
+  it('refuses the demo estate in production — a test card must not settle a real invoice', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+
+    expect(vivaConfigured(VIVA)).toBe(false);
+    expect(providerFor(VIVA)).toBeNull();
+    // Production credentials are unaffected by the gate.
+    expect(vivaConfigured({ ...VIVA, viva_environment: 'production' })).toBe(true);
+  });
+
+  it('lets a production deployment opt in to the demo estate explicitly', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VIVA_ALLOW_DEMO', '1');
+
+    expect(vivaConfigured(VIVA)).toBe(true);
   });
 });
 

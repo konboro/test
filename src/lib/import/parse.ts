@@ -325,19 +325,19 @@ export function buildPreview(
     if (!name && !rawAmount) return; // A blank trailing row, not a problem.
 
     if (!name) {
-      problems.push({ line, message: 'Brak nazwy klienta' });
+      problems.push({ line, message: 'Λείπει η επωνυμία του πελάτη' });
       return;
     }
 
     const amountCents = parseAmountCents(rawAmount);
     if (amountCents === null) {
-      problems.push({ line, message: `Nie udało się odczytać kwoty: „${rawAmount}"` });
+      problems.push({ line, message: `Μη αναγνώσιμο ποσό: «${rawAmount}»` });
       return;
     }
     if (amountCents <= 0) {
       // A zero or a credit note is not a debt. Importing it would put a customer
       // on the ladder for money they do not owe.
-      problems.push({ line, message: `Kwota nie jest dodatnia: „${rawAmount}"` });
+      problems.push({ line, message: `Το ποσό δεν είναι θετικό: «${rawAmount}»` });
       return;
     }
 
