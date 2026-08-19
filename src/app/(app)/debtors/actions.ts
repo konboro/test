@@ -42,6 +42,14 @@ const debtorSchema = z
       .max(1000)
       .optional()
       .transform((v) => (v ? v : null)),
+    // Empty means automatic, and is stored as null rather than as a language.
+    // A stored 'el' would be indistinguishable from a deliberate choice and
+    // would stop tracking the phone number if it later changed.
+    locale: z
+      .enum(['el', 'en'])
+      .nullable()
+      .optional()
+      .transform((v) => v ?? null),
   })
   .refine((d) => d.phone === null || normalisePhone(d.phone) !== null, {
     message: 'invalidPhone',
@@ -55,6 +63,9 @@ function read(formData: FormData) {
     email: String(formData.get('email') ?? ''),
     phone: String(formData.get('phone') ?? ''),
     notes: String(formData.get('notes') ?? ''),
+    locale: formData.get('locale') === 'el' || formData.get('locale') === 'en'
+      ? formData.get('locale')
+      : null,
   };
 }
 

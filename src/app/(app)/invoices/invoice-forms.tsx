@@ -123,6 +123,7 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
   const [open, setOpen] = useState(false);
   const [choice, setChoice] = useState('manual');
   const [only, setOnly] = useState('both');
+  const [lang, setLang] = useState('auto');
   const [preview, setPreview] = useState<ReminderPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [state, action, sending] = useActionState<ReminderState, FormData>(sendReminder, {});
@@ -133,7 +134,7 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
     let cancelled = false;
     setLoading(true);
 
-    previewReminder(invoiceId, choice, only)
+    previewReminder(invoiceId, choice, only, lang)
       .then((result) => {
         if (!cancelled) setPreview(result);
       })
@@ -146,7 +147,7 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
     return () => {
       cancelled = true;
     };
-  }, [open, choice, only, invoiceId]);
+  }, [open, choice, only, lang, invoiceId]);
 
   const sent = Boolean(state.success);
 
@@ -199,6 +200,7 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
                   <input type="hidden" name="id" value={invoiceId} />
                   <input type="hidden" name="choice" value={choice} />
                   <input type="hidden" name="only" value={only} />
+                  <input type="hidden" name="lang" value={lang} />
                   <Button type="submit" disabled={sending || loading || !preview?.willSend?.length}>
                     {sending ? t.reminder.sending : t.reminder.send}
                   </Button>
@@ -234,6 +236,29 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
               <option value="both">{t.reminder.channelBoth}</option>
               <option value="email">{t.reminder.channelEmail}</option>
               <option value="sms">{t.reminder.channelSms}</option>
+            </select>
+          </Field>
+
+          {/* The language the customer is written to in. "Automatic" is what the
+              customer's own setting and phone country code work out to; the
+              label names the result, because an operator about to send should
+              not have to trust that the automatic choice is the right one. */}
+          <Field label={t.reminder.languageLabel} hint={lang === 'auto' ? t.reminder.languageFrom : undefined}>
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value)}
+              disabled={sent}
+              className={inputClass}
+            >
+              <option value="auto">
+                {preview?.locale
+                  ? t.reminder.languageAuto(
+                      preview.locale === 'el' ? t.fields.localeEl : t.fields.localeEn,
+                    )
+                  : t.fields.localeAuto}
+              </option>
+              <option value="el">{t.fields.localeEl}</option>
+              <option value="en">{t.fields.localeEn}</option>
             </select>
           </Field>
 
