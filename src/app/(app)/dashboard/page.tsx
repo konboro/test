@@ -445,7 +445,52 @@ export default async function DashboardPage() {
                 <p className="px-5 pb-1 pt-4 text-xs font-medium uppercase tracking-wide text-ink-400">
                   {t.dashboard.activityTitle}
                 </p>
-                <div className="overflow-x-auto">
+                {/* Five columns, two of them dates that are usually a dash. On a
+                    phone each row becomes one line of prose: who, on what, and
+                    how far they got. */}
+                <ul className="divide-y divide-ink-100 md:hidden">
+                  {activity.slice(0, 20).map((row) => (
+                    <li key={row.invoiceId} className="px-5 py-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm text-ink-800">
+                            {row.name ?? t.debtors.nameMissing}
+                          </p>
+                          <p className="tabular mt-0.5 truncate text-xs text-ink-500">
+                            {row.label}
+                          </p>
+                        </div>
+                        {row.paidAt ? (
+                          <span className="tabular shrink-0 text-sm font-medium text-emerald-700">
+                            {formatMoney(row.amountCents, row.currency)}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-500">
+                        <Badge tone={row.channel === 'sms' ? 'info' : 'neutral'}>
+                          {row.channel === 'sms'
+                            ? t.common.sms
+                            : row.channel === 'email'
+                              ? t.common.email
+                              : t.dashboard.activityDirect}
+                        </Badge>
+                        {row.opened ? (
+                          <span className="tabular">
+                            {t.dashboard.activityOpened}: {formatDate(row.opened.slice(0, 10))}
+                          </span>
+                        ) : null}
+                        {row.started ? (
+                          <span className="tabular">
+                            {t.dashboard.activityStarted}: {formatDate(row.started.slice(0, 10))}
+                          </span>
+                        ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="hidden overflow-x-auto md:block">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-ink-100 text-left text-xs uppercase tracking-wide text-ink-500">
@@ -507,7 +552,44 @@ export default async function DashboardPage() {
         {!recentPayments?.length ? (
           <EmptyState title={t.recentPayments.emptyTitle} body={t.recentPayments.emptyBody} />
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            {/* A settled payment is read as a line, not a grid: who paid, and
+                how much. The timestamp goes underneath rather than first — it
+                was taking the widest column on the narrowest screen to answer a
+                question nobody had. */}
+            <ul className="divide-y divide-ink-100 md:hidden">
+              {recentPayments.map((payment) => {
+                const customer = debtorsById.get(payment.debtor_id);
+                const name = customer ? displayName(customer) : null;
+                const number =
+                  [payment.series, payment.invoice_number].filter(Boolean).join(' ') ||
+                  payment.mark ||
+                  payment.id.slice(0, 8);
+
+                return (
+                  <li key={payment.id} className="flex items-start justify-between gap-3 px-5 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm text-ink-800">
+                        {name ?? (
+                          <span className="italic text-ink-400">{t.debtors.nameMissing}</span>
+                        )}
+                      </p>
+                      <p className="tabular mt-0.5 truncate text-xs text-ink-500">
+                        {number}
+                        {payment.paid_at
+                          ? ` · ${new Date(payment.paid_at).toLocaleDateString(t.dateTimeTag)}`
+                          : ''}
+                      </p>
+                    </div>
+                    <span className="tabular shrink-0 text-sm font-medium text-emerald-700">
+                      {formatMoney(payment.paid_amount_cents ?? payment.amount_cents, payment.currency)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-500">
@@ -549,7 +631,8 @@ export default async function DashboardPage() {
                 })}
               </tbody>
             </table>
-          </div>
+            </div>
+          </>
         )}
       </Card>
 

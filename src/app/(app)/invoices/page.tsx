@@ -149,6 +149,38 @@ export default async function InvoicesPage({
   // The actions cell is only ever populated for pending rows, so a paid-only
   // view would render an empty column that just pushes the table wider.
   const showActions = filter !== 'paid';
+
+  /**
+   * Everything a row needs, derived once.
+   *
+   * Two layouts read this — a table from `md` up and a stack of cards below it
+   * — and the derivations are not trivial: which of the document number, the
+   * MARK or a truncated id stands in as the label decides what the customer is
+   * shown, and it has to be the same answer on both.
+   */
+  function view(invoice: (typeof visible)[number]) {
+    const status = workflowStatus(
+      invoice,
+      stepsByInvoice.get(invoice.id) ?? new Set(),
+      today,
+      t,
+    );
+    // The creditor's own document number, which is what they and their customer
+    // recognise. The MARK is AADE's id and belongs underneath it, labelled —
+    // not standing in for the number.
+    const number = [invoice.series, invoice.invoice_number].filter(Boolean).join(' ') || null;
+    const label = number ?? invoice.mark ?? invoice.id.slice(0, 8);
+    const debtor = debtorsById.get(invoice.debtor_id);
+
+    return {
+      status,
+      number,
+      label,
+      debtor,
+      customer: debtor ? displayName(debtor) : null,
+      age: aging(invoice, today, t),
+    };
+  }
   // Same labels the payments timeline uses, so the two screens tell one story.
   const methodLabel = {
     card_stripe: t.bank.channels.stripe,
@@ -288,7 +320,92 @@ export default async function InvoicesPage({
                 />
             </form>
           ) : null}
-          <div className="overflow-x-auto">
+          {/* Eleven columns is a table nobody reads on a phone; it reads as a
+              horizontal drag with the amount always just off-screen. Below
+              `md` each invoice is a card carrying the same facts in the order
+              they are actually wanted — who, how much, how late — with the
+              controls underneath. From `md` up the table returns, because
+              comparing invoices side by side is what it is good at. */}
+          <ul className="divide-y divide-ink-100 md:hidden">
+            {visible.map((invoice) => {
+              const { status, number, label, debtor, customer, age } = view(invoice);
+              const selectable = showActions && invoice.status === 'pending';
+
+              return (
+                <li key={invoice.id} className="px-4 py-4">
+                  <div className="flex items-start gap-3">
+                    {selectable ? (
+                      <input
+                        type="checkbox"
+                        form="bulk"
+                        name="ids"
+                        value={invoice.id}
+                        aria-label={label}
+                        className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-ink-300 text-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500"
+                      />
+                    ) : null}
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          {debtor ? (
+                            <Link
+                              href={`/debtors/${debtor.id}`}
+                              className="block truncate font-medium text-ink-900 underline-offset-2 hover:underline"
+                            >
+                              {customer ?? t.debtors.nameMissing}
+                            </Link>
+                          ) : (
+                            <span className="block truncate italic text-ink-400">
+                              {t.debtors.nameMissing}
+                            </span>
+                          )}
+                          <p className="tabular mt-0.5 truncate text-xs text-ink-500">
+                            {number ?? t.invoices.noNumber}
+                          </p>
+                        </div>
+
+                        <span className="tabular shrink-0 text-base font-semibold text-ink-900">
+                          {formatMoney(invoice.amount_cents, invoice.currency)}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        <Badge tone={status.tone}>{status.label}</Badge>
+                        {age ? <Badge tone={age.tone}>{age.label}</Badge> : null}
+                      </div>
+
+                      <p className="tabular mt-2 text-xs text-ink-500">
+                        {t.invoices.colDue}:{' '}
+                        <DueDateButton
+                          invoiceId={invoice.id}
+                          dueDate={invoice.due_date}
+                          display={formatDate(invoice.due_date)}
+                        />
+                      </p>
+
+                      {invoice.status === 'pending' ? (
+                        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                          <RemindButton invoiceId={invoice.id} label={label} />
+                          <CopyPayLink code={invoice.short_code ?? invoice.pay_token} />
+                          <label className="flex items-center gap-2 text-sm text-ink-600">
+                            <AutomationCheckbox
+                              invoiceId={invoice.id}
+                              enabled={invoice.automation_enabled !== false}
+                              label={label}
+                            />
+                            {t.invoices.colAutomation}
+                          </label>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-500">
@@ -337,22 +454,7 @@ export default async function InvoicesPage({
               </thead>
               <tbody>
                 {visible.map((invoice) => {
-                  const status = workflowStatus(
-                    invoice,
-                    stepsByInvoice.get(invoice.id) ?? new Set(),
-                    today,
-                    t,
-                  );
-                  // The creditor's own document number, which is what they and
-                  // their customer recognise. The MARK is AADE's id and belongs
-                  // underneath it, labelled — not standing in for the number.
-                  const number =
-                    [invoice.series, invoice.invoice_number].filter(Boolean).join(' ') || null;
-                  const label = number ?? invoice.mark ?? invoice.id.slice(0, 8);
-
-                  const age = aging(invoice, today, t);
-                  const debtor = debtorsById.get(invoice.debtor_id);
-                  const customer = debtor ? displayName(debtor) : null;
+                  const { status, number, label, debtor, customer, age } = view(invoice);
 
                   return (
                     <tr key={invoice.id} className="border-b border-ink-100 last:border-0">

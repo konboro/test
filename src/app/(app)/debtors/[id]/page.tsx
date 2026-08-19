@@ -166,7 +166,56 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
         {rows.length === 0 ? (
           <EmptyState title={t.debtors.noInvoicesTitle} body={t.debtors.noInvoicesBody} />
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            {/* On a phone the six columns collapse to one card per document.
+                The amount and how late it is are what someone opens a customer
+                to find out; the issue date is the column that always got pushed
+                off the edge, and it is the one nobody was looking for. */}
+            <ul className="divide-y divide-ink-100 md:hidden">
+              {rows.map((invoice) => {
+                const status = workflowStatus(
+                  invoice,
+                  stepsByInvoice.get(invoice.id) ?? new Set(),
+                  today,
+                  t,
+                );
+                const number =
+                  [invoice.series, invoice.invoice_number].filter(Boolean).join(' ') || null;
+                const age = aging(invoice, today, t);
+
+                return (
+                  <li key={invoice.id} className="px-4 py-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-ink-900">
+                          {number ?? (
+                            <span className="italic text-ink-400">{t.invoices.noNumber}</span>
+                          )}
+                        </p>
+                        <p className="tabular mt-0.5 text-xs text-ink-500">
+                          {t.invoices.colDue}:{' '}
+                          <DueDateButton
+                            invoiceId={invoice.id}
+                            dueDate={invoice.due_date}
+                            display={formatDate(invoice.due_date)}
+                          />
+                        </p>
+                      </div>
+                      <span className="tabular shrink-0 text-base font-semibold text-ink-900">
+                        {formatMoney(invoice.amount_cents, invoice.currency)}
+                      </span>
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <Badge tone={status.tone}>{status.label}</Badge>
+                      {age ? <Badge tone={age.tone}>{age.label}</Badge> : null}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-500">
@@ -239,7 +288,8 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
                 })}
               </tbody>
             </table>
-          </div>
+            </div>
+          </>
         )}
       </Card>
     </div>
