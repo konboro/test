@@ -139,6 +139,27 @@ export default async function DashboardPage() {
     return { channel, sent: sentInvoices.size, opened: opened.size, checkout: checkout.size, paid };
   });
 
+
+  const funnelHasData =
+    funnelRows.some((row) => row.sent > 0) || (funnelEvents?.length ?? 0) > 0;
+  const untaggedViews = new Set(
+    (funnelEvents ?? [])
+      .filter((event) => event.event === 'page_view' && event.channel === 'other')
+      .map((event) => event.invoice_id),
+  ).size;
+
+  // Steps already fired, per invoice. Manual reminders carry no step — they are
+  // contacts, not rungs, and must not move an invoice along the ladder.
+  const stepsByInvoice = new Map<string, Set<DunningStep>>();
+  for (const c of contacts ?? []) {
+    if (!c.step) continue;
+    const set = stepsByInvoice.get(c.invoice_id) ?? new Set<DunningStep>();
+    set.add(c.step);
+    stepsByInvoice.set(c.invoice_id, set);
+  }
+
+  const debtorsById = new Map((debtors ?? []).map((d) => [d.id, d]));
+
   /**
    * The funnel one row per invoice, rather than as four totals.
    *
@@ -197,26 +218,6 @@ export default async function DashboardPage() {
       // one worth a call today.
       .sort((a, b) => (b.started ?? b.opened ?? '').localeCompare(a.started ?? a.opened ?? ''));
   })();
-
-  const funnelHasData =
-    funnelRows.some((row) => row.sent > 0) || (funnelEvents?.length ?? 0) > 0;
-  const untaggedViews = new Set(
-    (funnelEvents ?? [])
-      .filter((event) => event.event === 'page_view' && event.channel === 'other')
-      .map((event) => event.invoice_id),
-  ).size;
-
-  // Steps already fired, per invoice. Manual reminders carry no step — they are
-  // contacts, not rungs, and must not move an invoice along the ladder.
-  const stepsByInvoice = new Map<string, Set<DunningStep>>();
-  for (const c of contacts ?? []) {
-    if (!c.step) continue;
-    const set = stepsByInvoice.get(c.invoice_id) ?? new Set<DunningStep>();
-    set.add(c.step);
-    stepsByInvoice.set(c.invoice_id, set);
-  }
-
-  const debtorsById = new Map((debtors ?? []).map((d) => [d.id, d]));
 
   // Roll pending invoices up per debtor for the overview table.
   const rows = [...debtorsById.values()]
