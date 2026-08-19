@@ -9,11 +9,12 @@ import {
   type ReminderPreview,
 } from '@/lib/dunning/manual';
 import { parseReminderChoice } from '@/lib/dunning/templates';
-import { toCents } from '@/lib/money';
+import { athensDate, toCents } from '@/lib/money';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { formError, getDictionary } from '@/lib/i18n';
 import { redirect } from 'next/navigation';
+import { loadScenario, stepForInvoice } from '@/lib/dunning/engine';
 
 export interface InvoiceFormState {
   error?: string;
@@ -325,6 +326,97 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
       limited,
       skipped,
       failed,
+      left: Math.max(0, ids.length - batch.length),
+    }),
+  );
+}
+
+
+/**
+ * Sends whatever the scenario says is due today, for each selected invoice.
+ *
+ * Different from picking a template by hand: nothing is chosen, the cadence
+ * decides. An invoice that has not reached a step yet is reported as such rather
+ * than being sent something arbitrary.
+ *
+ * It goes out as a manual contact, which in this product deliberately does not
+ * consume a rung of the automatic ladder — bringing a message forward must not
+ * cancel the scheduled one. So the sweep will still send that step on its own
+ * day, and the once-per-debtor-per-day guarantee is what stops the two landing
+ * together.
+ */
+export async function runScenarioForSelected(formData: FormData): Promise<void> {
+  const ids = formData.getAll('ids').map(String).filter(Boolean);
+  const back = String(formData.get('back') ?? '/invoices');
+
+  const to = (params: Record<string, string | number>) => {
+    const query = new URLSearchParams(back.split('?')[1] ?? '');
+    for (const [k, v] of Object.entries(params)) query.set(k, String(v));
+    return `${back.split('?')[0]}?${query}`;
+  };
+
+  if (!ids.length) redirect(to({ bulk: 'none' }));
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+
+  const batch = ids.slice(0, BULK_LIMIT);
+  const scenario = await loadScenario(user.id);
+  const today = athensDate();
+
+  const { data: rows } = await supabase
+    .from('invoices')
+    .select('id, due_date')
+    .eq('user_id', user.id)
+    .in('id', batch);
+
+  const dueDates = new Map((rows ?? []).map((row) => [row.id, row.due_date]));
+
+  let sent = 0;
+  let limited = 0;
+  let skipped = 0;
+  let failed = 0;
+  let notDue = 0;
+
+  for (const id of batch) {
+    const dueDate = dueDates.get(id);
+    if (!dueDate) {
+      failed += 1;
+      continue;
+    }
+
+    const rung = stepForInvoice(dueDate, today, scenario);
+    if (!rung) {
+      notDue += 1;
+      continue;
+    }
+
+    const result = await sendManualReminder({ userId: user.id, invoiceId: id, step: rung.step });
+
+    if (result.error) {
+      if (result.code === 'daily_limit') limited += 1;
+      else failed += 1;
+      continue;
+    }
+
+    if (result.emailsSent + result.smsSent > 0) sent += 1;
+    else skipped += 1;
+  }
+
+  revalidatePath('/invoices');
+  revalidatePath('/logs');
+
+  redirect(
+    to({
+      bulk: 'done',
+      sent,
+      limited,
+      skipped,
+      failed,
+      notDue,
       left: Math.max(0, ids.length - batch.length),
     }),
   );

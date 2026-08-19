@@ -122,6 +122,32 @@ const el = {
     dailyLimit: 'Ο πελάτης έχει ήδη ειδοποιηθεί σήμερα. Επιτρέπεται μία επικοινωνία ανά ημέρα.',
     contactFailed: (detail: string) => `Δεν ήταν δυνατή η καταχώριση της επικοινωνίας: ${detail}`,
   },
+
+  scenario: {
+    title: 'Σενάριο υπενθυμίσεων',
+    hint: 'Πότε φεύγει κάθε βήμα, από ποιο κανάλι, και αν επαναλαμβάνεται.',
+    saved: 'Το σενάριο αποθηκεύτηκε.',
+    enabled: 'Ενεργό',
+    offsetLabel: 'Ημέρες από τη λήξη',
+    offsetBefore: 'πριν τη λήξη',
+    offsetAfter: 'μετά τη λήξη',
+    offsetDue: 'την ημέρα λήξης',
+    channels: 'Κανάλια',
+    channelEmail: 'Email',
+    channelSms: 'SMS',
+    noChannel: 'Χωρίς κανάλι το βήμα δεν στέλνεται.',
+    preDueMustBeBefore: 'Το βήμα πριν τη λήξη πρέπει να έχει αρνητικό αριθμό ημερών.',
+    offsetsMustDiffer: 'Δύο ενεργά βήματα δεν μπορούν να πέφτουν την ίδια ημέρα.',
+    repeatTitle: 'Επανάληψη τελευταίου βήματος',
+    repeatEnabled: 'Επανάληψη μέχρι να εξοφληθεί',
+    repeatEvery: 'Κάθε (ημέρες)',
+    repeatMax: 'Μέγιστες επαναλήψεις',
+    repeatHint:
+      'Ελάχιστο διάστημα 7 ημέρες και το πολύ 6 επαναλήψεις — τα όρια επιβάλλονται στη βάση. Η δίωξη σταματά οριστικά στις 120 ημέρες καθυστέρησης.',
+    guarantee:
+      'Ανεξάρτητα από το σενάριο: ένας πελάτης δέχεται το πολύ μία επικοινωνία ανά ημέρα.',
+    save: 'Αποθήκευση σεναρίου',
+  },
   forms: {
     api: {
       stripeKeyPrefix: 'Το κλειδί πρέπει να ξεκινά με sk_ ή rk_.',
@@ -418,6 +444,8 @@ const el = {
 
   invoices: {
     bulk: {
+      runScenario: 'Εκτέλεση σεναρίου',
+      notDue: (n: number) => `${n} δεν έχουν φτάσει ακόμη σε βήμα του σεναρίου.`,
       selected: (n: number) => `${n} επιλεγμένα`,
       selectAll: 'Επιλογή όλων',
       send: 'Αποστολή υπενθύμισης',
@@ -806,6 +834,31 @@ const en: typeof el = {
     dailyLimit: 'This customer has already been contacted today. One contact per day is allowed.',
     contactFailed: (detail: string) => `The contact could not be recorded: ${detail}`,
   },
+
+  scenario: {
+    title: 'Reminder scenario',
+    hint: 'When each step goes out, on which channel, and whether it repeats.',
+    saved: 'Scenario saved.',
+    enabled: 'On',
+    offsetLabel: 'Days from the due date',
+    offsetBefore: 'before the due date',
+    offsetAfter: 'after the due date',
+    offsetDue: 'on the due date',
+    channels: 'Channels',
+    channelEmail: 'Email',
+    channelSms: 'SMS',
+    noChannel: 'With no channel the step does not send.',
+    preDueMustBeBefore: 'The pre-due step needs a negative number of days.',
+    offsetsMustDiffer: 'Two active steps cannot fall on the same day.',
+    repeatTitle: 'Repeat the final step',
+    repeatEnabled: 'Repeat until it is paid',
+    repeatEvery: 'Every (days)',
+    repeatMax: 'Most repeats',
+    repeatHint:
+      'At least 7 days apart and at most 6 repeats — the limits are enforced in the database. Chasing stops for good at 120 days overdue.',
+    guarantee: 'Whatever the scenario says: a customer receives at most one contact per day.',
+    save: 'Save scenario',
+  },
   forms: {
     api: {
       stripeKeyPrefix: 'The key has to start with sk_ or rk_.',
@@ -1102,6 +1155,8 @@ const en: typeof el = {
 
   invoices: {
     bulk: {
+      runScenario: 'Run the scenario',
+      notDue: (n: number) => `${n} have not reached a step of the scenario yet.`,
       selected: (n: number) => `${n} selected`,
       selectAll: 'Select all',
       send: 'Send reminder',

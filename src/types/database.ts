@@ -106,6 +106,26 @@ export type InvoiceRow = {
   updated_at: string;
 }
 
+/** One configured rung of a tenant's scenario. */
+export type DunningStepRow = {
+  user_id: string;
+  step: DunningStep;
+  enabled: boolean;
+  /** Days from the due date; negative is before it. Bounded by a check constraint. */
+  offset_days: number;
+  channels: CommChannel[];
+  updated_at: string;
+}
+
+/** Whether the final step comes round again, and how often. */
+export type DunningSettingsRow = {
+  user_id: string;
+  repeat_enabled: boolean;
+  repeat_every_days: number;
+  repeat_max: number;
+  updated_at: string;
+}
+
 export type DunningContactRow = {
   id: string;
   user_id: string;
@@ -115,6 +135,8 @@ export type DunningContactRow = {
   step: DunningStep | null;
   manual: boolean;
   contact_on: string;
+  /** 0 is the first pass; each repeat of the final step increments it. */
+  cycle: number;
   created_at: string;
 }
 
@@ -273,6 +295,18 @@ export interface Database {
           'user_id' | 'debtor_id' | 'amount_cents' | 'issue_date' | 'due_date'
         >;
         Update: Partial<InvoiceRow>;
+        Relationships: NoRelationships;
+      };
+      dunning_steps: {
+        Row: DunningStepRow;
+        Insert: InsertOf<DunningStepRow, 'user_id' | 'step' | 'offset_days'>;
+        Update: Partial<DunningStepRow>;
+        Relationships: NoRelationships;
+      };
+      dunning_settings: {
+        Row: DunningSettingsRow;
+        Insert: InsertOf<DunningSettingsRow, 'user_id'>;
+        Update: Partial<DunningSettingsRow>;
         Relationships: NoRelationships;
       };
       message_templates: {
