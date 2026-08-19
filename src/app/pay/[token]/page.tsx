@@ -1,6 +1,12 @@
 import { PayView } from '../pay-view';
 
-export const metadata = { title: 'Εξόφληση παραστατικού' };
+export const metadata = {
+  title: 'Εξόφληση παραστατικού',
+  // This page names a debtor and what they owe. Indexed, it would publish a
+  // private debt to anyone searching that person's name — and `nocache` keeps
+  // it out of the cached copy a delisting would otherwise leave behind.
+  robots: { index: false, follow: false, nocache: true },
+};
 export const dynamic = 'force-dynamic';
 
 /**

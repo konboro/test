@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 
+import { appUrl } from '@/lib/env';
 import { getDictionary, getLocale } from '@/lib/i18n';
 
 import './globals.css';
@@ -9,7 +10,7 @@ import './globals.css';
  * are copy like any other, and a static object cannot read the locale.
  */
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getDictionary();
+  const [t, locale] = await Promise.all([getDictionary(), getLocale()]);
 
   return {
     // `template` keeps the wordmark in the tab title on every page without each
@@ -20,6 +21,27 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     description: t.common.appDescription,
     applicationName: 'lefta.app',
+
+    // Without a base, every canonical and Open Graph URL below resolves
+    // relative to nothing and the tags are quietly useless.
+    metadataBase: new URL(appUrl()),
+    alternates: { canonical: '/' },
+
+    openGraph: {
+      title: t.common.appTitle,
+      description: t.common.appDescription,
+      url: '/',
+      siteName: 'lefta.app',
+      // The market is Greek; the interface also speaks English.
+      locale: locale === 'en' ? 'en_GB' : 'el_GR',
+      type: 'website',
+    },
+
+    twitter: { card: 'summary_large_image', title: t.common.appTitle, description: t.common.appDescription },
+
+    // Both interface languages answer on the same URL, chosen by the account
+    // and a cookie, so they share one canonical rather than splitting rank.
+    robots: { index: true, follow: true },
   };
 }
 

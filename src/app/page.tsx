@@ -2,13 +2,47 @@ import Link from 'next/link';
 
 import { LeftaLogo, LeftaMark } from '@/components/logo';
 import { ButtonLink } from '@/components/ui';
+import { appUrl } from '@/lib/env';
 import { getDictionary } from '@/lib/i18n';
 
 export default async function HomePage() {
   const t = await getDictionary();
 
+  // Structured data, so a result can carry the product name, what it is and
+  // who runs it rather than a stripped snippet. Written from the same copy the
+  // page shows — a description here that disagrees with the visible one is
+  // what search engines treat as cloaking.
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'SoftwareApplication',
+        name: 'lefta.app',
+        description: t.common.appDescription,
+        applicationCategory: 'BusinessApplication',
+        operatingSystem: 'Web',
+        url: appUrl(),
+        inLanguage: ['el', 'en'],
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
+      },
+      {
+        '@type': 'Organization',
+        name: 'lefta.app',
+        url: appUrl(),
+        logo: `${appUrl()}/icon.svg`,
+        areaServed: 'GR',
+      },
+    ],
+  };
+
   return (
     <div className="min-h-screen">
+      <script
+        type="application/ld+json"
+        // The value is built above from our own copy; nothing user-supplied
+        // reaches it.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <header className="sticky top-0 z-40 border-b border-ink-200/90 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-4">
           <LeftaLogo />
