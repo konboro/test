@@ -10,6 +10,7 @@ import {
   type ReminderPreview,
 } from '@/lib/dunning/manual';
 import { parseReminderSlot } from '@/lib/dunning/templates';
+import { parseLanguageChoice } from '@/lib/i18n/message-locale';
 import { athensDate, toCents } from '@/lib/money';
 import { safeNextPath } from '@/lib/redirects';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -60,6 +61,7 @@ export async function sendReminder(
     step: slot.step,
     variant: slot.variant,
     only: channelChoice(formData.get('only')),
+    language: parseLanguageChoice(formData.get('lang')),
   });
 
   revalidatePath('/invoices');
@@ -91,6 +93,7 @@ export async function previewReminder(
   invoiceId: string,
   choice: string,
   only?: string,
+  lang?: string,
 ): Promise<ReminderPreview> {
   const t = await getDictionary();
 
@@ -109,6 +112,7 @@ export async function previewReminder(
     step: slot.step,
     variant: slot.variant,
     only: channelChoice(only),
+    language: parseLanguageChoice(lang),
   });
 }
 
@@ -348,6 +352,7 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
   if (!user) redirect('/login');
 
   const only = channelChoice(formData.get('only'));
+  const language = parseLanguageChoice(formData.get('lang'));
   const batch = ids.slice(0, BULK_LIMIT);
   let sent = 0;
   let limited = 0;
@@ -364,6 +369,7 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
       step: slot.step,
       variant: slot.variant,
       only,
+      language,
     });
 
     if (result.error) {
@@ -455,6 +461,8 @@ export async function runScenarioForSelected(formData: FormData): Promise<void> 
     rows = fallback.data?.map((row) => ({ ...row, automation_enabled: true })) ?? null;
   }
 
+  const language = parseLanguageChoice(formData.get('lang'));
+
   const dueDates = new Map((rows ?? []).map((row) => [row.id, row.due_date]));
   const paused = new Set((rows ?? []).filter(automationPaused).map((r) => r.id));
 
@@ -486,7 +494,12 @@ export async function runScenarioForSelected(formData: FormData): Promise<void> 
       continue;
     }
 
-    const result = await sendManualReminder({ userId: user.id, invoiceId: id, step: rung.step });
+    const result = await sendManualReminder({
+      userId: user.id,
+      invoiceId: id,
+      step: rung.step,
+      language,
+    });
 
     if (result.error) {
       if (result.code === 'daily_limit') limited += 1;

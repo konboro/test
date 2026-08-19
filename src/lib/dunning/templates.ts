@@ -1,3 +1,4 @@
+import type { Locale } from '@/lib/i18n/dictionaries';
 import { formatDate, formatMoney } from '@/lib/money';
 import type { CommChannel, TemplateStep } from '@/types/database';
 
@@ -286,6 +287,117 @@ export const DEFAULT_TEMPLATES: Record<
   },
 };
 
+
+/**
+ * The same slots in English.
+ *
+ * Written rather than translated at send time: a reminder is a legal-ish
+ * document about money owed, and a machine translation of it going out under
+ * the creditor's name is not something to discover after the fact.
+ *
+ * Kept deliberately plainer than the Greek. The Greek copy addresses a company
+ * in the formal plural, which English has no equivalent for; reaching for
+ * "Dear Sirs" would be a worse match than a neutral greeting.
+ */
+const TEMPLATES_EN: Record<TemplateSlotKey, { subject: string | null; body: string }> = {
+  'pre_due:email': {
+    subject: 'Reminder: invoice {{invoice}} is due on {{due_date}}',
+    body: [
+      'Dear {{debtor_name}},',
+      '',
+      'this is a reminder that invoice {{invoice}} for {{amount}} is due on {{due_date}}.',
+      '',
+      'You can pay online here: {{pay_url}}',
+      '',
+      'Kind regards,',
+      '{{creditor_name}}',
+    ].join('\n'),
+  },
+  'pre_due:sms': {
+    subject: null,
+    body: '{{creditor_name}}: invoice {{invoice}} ({{amount}}) is due {{due_date}}. Pay: {{pay_url}}',
+  },
+  'overdue_2:email': {
+    subject: 'Overdue invoice {{invoice}} — {{amount}}',
+    body: [
+      'Dear {{debtor_name}},',
+      '',
+      'invoice {{invoice}} for {{amount}} was due on {{due_date}} and is still showing as unpaid.',
+      '',
+      'Pay: {{pay_url}}',
+      '',
+      'If there is a problem with the invoice, please get in touch.',
+      '',
+      'Kind regards,',
+      '{{creditor_name}}',
+    ].join('\n'),
+  },
+  'overdue_2:sms': {
+    subject: null,
+    body: '{{creditor_name}}: invoice {{invoice}} ({{amount}}) is overdue. Pay: {{pay_url}}',
+  },
+  'overdue_10:email': {
+    subject: 'Final reminder — invoice {{invoice}} ({{amount}})',
+    body: [
+      'Dear {{debtor_name}},',
+      '',
+      'this is the last automatic reminder for invoice {{invoice}} for {{amount}}, which was due on {{due_date}}.',
+      '',
+      'Pay: {{pay_url}}',
+      '',
+      'No further automatic reminders will be sent after this message. For any question or to arrange payment, please contact us directly.',
+      '',
+      'Kind regards,',
+      '{{creditor_name}}',
+    ].join('\n'),
+  },
+  'overdue_10:sms': {
+    subject: null,
+    body: '{{creditor_name}}: final reminder for {{invoice}} ({{amount}}). Pay: {{pay_url}}',
+  },
+  'manual:email': {
+    subject: 'Payment reminder — invoice {{invoice}}',
+    body: [
+      'Dear {{debtor_name}},',
+      '',
+      'a reminder about invoice {{invoice}} for {{amount}}, due on {{due_date}}.',
+      '',
+      'Pay: {{pay_url}}',
+      '',
+      'Kind regards,',
+      '{{creditor_name}}',
+    ].join('\n'),
+  },
+  'manual:sms': {
+    subject: null,
+    body: '{{creditor_name}}: reminder for {{invoice}} ({{amount}}). Pay: {{pay_url}}',
+  },
+  'penny:email': {
+    subject: 'Your payment is still open — {{amount}}',
+    body: [
+      'Hi {{debtor_name}},',
+      '',
+      'the {{amount}} charge for your ride did not go through, so the amount is still open. Due by {{due_date}}.',
+      '',
+      'It is usually something simple — a card that expired, or a temporary limit from your bank.',
+      '',
+      'You can sort it out by card in under a minute, without opening the app:',
+      '{{pay_url}}',
+      '',
+      'If you have already paid, please ignore this message.',
+      '',
+      'Safe rides,',
+      '{{creditor_name}}',
+    ].join('\n'),
+  },
+};
+
+/** The built-in copy, per language. A tenant's overrides sit on top of this. */
+const BUILT_IN_TEMPLATES: Record<Locale, Record<TemplateSlotKey, { subject: string | null; body: string }>> = {
+  el: DEFAULT_TEMPLATES,
+  en: TEMPLATES_EN,
+};
+
 /**
  * The built-in copy for a slot, if one was written.
  *
@@ -293,9 +405,12 @@ export const DEFAULT_TEMPLATES: Record<
  * cover every channel, so this lookup genuinely can miss, and the declared
  * Record type would otherwise promise a value that is not there.
  */
-function builtIn(key: TemplateSlotKey): { subject: string | null; body: string } | undefined {
+function builtIn(
+  key: TemplateSlotKey,
+  locale: Locale = 'el',
+): { subject: string | null; body: string } | undefined {
   const table: Partial<Record<TemplateSlotKey, { subject: string | null; body: string }>> =
-    DEFAULT_TEMPLATES;
+    BUILT_IN_TEMPLATES[locale];
   return table[key];
 }
 
@@ -313,13 +428,14 @@ export function templateFor(
   channel: CommChannel,
   overrides: TemplateOverrides = {},
   variant: TemplateVariant = null,
+  locale: Locale = 'el',
 ): { subject: string | null; body: string } {
   const key = slotKey(step, channel, variant);
-  const chosen = overrides[key] ?? builtIn(key);
+  const chosen = overrides[key] ?? builtIn(key, locale);
   if (chosen) return chosen;
 
   const base = slotKey(step, channel);
-  return overrides[base] ?? DEFAULT_TEMPLATES[base];
+  return overrides[base] ?? BUILT_IN_TEMPLATES[locale][base];
 }
 
 function escapeHtml(value: string): string {
@@ -481,14 +597,15 @@ export function renderEmail(
   ctx: TemplateContext,
   overrides: TemplateOverrides = {},
   variant: TemplateVariant = null,
+  locale: Locale = 'el',
 ): RenderedEmail {
-  const template = templateFor(step, 'email', overrides, variant);
+  const template = templateFor(step, 'email', overrides, variant, locale);
   // A tenant may clear the subject on an override; the built-in one for the
   // same slot then stands in, and the plain slot's behind that.
   const subject = applyPlaceholders(
     template.subject ??
-      builtIn(slotKey(step, 'email', variant))?.subject ??
-      builtIn(slotKey(step, 'email'))?.subject ??
+      builtIn(slotKey(step, 'email', variant), locale)?.subject ??
+      builtIn(slotKey(step, 'email'), locale)?.subject ??
       '',
     ctx,
   );
@@ -518,6 +635,7 @@ export function renderSms(
   ctx: TemplateContext,
   overrides: TemplateOverrides = {},
   variant: TemplateVariant = null,
+  locale: Locale = 'el',
 ): string {
-  return applyPlaceholders(templateFor(step, 'sms', overrides, variant).body, ctx);
+  return applyPlaceholders(templateFor(step, 'sms', overrides, variant, locale).body, ctx);
 }

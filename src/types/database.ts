@@ -70,6 +70,8 @@ export type DebtorRow = {
   phone: string | null;
   notes: string | null;
   muted: boolean;
+  /** Reminder language. Null derives it from the phone number. */
+  locale: string | null;
   created_at: string;
   updated_at: string;
 }

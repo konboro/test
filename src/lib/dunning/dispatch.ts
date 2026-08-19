@@ -14,6 +14,12 @@
 import { sendEmail } from '@/lib/email/send';
 import { appUrl } from '@/lib/env';
 import { channelTaggedUrl } from '@/lib/funnel/events';
+import type { Locale } from '@/lib/i18n/dictionaries';
+import {
+  overridesForLocale,
+  resolveDebtorLocale,
+  tenantLocale,
+} from '@/lib/i18n/message-locale';
 import { payPath } from '@/lib/pay-code';
 import { smsCreditsEnforced } from '@/lib/limits';
 import { emailAvailable, smsAvailable, type Channel } from '@/lib/providers';
@@ -92,8 +98,19 @@ export async function dispatchContact(params: {
   contactId: string | null;
   channels: ReadonlyArray<Channel>;
   overrides: TemplateOverrides;
+  /**
+   * Forces the language. Omitted, the customer decides it: their own setting
+   * first, then the country code on their phone. The automatic sweep never
+   * passes this, so every debtor is written to in their own language without
+   * the sweep knowing anything about languages.
+   */
+  locale?: Locale;
 }): Promise<DispatchOutcome> {
-  const { tenant, debtor, invoice, step, contactId, channels, overrides } = params;
+  const { tenant, debtor, invoice, step, contactId, channels } = params;
+
+  const authoredIn = tenantLocale(tenant);
+  const locale = params.locale ?? resolveDebtorLocale(debtor, authoredIn);
+  const overrides = overridesForLocale(params.overrides, locale, authoredIn);
   // `templateStep` may legitimately be null, so distinguish "not passed" from
   // "passed as null" rather than falling back with ??.
   const copyStep = params.templateStep !== undefined ? params.templateStep : step;
@@ -118,7 +135,7 @@ export async function dispatchContact(params: {
   };
 
   if (channels.includes('email') && debtor.email) {
-    const email = renderEmail(copyStep, channelCtx('email'), overrides, copyVariant);
+    const email = renderEmail(copyStep, channelCtx('email'), overrides, copyVariant, locale);
 
     if (!emailAvailable()) {
       // Reached only when another channel carried this contact — a step is never
@@ -163,7 +180,7 @@ export async function dispatchContact(params: {
 
   const phone = normalisePhone(debtor.phone);
   if (channels.includes('sms') && phone) {
-    const body = renderSms(copyStep, channelCtx('sms'), overrides, copyVariant);
+    const body = renderSms(copyStep, channelCtx('sms'), overrides, copyVariant, locale);
 
     // Ask whether the provider exists *before* reserving a credit. Reserving
     // first would push every message through a reserve-then-refund cycle that

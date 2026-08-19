@@ -35,6 +35,14 @@ function Fields({ debtor }: { debtor?: DebtorRow }) {
       <Field label={t.fields.mobile} hint={t.fields.mobileHint}>
         <input name="phone" defaultValue={debtor?.phone ?? ''} className={inputClass} />
       </Field>
+
+      <Field label={t.fields.debtorLocale} hint={t.fields.debtorLocaleHint}>
+        <select name="locale" defaultValue={debtor?.locale ?? ''} className={inputClass}>
+          <option value="">{t.fields.localeAuto}</option>
+          <option value="el">{t.fields.localeEl}</option>
+          <option value="en">{t.fields.localeEn}</option>
+        </select>
+      </Field>
       <div className="sm:col-span-2">
         <Field label={t.fields.notes}>
           <textarea name="notes" rows={2} defaultValue={debtor?.notes ?? ''} className={inputClass} />

@@ -312,6 +312,22 @@ export default async function InvoicesPage({
                 <option value="email">{t.reminder.channelEmail}</option>
                 <option value="sms">{t.reminder.channelSms}</option>
               </select>
+
+              {/* The language for the batch. Automatic is per customer, which is
+                  the only setting that is right for a mixed selection — a batch
+                  of 40 Greek customers and 4 foreign ones should not have to be
+                  sent twice. Forcing one language is there for the case where
+                  the selection is deliberately homogeneous. */}
+              <select
+                name="lang"
+                defaultValue="auto"
+                aria-label={t.reminder.languageLabel}
+                className="rounded-lg border border-ink-300 bg-white px-3 py-1.5 text-sm text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+              >
+                <option value="auto">{t.fields.localeAuto}</option>
+                <option value="el">{t.fields.localeEl}</option>
+                <option value="en">{t.fields.localeEn}</option>
+              </select>
                 <BulkActions
                   sendLabel={t.invoices.bulk.send}
                   sendingLabel={t.invoices.bulk.sending}

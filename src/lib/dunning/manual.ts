@@ -18,6 +18,13 @@
  */
 
 import { channelTaggedUrl } from '@/lib/funnel/events';
+import type { Locale } from '@/lib/i18n/dictionaries';
+import {
+  overridesForLocale,
+  resolveDebtorLocale,
+  tenantLocale,
+  type LanguageChoice,
+} from '@/lib/i18n/message-locale';
 import { contactLimitsDisabled } from '@/lib/limits';
 import { athensDate } from '@/lib/money';
 import { channelAvailable, providerStatus, type Channel } from '@/lib/providers';
@@ -62,6 +69,10 @@ export interface ReminderPreview {
   willSend?: Channel[];
   /** Why a channel is missing, or anything else worth knowing before sending. */
   notes?: string[];
+  /** The language this preview was rendered in, after resolving 'auto'. */
+  locale?: Locale;
+  /** True when the language came from the customer rather than the operator. */
+  localeAuto?: boolean;
 }
 
 interface Target {
@@ -177,6 +188,7 @@ export async function previewManualReminder(params: {
   step: TemplateStep;
   variant?: TemplateVariant;
   only?: ChannelChoice;
+  language?: LanguageChoice;
 }): Promise<ReminderPreview> {
   const t = await getDictionary();
 
@@ -184,8 +196,18 @@ export async function previewManualReminder(params: {
   if (!loaded.ok) return { ok: false, error: loaded.error };
 
   const { tenant, debtor, invoice } = loaded.target;
-  const overrides = await loadTemplateOverrides(params.userId);
   const ctx = templateContext(tenant, debtor, invoice);
+
+  // The same resolution the send performs, so the preview cannot show one
+  // language and post another.
+  const authoredIn = tenantLocale(tenant);
+  const language = params.language ?? 'auto';
+  const locale = language === 'auto' ? resolveDebtorLocale(debtor, authoredIn) : language;
+  const overrides = overridesForLocale(
+    await loadTemplateOverrides(params.userId),
+    locale,
+    authoredIn,
+  );
 
   // Tagged exactly as the send will be, so the preview tells the truth down to
   // the URL — including the four characters the tag costs an SMS segment.
@@ -194,12 +216,14 @@ export async function previewManualReminder(params: {
     { ...ctx, payUrl: channelTaggedUrl(ctx.payUrl, 'email') },
     overrides,
     params.variant ?? null,
+    locale,
   );
   const sms = renderSms(
     params.step,
     { ...ctx, payUrl: channelTaggedUrl(ctx.payUrl, 'sms') },
     overrides,
     params.variant ?? null,
+    locale,
   );
 
   const { channels: available, notes } = resolveChannels(debtor, t);
@@ -222,6 +246,8 @@ export async function previewManualReminder(params: {
     smsTo: normalisePhone(debtor.phone),
     willSend: channels,
     notes,
+    locale,
+    localeAuto: language === 'auto',
   };
 }
 
@@ -231,6 +257,7 @@ export async function sendManualReminder(params: {
   step: TemplateStep;
   variant?: TemplateVariant;
   only?: ChannelChoice;
+  language?: LanguageChoice;
 }): Promise<ManualReminderResult> {
   const t = await getDictionary();
 
@@ -304,6 +331,10 @@ export async function sendManualReminder(params: {
     contactId,
     channels,
     overrides: await loadTemplateOverrides(userId),
+    // Undefined lets dispatch resolve it from the customer, which is what the
+    // automatic sweep does too. 'auto' here would be a value meaning the same
+    // thing in a second place.
+    locale: params.language && params.language !== 'auto' ? params.language : undefined,
   });
 
   return {
