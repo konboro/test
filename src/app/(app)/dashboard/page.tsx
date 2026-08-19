@@ -72,7 +72,7 @@ export default async function DashboardPage() {
         .limit(5000),
       supabase
         .from('funnel_events')
-        .select('invoice_id, channel, event')
+        .select('invoice_id, debtor_id, channel, event, occurred_at')
         .gte('occurred_at', funnelSince)
         .limit(5000),
     ]);
@@ -138,6 +138,65 @@ export default async function DashboardPage() {
 
     return { channel, sent: sentInvoices.size, opened: opened.size, checkout: checkout.size, paid };
   });
+
+  /**
+   * The funnel one row per invoice, rather than as four totals.
+   *
+   * Totals answer whether the channel works; this answers who to call. An
+   * operator looking at "3 opened, 1 paid" cannot act on it — the two who
+   * opened and did not pay are the entire point of the screen.
+   *
+   * Earliest event of each kind wins: a debtor who opens the link four times
+   * engaged once, and counting the refreshes would make the busiest procrastinator
+   * look like the warmest lead.
+   */
+  const activity = (() => {
+    const byInvoice = new Map<
+      string,
+      { opened: string | null; started: string | null; channel: string }
+    >();
+
+    for (const event of funnelEvents ?? []) {
+      if (!event.invoice_id) continue;
+      const row = byInvoice.get(event.invoice_id) ?? {
+        opened: null,
+        started: null,
+        // An untagged visit is a real visit; it just cannot say which message
+        // brought it, so it starts as 'other' and yields to a tagged one below.
+        channel: event.channel ?? 'other',
+      };
+      const at = event.occurred_at;
+
+      if (event.event === 'page_view' && (!row.opened || at < row.opened)) row.opened = at;
+      if (event.event === 'checkout_started' && (!row.started || at < row.started)) row.started = at;
+      // A tagged event names the message that brought them; it always beats an
+      // untagged visit already recorded for the same invoice.
+      if (event.channel && event.channel !== 'other') row.channel = event.channel;
+
+      byInvoice.set(event.invoice_id, row);
+    }
+
+    return [...byInvoice.entries()]
+      .map(([invoiceId, row]) => {
+        const invoice = allInvoices.find((i) => i.id === invoiceId);
+        const debtor = invoice ? debtorsById.get(invoice.debtor_id) : undefined;
+
+        return {
+          invoiceId,
+          label: invoice
+            ? [invoice.series, invoice.invoice_number].filter(Boolean).join(' ') || invoice.mark || invoiceId.slice(0, 8)
+            : invoiceId.slice(0, 8),
+          name: debtor ? displayName(debtor) : null,
+          amountCents: invoice?.amount_cents ?? 0,
+          currency: invoice?.currency,
+          ...row,
+          paidAt: invoice?.status === 'paid' ? (invoice.paid_at ?? null) : null,
+        };
+      })
+      // Newest engagement first: the person who just opened the link is the
+      // one worth a call today.
+      .sort((a, b) => (b.started ?? b.opened ?? '').localeCompare(a.started ?? a.opened ?? ''));
+  })();
 
   const funnelHasData =
     funnelRows.some((row) => row.sent > 0) || (funnelEvents?.length ?? 0) > 0;
@@ -353,6 +412,67 @@ export default async function DashboardPage() {
               <p className="border-t border-ink-100 px-5 py-3 text-xs text-ink-500">
                 {t.dashboard.funnelUntagged(untaggedViews)}
               </p>
+            ) : null}
+
+            {/* Who, not how many. The totals above say whether a channel works;
+                this says which customer opened the link and stopped — which is
+                the only part of the funnel anyone can act on today. */}
+            {activity.length ? (
+              <div className="border-t border-ink-200">
+                <p className="px-5 pb-1 pt-4 text-xs font-medium uppercase tracking-wide text-ink-400">
+                  {t.dashboard.activityTitle}
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-ink-100 text-left text-xs uppercase tracking-wide text-ink-500">
+                        <th className="px-5 py-2 font-medium">{t.invoices.colCustomer}</th>
+                        <th className="px-5 py-2 font-medium">{t.invoices.colInvoice}</th>
+                        <th className="px-5 py-2 font-medium">{t.dashboard.activityOpened}</th>
+                        <th className="px-5 py-2 font-medium">{t.dashboard.activityStarted}</th>
+                        <th className="px-5 py-2 font-medium">{t.dashboard.activityPaid}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activity.slice(0, 20).map((row) => (
+                        <tr key={row.invoiceId} className="border-b border-ink-100 last:border-0">
+                          <td className="px-5 py-2.5">
+                            <span className="text-ink-800">{row.name ?? t.debtors.nameMissing}</span>
+                            <Badge tone={row.channel === 'sms' ? 'info' : 'neutral'}>
+                              {row.channel === 'sms'
+                                ? t.common.sms
+                                : row.channel === 'email'
+                                  ? t.common.email
+                                  : t.dashboard.activityDirect}
+                            </Badge>
+                          </td>
+                          <td className="tabular px-5 py-2.5 text-ink-600">{row.label}</td>
+                          <td className="tabular px-5 py-2.5 text-ink-600">
+                            {row.opened ? formatDate(row.opened.slice(0, 10)) : '—'}
+                          </td>
+                          <td className="tabular px-5 py-2.5 text-ink-600">
+                            {row.started ? formatDate(row.started.slice(0, 10)) : '—'}
+                          </td>
+                          <td className="tabular px-5 py-2.5">
+                            {row.paidAt ? (
+                              <span className="font-medium text-emerald-700">
+                                {formatMoney(row.amountCents, row.currency)}
+                              </span>
+                            ) : (
+                              <span className="text-ink-400">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {activity.length > 20 ? (
+                  <p className="px-5 py-2.5 text-xs text-ink-500">
+                    {t.dashboard.activityMore(activity.length - 20)}
+                  </p>
+                ) : null}
+              </div>
             ) : null}
           </>
         )}
