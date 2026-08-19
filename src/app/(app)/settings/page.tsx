@@ -5,15 +5,13 @@ import { bankingConfigured, listAspsps } from '@/lib/bank/client';
 import { loadScenario } from '@/lib/dunning/engine';
 
 import { DEFAULT_TEMPLATES, EDITABLE_SLOTS, slotKey } from '@/lib/dunning/templates';
-import { DICTIONARIES } from '@/lib/i18n/dictionaries';
-import { getDictionary, LOCALES, type Dictionary } from '@/lib/i18n';
+import { getDictionary, type Dictionary } from '@/lib/i18n';
 import { smsCreditsEnforced } from '@/lib/limits';
 import { paymentsAvailable } from '@/lib/providers';
 import { connectConfigured, SMS_PACKS } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
-import { updateLocale } from './actions';
 import { ElorusForm } from './elorus-forms';
 import { BankConnect } from './bank-forms';
 import { ScenarioForm } from './scenario-forms';
@@ -278,28 +276,6 @@ export default async function SettingsPage({
           {bankOutcome.text}
         </div>
       ) : null}
-
-      <Card>
-        <CardHeader title={t.settings.language} subtitle={t.settings.languageHint} />
-        <form action={updateLocale} className="flex flex-wrap gap-2 px-5 py-4">
-          {LOCALES.map((code) => (
-            <button
-              key={code}
-              type="submit"
-              name="locale"
-              value={code}
-              aria-current={profile.locale === code}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-                profile.locale === code
-                  ? 'bg-ink-900 text-white'
-                  : 'border border-ink-300 bg-white text-ink-600 hover:bg-ink-50'
-              }`}
-            >
-              {DICTIONARIES[code].languageName}
-            </button>
-          ))}
-        </form>
-      </Card>
 
       <Card>
         <CardHeader title={t.settings.business} />

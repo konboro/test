@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { LeftaLogo } from '@/components/logo';
+import { LocaleSwitch } from '@/components/locale-switch';
 import { ButtonLink } from '@/components/ui';
 import type { Dictionary } from '@/lib/i18n';
 
@@ -36,6 +37,10 @@ export function PublicHeader({ t }: { t: Dictionary }) {
           <Link href="/faq" className={`hidden sm:inline ${navLinkClass}`}>
             {t.faq.metaTitle}
           </Link>
+          {/* Kept on every width. A visitor who cannot read the page is the one
+              who needs this most, and hiding it behind a menu on the screens
+              where that is most likely defeats it. */}
+          <LocaleSwitch />
           <Link href="/login" className={navLinkClass}>
             {t.landing.signIn}
           </Link>
