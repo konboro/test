@@ -337,6 +337,38 @@ inference — with hard caveats:
   pilot and the training lab, not as the only prod box; ex-mining units need
   fans/paste service and a VRAM stress test before being trusted.
 
+## The cost floor, and the plug-and-play ceiling
+
+Where the per-minute price can actually go, marginal cost at volume:
+
+| Component | Floor (all owned) | How |
+|---|---|---|
+| Call to Greek mobile | €0.004–0.01/min | wholesale-ish trunk; the EU-regulated MTR (~€0.002) is the physics floor — below it lies only SIM-box fraud, ruled out |
+| STT | ~€0.0005/min | faster-whisper int8 on an owned 1080 Ti — electricity |
+| TTS | ~€0.0005/min | Piper on CPU / own voice on an owned GPU |
+| Media stack | €0.002–0.01/min | jambonz on a colo box, €30–80/mo amortised over volume |
+| Brain | €0.001–0.012/min | local LLM on the 3090 (≈ power) … Claude Haiku cached (~€0.0025) … Claude Opus cached (~€0.012) |
+
+**Floor: ~€0.01/min** with a local brain, **~€0.015–0.03/min keeping Claude**
+— i.e. the AI becomes nearly free and what remains is the phone call itself.
+The brain is the one component NOT worth squeezing to zero: it is the
+compliance surface, and one mishandled dispute costs more than a year of
+Haiku at €0.0025/min. The recommended floor is therefore **~2 c/min**
+(trunk + Haiku), not 1.
+
+**Plug-and-play for contrast** (Vapi / Retell / ElevenLabs Agents — agent in a
+dashboard, number attached, live in 1–3 days): realistic all-in runs
+**$0.11–0.32/min** — platform fee plus pass-through STT/TTS/LLM/telephony.
+Guardrails live at prompt/config level, data transits US vendors, and the
+meter runs forever. Our CR plan sits between: ~€0.15/min, 3–4 weeks, hard
+guardrails.
+
+**The ratio is ~10–20× — but the cross-over is volume.** The floor saves
+~€0.13/min over plug-and-play: at Penny's ~500 min/mo that is ~€65/mo against
+colo, ops and build time (not worth it); at 10k min/mo it is ~€1,300/mo
+(pays for everything). Same conclusion as everywhere else in this document:
+start high on the convenience curve, descend it as volume earns each step.
+
 ## Guardrail testing is a deliverable, not a phase
 
 - A **simulator harness**: the same gateway loop driven by text (no telephony),
