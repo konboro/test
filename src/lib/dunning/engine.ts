@@ -406,3 +406,19 @@ async function deliver(
 
   return 'contacted';
 }
+
+/**
+ * Whether a PostgREST failure is "that column is not there".
+ *
+ * Code is deployed from a branch; migrations are pushed by hand. The two land
+ * minutes apart at best, and a `select` naming a column that has not arrived yet
+ * does not degrade — it fails the whole query, so the caller gets `data: null`
+ * and cannot tell "no rows" from "no column". For the bulk sender that reads as
+ * every invoice having no due date, which it reports as failed.
+ *
+ * 42703 is undefined_column in Postgres. Matched on the code rather than the
+ * message, which is human-facing text and localised.
+ */
+export function missingColumn(error: { code?: string } | null): boolean {
+  return error?.code === '42703';
+}
