@@ -121,6 +121,7 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
   const t = useT();
   const [open, setOpen] = useState(false);
   const [choice, setChoice] = useState('manual');
+  const [only, setOnly] = useState('both');
   const [preview, setPreview] = useState<ReminderPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [state, action, sending] = useActionState<ReminderState, FormData>(sendReminder, {});
@@ -131,7 +132,7 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
     let cancelled = false;
     setLoading(true);
 
-    previewReminder(invoiceId, choice)
+    previewReminder(invoiceId, choice, only)
       .then((result) => {
         if (!cancelled) setPreview(result);
       })
@@ -144,7 +145,7 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
     return () => {
       cancelled = true;
     };
-  }, [open, choice, invoiceId]);
+  }, [open, choice, only, invoiceId]);
 
   const sent = Boolean(state.success);
 
@@ -196,6 +197,7 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
                 <form action={action}>
                   <input type="hidden" name="id" value={invoiceId} />
                   <input type="hidden" name="choice" value={choice} />
+                  <input type="hidden" name="only" value={only} />
                   <Button type="submit" disabled={sending || loading || !preview?.willSend?.length}>
                     {sending ? t.reminder.sending : t.reminder.send}
                   </Button>
@@ -216,6 +218,21 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
                   {t.reminder.choices[c.value] ?? c.label}
                 </option>
               ))}
+            </select>
+          </Field>
+
+          {/* Narrows the send to one channel. The preview below re-renders for
+              the choice, so what is on screen is always what will go out. */}
+          <Field label={t.reminder.channelLabel}>
+            <select
+              value={only}
+              onChange={(e) => setOnly(e.target.value)}
+              disabled={sent}
+              className={inputClass}
+            >
+              <option value="both">{t.reminder.channelBoth}</option>
+              <option value="email">{t.reminder.channelEmail}</option>
+              <option value="sms">{t.reminder.channelSms}</option>
             </select>
           </Field>
 

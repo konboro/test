@@ -256,6 +256,20 @@ export default async function InvoicesPage({
                   </option>
                 ))}
               </select>
+              {/* Which channels this batch goes out on. Narrows what is possible
+                  rather than forcing anything: a customer with no phone still
+                  gets nothing when SMS-only is chosen, and is reported as
+                  skipped. */}
+              <select
+                name="only"
+                defaultValue="both"
+                aria-label={t.reminder.channelLabel}
+                className="rounded-lg border border-ink-300 bg-white px-3 py-1.5 text-sm text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+              >
+                <option value="both">{t.reminder.channelBoth}</option>
+                <option value="email">{t.reminder.channelEmail}</option>
+                <option value="sms">{t.reminder.channelSms}</option>
+              </select>
               <button
                 type="submit"
                 className="rounded-lg bg-brand-600 px-3.5 py-1.5 text-sm font-medium text-white shadow-sm outline-none transition hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"

@@ -119,6 +119,21 @@ async function loadTarget(
   return { ok: true, target: { tenant, debtor, invoice } };
 }
 
+/**
+ * Narrows what is possible to what was asked for.
+ *
+ * The operator picks a channel for reasons the system cannot see — an SMS to
+ * someone who never opens mail, email only for a customer who complained about
+ * texts.  is a filter over what is available, never a way to force a
+ * channel that is unavailable: asking for SMS alone when there is no number
+ * still sends nothing, and says so.
+ */
+export type ChannelChoice = 'both' | 'email' | 'sms';
+
+export function narrowChannels(available: Channel[], only: ChannelChoice): Channel[] {
+  return only === 'both' ? available : available.filter((c) => c === only);
+}
+
 /** Which channels can carry a message right now, and why the others cannot. */
 function resolveChannels(
   debtor: DebtorRow,
@@ -160,6 +175,7 @@ export async function previewManualReminder(params: {
   userId: string;
   invoiceId: string;
   step: TemplateStep;
+  only?: ChannelChoice;
 }): Promise<ReminderPreview> {
   const t = await getDictionary();
 
@@ -183,7 +199,9 @@ export async function previewManualReminder(params: {
     overrides,
   );
 
-  const { channels, notes } = resolveChannels(debtor, t);
+  const { channels: available, notes } = resolveChannels(debtor, t);
+  // What the operator asked for, narrowed to what is actually possible.
+  const channels = narrowChannels(available, params.only ?? 'both');
 
   if (contactLimitsDisabled()) {
     notes.push(t.manual.limitsOff);
@@ -208,6 +226,7 @@ export async function sendManualReminder(params: {
   userId: string;
   invoiceId: string;
   step: TemplateStep;
+  only?: ChannelChoice;
 }): Promise<ManualReminderResult> {
   const t = await getDictionary();
 
@@ -221,7 +240,9 @@ export async function sendManualReminder(params: {
   }
 
   const { tenant, debtor, invoice } = loaded.target;
-  const { channels, notes } = resolveChannels(debtor, t);
+  const { channels: available, notes } = resolveChannels(debtor, t);
+  // What the operator asked for, narrowed to what is actually possible.
+  const channels = narrowChannels(available, params.only ?? 'both');
 
   if (channels.length === 0) {
     console.error('[manual:refused] no channel', {
