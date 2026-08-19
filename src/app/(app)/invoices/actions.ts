@@ -16,7 +16,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { formError, getDictionary } from '@/lib/i18n';
 import { redirect } from 'next/navigation';
-import { automationPaused, loadScenario, stepForInvoice } from '@/lib/dunning/engine';
+import { automationPaused, loadScenario, missingColumn, stepForInvoice } from '@/lib/dunning/engine';
 
 export interface InvoiceFormState {
   error?: string;
@@ -428,11 +428,32 @@ export async function runScenarioForSelected(formData: FormData): Promise<void> 
   const scenario = await loadScenario(user.id);
   const today = athensDate();
 
-  const { data: rows } = await supabase
+  // Retried without the per-invoice switch when that column has not been pushed
+  // yet. Without the fallback the whole select fails, every invoice looks like it
+  // has no due date, and the operator is told the batch failed — see
+  // missingColumn() for why a deploy can legitimately run ahead of a migration.
+  const selected = await supabase
     .from('invoices')
     .select('id, due_date, automation_enabled')
     .eq('user_id', user.id)
     .in('id', batch);
+
+  let rows = selected.data;
+
+  if (missingColumn(selected.error)) {
+    // Both selects are written out in full rather than built from a variable:
+    // postgrest infers the row type from the literal, and a computed string
+    // collapses it to an error type that no longer has the columns on it.
+    const fallback = await supabase
+      .from('invoices')
+      .select('id, due_date')
+      .eq('user_id', user.id)
+      .in('id', batch);
+
+    // Absent means the switch does not exist yet, and an invoice that cannot be
+    // paused is one that is chased — the same reading automationPaused() takes.
+    rows = fallback.data?.map((row) => ({ ...row, automation_enabled: true })) ?? null;
+  }
 
   const dueDates = new Map((rows ?? []).map((row) => [row.id, row.due_date]));
   const paused = new Set((rows ?? []).filter(automationPaused).map((r) => r.id));
