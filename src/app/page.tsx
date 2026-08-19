@@ -1,6 +1,5 @@
-import Link from 'next/link';
-
-import { LeftaLogo, LeftaMark } from '@/components/logo';
+import { LeftaMark } from '@/components/logo';
+import { PublicFooter, PublicHeader } from '@/components/public-chrome';
 import { ButtonLink } from '@/components/ui';
 import { appUrl } from '@/lib/env';
 import { getDictionary } from '@/lib/i18n';
@@ -43,22 +42,7 @@ export default async function HomePage() {
         // reaches it.
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <header className="sticky top-0 z-40 border-b border-ink-200/90 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-4">
-          <LeftaLogo />
-          <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="text-sm font-medium text-ink-600 transition hover:text-ink-900"
-            >
-              {t.landing.signIn}
-            </Link>
-            <ButtonLink href="/register" variant="brand">
-              {t.landing.freeTrial}
-            </ButtonLink>
-          </div>
-        </div>
-      </header>
+      <PublicHeader t={t} />
 
       <main className="mx-auto max-w-5xl px-4">
         <section className="py-16 text-center sm:py-20">
@@ -150,17 +134,7 @@ export default async function HomePage() {
         </section>
       </main>
 
-      <footer className="border-t border-ink-200 py-8">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-4">
-          <LeftaLogo markClassName="h-6 w-6" textClassName="text-sm" />
-          {/* Without a link from here the guides are orphans: nothing on the
-              site points at them, so nothing crawls them. */}
-          <Link href="/odigos" className="text-xs text-ink-500 transition hover:text-ink-800">
-            Οδηγοί
-          </Link>
-          <p className="text-xs text-ink-500">© {new Date().getFullYear()} lefta.app</p>
-        </div>
-      </footer>
+      <PublicFooter t={t} />
     </div>
   );
 }

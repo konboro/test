@@ -20,6 +20,20 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'weekly',
       priority: 1,
     },
+    // Two pages that answer a question before anyone signs up: what it costs,
+    // and who ends up holding the money. Both rank for terms the landing page
+    // cannot, because the landing page is about the product rather than about
+    // the question.
+    {
+      url: `${base}/pricing`,
+      changeFrequency: 'monthly' as const,
+      priority: 0.8,
+    },
+    {
+      url: `${base}/faq`,
+      changeFrequency: 'monthly' as const,
+      priority: 0.8,
+    },
     {
       url: `${base}/odigos`,
       lastModified: new Date(),

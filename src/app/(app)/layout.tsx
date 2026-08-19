@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 
 import { signOut } from '@/app/auth/actions';
 import { LeftaLogo } from '@/components/logo';
+import { LocaleSwitch } from '@/components/locale-switch';
 import { getDictionary, getLocale } from '@/lib/i18n';
 import { LocaleProvider } from '@/lib/i18n/provider';
 import { smsCreditsEnforced } from '@/lib/limits';
@@ -66,6 +67,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <span className="hidden max-w-[16ch] truncate text-sm text-ink-500 lg:block">
               {profile?.company_name ?? profile?.email ?? user.email}
             </span>
+            <LocaleSwitch />
             <form action={signOut}>
               <button
                 type="submit"
