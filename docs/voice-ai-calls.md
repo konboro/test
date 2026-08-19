@@ -204,6 +204,53 @@ Branches that get scripted, each one a golden transcript in the harness:
 Turn counter and wall-clock live in the state (max 10 turns / 4 min → CLOSE),
 so a looping conversation physically cannot happen.
 
+## The fully in-house variant
+
+Everything above assumes ConversationRelay carries the audio. Building that
+layer ourselves replaces exactly one box in the architecture — the transport —
+and none of the product: the state machine, tools, renderSpeech, guardrails,
+logging and funnel wiring are identical. The gateway's transport is therefore
+written as an interface from day one, so this section is a swap, not a rewrite.
+
+**The stack:**
+
+- **Telephony**: a Greek SIP trunk (Modulus-class B2B VoIP) — creditor's own
+  number as caller ID, mobile termination at €0.005–0.02/min instead of
+  Twilio's $0.0746.
+- **Media & orchestration** — two credible shapes:
+  - **jambonz** — open-source, self-hosted "ConversationRelay": SIP in, BYO
+    STT/TTS/LLM, a WebSocket API so close to CR's that the gateway barely
+    notices the migration. Least new code.
+  - **LiveKit Agents / pipecat** — agent frameworks with VAD (Silero),
+    turn-taking and barge-in as libraries plus a SIP bridge. More control,
+    more code.
+- **STT**: Deepgram **nova-3 streaming, Greek confirmed** (~$0.006–0.008/min).
+  Self-hosted Whisper is the fallback, but real-time endpointing becomes our
+  problem.
+- **TTS**: Azure neural `el-GR` (Athina/Nestoras — a *better* Greek voice
+  selection than CR's Google-only option) at ~$16/1M chars ≈ $0.05/call; or
+  ElevenLabs API directly.
+- **AMD** — the one thing nobody hands us: Twilio's answering-machine
+  detection stays behind. Self-hosted AMD is greeting-length + beep heuristics
+  or a small classifier, and it must be built and tested (a voicemail that
+  hears debt details is a compliance failure, not a UX bug).
+
+**Cost per answered 3-minute call:** trunk €0.015–0.06 + STT ~$0.02 + TTS
+~$0.05 + Claude ~$0.04 ≈ **€0.12–0.20** (vs €0.44 on CR), plus a fixed EU
+server €20–50/mo. Latency can actually *improve* — an EU-hosted media stack
+next to a Greek trunk beats CR round-trips — and the GDPR posture is cleaner:
+audio never leaves processors we chose.
+
+**The price is ops, not code:** +2–3 weeks build (media plumbing, AMD, latency
+tuning) and a **permanent tax** — SIP debugging, codec issues, media-server
+upkeep and HA are ours forever, where CR's are Twilio's. Break-even stays
+where the BYOC note put it: roughly 5–10k min/month across tenants, or earlier
+if M0 finds CR's Greek quality wanting.
+
+**Decision rule:** pilot on CR (M0–M3 unchanged) with the transport interface
+in place; go in-house when multi-tenant volume, latency or data-residency
+demands it — jambonz first, LiveKit/pipecat if we outgrow it.
+
 ## Guardrail testing is a deliverable, not a phase
 
 - A **simulator harness**: the same gateway loop driven by text (no telephony),
