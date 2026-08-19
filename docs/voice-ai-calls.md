@@ -369,6 +369,40 @@ colo, ops and build time (not worth it); at 10k min/mo it is ~€1,300/mo
 (pays for everything). Same conclusion as everywhere else in this document:
 start high on the convenience curve, descend it as volume earns each step.
 
+## SMS, for contrast
+
+The same descend-the-curve reasoning gives the **opposite** answer for SMS,
+and it is worth writing down so nobody re-derives it later.
+
+**Price is per segment, not per minute.** Greek reminders are UCS-2, so one
+segment is **70 characters** — `segmentCount()` and the template editor
+already surface this. A typical reminder with a short link is one, sometimes
+two segments. Retail rates to Greek mobiles: Twilio
+[$0.0657/segment](https://www.twilio.com/en-us/sms/pricing/gr), Brevo (what we
+ship on) in the same €0.04–0.07 range; alphanumeric sender IDs are free and
+supported in Greece, which is why the creditor's name can be the sender.
+
+**There is no meaningful floor to chase.** The A2P termination fee the Greek
+operators charge is most of that price — it is not aggregator margin, so
+unlike voice there is no BYOC-style bypass. A direct aggregator contract at
+volume gets to roughly €0.03–0.045/segment; below that lies grey-route
+traffic, which loses the alphanumeric sender, arrives unreliably and would be
+the same category of mistake as SIM-boxing. **Realistic floor: ~half of
+retail, and only at tens of thousands of messages a month.**
+
+**Which flips the optimisation target.** With voice, engineering buys a 10–20×
+cost reduction; with SMS, engineering buys at most 1.5–2×, and the same effort
+spent on *copy* pays better: keeping a reminder inside one segment is an
+instant −50%, and the payment link is the main lever there — this is exactly
+why short codes (`lefta.app/A7K2M9PQ4X`) exist instead of 48-hex tokens, and
+why the channel tag is `?c=s` and not `?channel=sms`.
+
+Per-message economics for the record: at ~€0.05/segment, a 150-debtor wave
+that reaches step 2 and 3 by SMS costs **€15–25** — an order of magnitude
+under the same wave by voice, and roughly 300× a single email. The ladder's
+channel mix (email first, SMS from step 2, voice only for the hard tail) is
+therefore also the cost-optimal ordering, not just the polite one.
+
 ## Guardrail testing is a deliverable, not a phase
 
 - A **simulator harness**: the same gateway loop driven by text (no telephony),
