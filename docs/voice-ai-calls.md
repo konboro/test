@@ -120,6 +120,81 @@ eval harness + supervised pilot ≈ **3–4 weeks of focused engineering**, most
 it in the last two items — the telephony plumbing is days, making the agent
 boringly predictable is the work.
 
+## Voice design
+
+ConversationRelay offers three TTS providers: Google, Amazon Polly, ElevenLabs.
+Polly has **no Greek voice**, so the real choice is:
+
+- **Google `el-GR`** — one Wavenet voice (female). Correct, slightly official
+  tone — arguably right for the subject matter. Full SSML support.
+- **ElevenLabs (Flash 2.5, CR public beta)** — Greek among its languages, far
+  more natural, big voice catalogue; also the only provider CR allows for
+  automatic language detection. Trade-offs: near-zero SSML (formatting must be
+  done in text), beta status on the money path.
+
+M0 decides between them **over a real phone call** — telephone audio is 8 kHz
+μ-law, which flattens studio-demo differences; pick by handset listening, not
+by web demos. One platform voice for all tenants ("the assistant of X" is the
+identity, so the voice belongs to the platform); no voice cloning, ever.
+
+**Text-to-speech normalisation is its own renderer.** TTS reads "1.234,56 €",
+"ΤΠΥ Α-1042" and "15/07/2026" wrong. Alongside renderEmail/renderSms there is a
+`renderSpeech` layer: amounts spoken out in Greek words, dates as spoken dates,
+document numbers spelled character by character, deliberate pauses (SSML on
+Google; punctuation on ElevenLabs). Same `{{placeholders}}`, different surface
+— and unit-testable exactly like the SMS segment counter.
+
+**Latency choreography:** the opening line is a rendered template, played
+immediately — the LLM only enters from turn 2. Replies stream sentence by
+sentence; barge-in is CR's job. STT stays pinned to `el-GR` (code-switching is
+where phone STT breaks); if the callee answers in English, the agent has one
+scripted English line and the LLM continues in simple English — full
+auto-detection (ElevenLabs `multi`) is a v2 experiment. M0 must also test STT
+on the hard vocabulary: spoken amounts, dates, ΑΦΜ digits, Greek surnames.
+
+## Conversation scenarios
+
+Not a free chat: a **state machine with the LLM inside the states**. States are
+fixed in code; the model understands and phrases, the machine decides what is
+allowed to happen next:
+
+```
+OPENING (scripted template — who calls, that it's an automated assistant)
+   → IDENTIFY (confirm the right person/company; nothing else may be said)
+   → DISCLOSE (document, amount, due date — rendered facts, not free recall)
+   → RESOLVE (loop: answer whitelisted questions, offer tool actions)
+   → CLOSE (scripted; always states how to pay)
+```
+
+Transitions fire on tools and classified intents, never on prose — the tool
+layer *is* the intent classifier, so there is no separate NLU to drift.
+
+**Voice copy is platform-fixed in v1** — deliberately unlike email/SMS, where
+tenants edit the wording. A spoken sentence is the compliance surface (tone,
+implied promises), and the guardrail harness certifies *our* copy; a tenant
+edit would be an untested script in lefta's voice. Tenants parameterise data
+only: name, document, amount, date — the same tokens templates already use.
+
+Branches that get scripted, each one a golden transcript in the harness:
+
+| Branch | Behaviour |
+|---|---|
+| right person confirms | proceed to DISCLOSE |
+| wrong person / refuses to confirm | "please have X contact [creditor]", end; no debt details |
+| company receptionist ("ποιος τον ζητάει;") | creditor name only, ask for the person or offer callback |
+| voicemail (AMD) | hang up, count attempt; no debt details |
+| silence / unintelligible ×2 | polite close |
+| "call me later" | `request_callback`, close |
+| "I already paid" | no argument, no promise — "it will be checked", flag to tenant, close |
+| dispute ("δεν το χρωστάω") | `register_dispute`, suggest-mute flag, close |
+| asks for discount / instalments | scripted refusal + `send_payment_link`, close |
+| "where did you get my number?" | scripted GDPR line (data from the creditor, for this debt) |
+| abuse | one de-escalation line, then close |
+| asks for a human | `request_callback`, close |
+
+Turn counter and wall-clock live in the state (max 10 turns / 4 min → CLOSE),
+so a looping conversation physically cannot happen.
+
 ## Guardrail testing is a deliverable, not a phase
 
 - A **simulator harness**: the same gateway loop driven by text (no telephony),
