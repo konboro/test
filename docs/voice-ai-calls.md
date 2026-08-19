@@ -107,6 +107,15 @@ Greece page (2026-08). A 3-minute answered call, ~8 turns:
 | **Total, answered 3-min call** | | **≈ $0.47 (~0.44 €)** |
 
 - Haiku 4.5 brain: ~$0.008/call — total barely moves; choose on latency, not cost.
+- **Voice pricing**: the $0.07/min CR rate covers the standard TTS providers, so
+  the Google `el-GR` voice adds nothing. ElevenLabs in CR is public beta with
+  no published CR rate yet — reference points are ElevenLabs' own ~$0.05/1k
+  chars (≈ $0.13–0.15 of spoken agent text per 3-min call) and $0.08–0.10/min
+  on their conversational plans, so budget **+$0.10–0.30/call** for the nicer
+  voice and confirm the real number in M0. TODO(verify at M0).
+- The scenario layer costs nothing at runtime — state machine and renderSpeech
+  are code. The guardrail harness is text-only Claude: a full regression over
+  ~50 golden/adversarial transcripts costs well under $2 per run.
 - Unanswered attempt: a few cents (call setup + AMD seconds, no CR minutes).
 - Landline instead of mobile: −$0.16/call ($0.0214/min).
 - Fixed: Greek number from ~$1.15/mo per tenant (regulatory bundle takes days —
