@@ -1,39 +1,48 @@
-import type { Metadata } from 'next';
-
 import { LeftaMark } from '@/components/logo';
-import { JsonLd, PublicFooter, PublicHeader } from '@/components/public-chrome';
+import { PublicFooter, PublicHeader } from '@/components/public-chrome';
 import { ButtonLink } from '@/components/ui';
 import { appUrl } from '@/lib/env';
 import { getDictionary } from '@/lib/i18n';
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getDictionary();
-
-  return {
-    alternates: { canonical: '/' },
-    openGraph: { url: '/', title: t.common.appTitle, description: t.common.appDescription },
-  };
-}
-
 export default async function HomePage() {
   const t = await getDictionary();
 
+  // Structured data, so a result can carry the product name, what it is and
+  // who runs it rather than a stripped snippet. Written from the same copy the
+  // page shows — a description here that disagrees with the visible one is
+  // what search engines treat as cloaking.
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'SoftwareApplication',
+        name: 'lefta.app',
+        description: t.common.appDescription,
+        applicationCategory: 'BusinessApplication',
+        operatingSystem: 'Web',
+        url: appUrl(),
+        inLanguage: ['el', 'en'],
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
+      },
+      {
+        '@type': 'Organization',
+        name: 'lefta.app',
+        url: appUrl(),
+        logo: `${appUrl()}/icon.svg`,
+        areaServed: 'GR',
+      },
+    ],
+  };
+
   return (
     <div className="min-h-screen">
-      <PublicHeader t={t} />
-
-      <JsonLd
-        data={{
-          '@context': 'https://schema.org',
-          '@type': 'SoftwareApplication',
-          name: 'lefta.app',
-          applicationCategory: 'BusinessApplication',
-          operatingSystem: 'Web',
-          url: appUrl(),
-          description: t.common.appDescription,
-          offers: { '@type': 'Offer', price: 0, priceCurrency: 'EUR' },
-        }}
+      <script
+        type="application/ld+json"
+        // The value is built above from our own copy; nothing user-supplied
+        // reaches it.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      <PublicHeader t={t} />
 
       <main className="mx-auto max-w-5xl px-4">
         <section className="py-16 text-center sm:py-20">

@@ -39,11 +39,24 @@ export async function GET(request: NextRequest) {
   // destination — we cannot know which invoice this was.
   if (!orderCode) return NextResponse.redirect(appUrl());
 
-  const { data: invoice } = await admin
-    .from('invoices')
-    .select('id, user_id, status, short_code, pay_token, amount_cents')
-    .eq('viva_order_code', orderCode)
+  // Resolve through viva_orders first: it remembers EVERY order this invoice
+  // ever minted, so an older order paid after a second Pay press still finds
+  // its invoice. The pointer column knows only the latest order — it stays as
+  // the fallback, and it is all a database has in the deploy-before-migration
+  // window.
+  const { data: order } = await admin
+    .from('viva_orders')
+    .select('invoice_id, amount_cents')
+    .eq('order_code', orderCode)
     .maybeSingle();
+
+  const invoiceQuery = admin
+    .from('invoices')
+    .select('id, user_id, status, short_code, pay_token, amount_cents');
+
+  const { data: invoice } = order
+    ? await invoiceQuery.eq('id', order.invoice_id).maybeSingle()
+    : await invoiceQuery.eq('viva_order_code', orderCode).maybeSingle();
 
   if (!invoice) return NextResponse.redirect(appUrl());
 
@@ -93,11 +106,12 @@ export async function GET(request: NextRequest) {
       .update({
         status: 'paid',
         paid_at: new Date().toISOString(),
-        // The order was created from the stored amount and Viva can only charge
-        // what the order says, so this is exact. Recorded rather than left null
-        // so every settled invoice answers "how much arrived" the same way,
-        // whichever provider took it.
-        paid_amount_cents: invoice.amount_cents,
+        // Viva charges exactly what the order was minted for, so the amount
+        // recorded at minting time is the amount that arrived. The invoice row
+        // is only the fallback — its amount can legitimately change while a
+        // checkout sits open (an Elorus correction, a manual edit), and writing
+        // the corrected figure here would claim money that never came.
+        paid_amount_cents: order?.amount_cents ?? invoice.amount_cents,
         viva_transaction_id: transaction.transactionId,
       })
       .eq('id', invoice.id)

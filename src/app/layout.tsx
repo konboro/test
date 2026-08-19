@@ -10,14 +10,9 @@ import './globals.css';
  * are copy like any other, and a static object cannot read the locale.
  */
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getDictionary();
-  const locale = await getLocale();
+  const [t, locale] = await Promise.all([getDictionary(), getLocale()]);
 
   return {
-    // Without a base, every relative canonical and og:url below resolves
-    // against nothing and Next drops it. It is the one setting that decides
-    // whether the rest of this object reaches a crawler at all.
-    metadataBase: new URL(appUrl()),
     // `template` keeps the wordmark in the tab title on every page without each
     // one having to repeat it.
     title: {
@@ -26,22 +21,27 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     description: t.common.appDescription,
     applicationName: 'lefta.app',
-    // Defaults for the public pages; each one narrows the title, description
-    // and url to its own. No canonical is set here on purpose — inherited, it
-    // would point the login and payment pages at the home page, which is a
-    // claim about them that is not true.
+
+    // Without a base, every canonical and Open Graph URL below resolves
+    // relative to nothing and the tags are quietly useless.
+    metadataBase: new URL(appUrl()),
+    alternates: { canonical: '/' },
+
     openGraph: {
-      type: 'website',
+      title: t.common.appTitle,
+      description: t.common.appDescription,
+      url: '/',
       siteName: 'lefta.app',
-      locale: locale === 'el' ? 'el_GR' : 'en_GB',
-      title: t.common.appTitle,
-      description: t.common.appDescription,
+      // The market is Greek; the interface also speaks English.
+      locale: locale === 'en' ? 'en_GB' : 'el_GR',
+      type: 'website',
     },
-    twitter: {
-      card: 'summary',
-      title: t.common.appTitle,
-      description: t.common.appDescription,
-    },
+
+    twitter: { card: 'summary_large_image', title: t.common.appTitle, description: t.common.appDescription },
+
+    // Both interface languages answer on the same URL, chosen by the account
+    // and a cookie, so they share one canonical rather than splitting rank.
+    robots: { index: true, follow: true },
   };
 }
 

@@ -59,7 +59,7 @@ export async function runImport(_prev: ImportState, formData: FormData): Promise
       termDays: Number(formData.get('term_days') ?? 0),
     });
   } catch {
-    return { error: 'Nieprawidłowe dane importu.' };
+    return { error: 'Μη έγκυρα δεδομένα εισαγωγής.' };
   }
 
   const table = parseCsv(parsedInput.text);
@@ -71,7 +71,7 @@ export async function runImport(_prev: ImportState, formData: FormData): Promise
   );
 
   if (!preview.rows.length) {
-    return { error: 'Żaden wiersz nie nadaje się do zaimportowania. Sprawdź przypisanie kolumn.' };
+    return { error: 'Καμία γραμμή δεν είναι κατάλληλη για εισαγωγή. Ελέγξτε την αντιστοίχιση των στηλών.' };
   }
 
   const outcome = await commitImport(user.id, preview.rows);

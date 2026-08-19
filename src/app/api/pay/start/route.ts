@@ -82,22 +82,67 @@ export async function POST(request: Request) {
     invoice.id.slice(0, 8);
 
   if (provider === 'viva') {
+    // Viva books the order in the merchant wallet's currency and the order
+    // payload carries no currency field, so a non-EUR document would be charged
+    // as face-value euros and then marked fully paid. Refuse instead.
+    if (invoice.currency.toUpperCase() !== 'EUR') {
+      return NextResponse.json(
+        { error: 'Ο εκδότης δεν δέχεται προς το παρόν ηλεκτρονικές πληρωμές.' },
+        { status: 409 },
+      );
+    }
+
     const credentials = vivaCredentialsFor(creditor!);
     if (!credentials) {
       return NextResponse.json({ error: 'Viva is not configured.' }, { status: 409 });
     }
 
-    const orderCode = await createOrder(credentials, {
-      amountCents: invoice.amount_cents,
-      customerTrns: `Παραστατικό ${label}`,
-      merchantTrns: `lefta ${label}`,
-      customerEmail: debtor?.email ?? null,
-    });
+    let orderCode: string;
+    try {
+      orderCode = await createOrder(credentials, {
+        amountCents: invoice.amount_cents,
+        customerTrns: `Παραστατικό ${label}`,
+        customerEmail: debtor?.email ?? null,
+        merchantTrns: `lefta ${label}`,
+      });
+    } catch (cause) {
+      // A mistyped source code or a revoked credential surfaces here, at the
+      // first press — as a message the debtor can act on, not a bare 500.
+      console.error('[pay:start] Viva refused the order', String(cause));
+      return NextResponse.json(
+        { error: 'Δεν ήταν δυνατή η έναρξη της πληρωμής. Δοκιμάστε ξανά.' },
+        { status: 502 },
+      );
+    }
 
-    // Stored before the debtor is sent anywhere. The return route settles only a
-    // transaction whose order code matches this one, so an order that was never
-    // recorded can never settle anything.
-    await admin.from('invoices').update({ viva_order_code: orderCode }).eq('id', invoice.id);
+    // Recorded before the debtor is sent anywhere: a checkout the database does
+    // not know about can never settle. Two writes on purpose — viva_orders keeps
+    // EVERY order this invoice ever minted (a second press must not orphan a
+    // first order that is still payable), and the invoice column keeps pointing
+    // at the latest one for the timeline and as the pre-migration fallback.
+    const { error: recordError } = await admin.from('viva_orders').insert({
+      order_code: orderCode,
+      user_id: invoice.user_id,
+      invoice_id: invoice.id,
+      amount_cents: invoice.amount_cents,
+    });
+    const { error: pointerError } = await admin
+      .from('invoices')
+      .update({ viva_order_code: orderCode })
+      .eq('id', invoice.id);
+
+    if (recordError) console.error('[pay:start] viva_orders write failed', recordError.message);
+    if (pointerError) console.error('[pay:start] viva pointer write failed', pointerError.message);
+
+    // Either write alone is enough to resolve the payment on return. Both
+    // failing means the checkout would be untraceable — the debtor could pay
+    // and nothing would ever settle — so they must not be sent there.
+    if (recordError && pointerError) {
+      return NextResponse.json(
+        { error: 'Δεν ήταν δυνατή η έναρξη της πληρωμής. Δοκιμάστε ξανά.' },
+        { status: 502 },
+      );
+    }
 
     await recordFunnelEvent({
       userId: invoice.user_id,
@@ -149,9 +194,20 @@ export async function POST(request: Request) {
   };
 
   // Passing options at all is conditional: see TenantPayments in lib/stripe.
-  const session = payments.options
-    ? await payments.client.checkout.sessions.create(params, payments.options)
-    : await payments.client.checkout.sessions.create(params);
+  let session;
+  try {
+    session = payments.options
+      ? await payments.client.checkout.sessions.create(params, payments.options)
+      : await payments.client.checkout.sessions.create(params);
+  } catch (cause) {
+    // A revoked key or a disabled account fails here; the debtor gets a message
+    // they can retry on rather than a bare 500.
+    console.error('[pay:start] Stripe refused the session', String(cause));
+    return NextResponse.json(
+      { error: 'Δεν ήταν δυνατή η έναρξη της πληρωμής. Δοκιμάστε ξανά.' },
+      { status: 502 },
+    );
+  }
 
   await admin
     .from('invoices')

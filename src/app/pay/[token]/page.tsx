@@ -1,12 +1,11 @@
 import { PayView } from '../pay-view';
 
-// A payment page names a debtor and what they owe. `robots.txt` can ask a
-// crawler not to fetch it, but not to leave the URL out of an index it heard
-// about elsewhere — and the short links live at the domain root, where no
-// prefix rule can reach them. This directive is the one that actually holds.
 export const metadata = {
   title: 'Εξόφληση παραστατικού',
-  robots: { index: false, follow: false },
+  // This page names a debtor and what they owe. Indexed, it would publish a
+  // private debt to anyone searching that person's name — and `nocache` keeps
+  // it out of the cached copy a delisting would otherwise leave behind.
+  robots: { index: false, follow: false, nocache: true },
 };
 export const dynamic = 'force-dynamic';
 

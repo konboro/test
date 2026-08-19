@@ -1,26 +1,52 @@
 import type { MetadataRoute } from 'next';
 
 import { appUrl } from '@/lib/env';
+import { GUIDES } from '@/lib/guides';
 
 /**
- * The pages worth crawling: three, and only three.
+ * The pages worth indexing, which is a short list on purpose.
  *
- * Everything else behind the login is gated by the middleware and would answer a
- * crawler with a redirect, and the payment pages must never be listed — each one
- * carries a named debtor and an amount. Listing only what is genuinely public
- * also means a URL appearing here later is a decision somebody made, not a route
- * that leaked in.
- *
- * `lastModified` is deliberately absent. It would have to be either the moment
- * of the request, which tells a crawler the page changes constantly and is a
- * lie, or a hardcoded date that goes stale the next time the copy is edited.
+ * A sitemap listing sign-in and sign-up pages tells a search engine to spend
+ * its crawl on screens with nothing to rank for. The landing page carries the
+ * whole proposition; the rest of the product is private.
  */
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = appUrl();
 
   return [
-    { url: base, changeFrequency: 'monthly', priority: 1 },
-    { url: `${base}/pricing`, changeFrequency: 'monthly', priority: 0.8 },
-    { url: `${base}/faq`, changeFrequency: 'monthly', priority: 0.8 },
+    {
+      url: base,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 1,
+    },
+    // Two pages that answer a question before anyone signs up: what it costs,
+    // and who ends up holding the money. Both rank for terms the landing page
+    // cannot, because the landing page is about the product rather than about
+    // the question.
+    {
+      url: `${base}/pricing`,
+      changeFrequency: 'monthly' as const,
+      priority: 0.8,
+    },
+    {
+      url: `${base}/faq`,
+      changeFrequency: 'monthly' as const,
+      priority: 0.8,
+    },
+    {
+      url: `${base}/odigos`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly' as const,
+      priority: 0.6,
+    },
+    // The articles are what can rank for a question someone actually typed;
+    // the landing page only ever ranks for the product name.
+    ...GUIDES.map((guide) => ({
+      url: `${base}/odigos/${guide.slug}`,
+      lastModified: new Date(guide.published),
+      changeFrequency: 'monthly' as const,
+      priority: 0.8,
+    })),
   ];
 }
