@@ -440,6 +440,12 @@ const el = {
       'Μόλις σταλούν οι πρώτες υπενθυμίσεις, εδώ θα φαίνεται πόσοι άνοιξαν τον σύνδεσμο πληρωμής, πόσοι ξεκίνησαν πληρωμή και πόσοι εξόφλησαν — ανά κανάλι.',
     funnelUntagged: (n: number) =>
       `${n} ${n === 1 ? 'επίσκεψη' : 'επισκέψεις'} στον σύνδεσμο χωρίς ετικέτα καναλιού (πληκτρολογημένος ή προωθημένος σύνδεσμος).`,
+    activityTitle: 'Ποιος άνοιξε και ποιος πλήρωσε',
+    activityOpened: 'Άνοιξε',
+    activityStarted: 'Ξεκίνησε πληρωμή',
+    activityPaid: 'Εξοφλήθηκε',
+    activityDirect: 'Απευθείας',
+    activityMore: (n: number) => `και άλλες ${n} εγγραφές`,
   },
 
   invoices: {
@@ -1158,6 +1164,12 @@ const en: typeof el = {
       'As soon as the first reminders go out, this shows how many opened the payment link, started paying, and settled — per channel.',
     funnelUntagged: (n: number) =>
       `${n} ${n === 1 ? 'visit' : 'visits'} to the link carried no channel tag (typed or forwarded link).`,
+    activityTitle: 'Who opened and who paid',
+    activityOpened: 'Opened',
+    activityStarted: 'Started paying',
+    activityPaid: 'Settled',
+    activityDirect: 'Direct',
+    activityMore: (n: number) => `and ${n} more`,
   },
 
   invoices: {
