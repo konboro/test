@@ -15,6 +15,7 @@ import type { DunningStep } from '@/types/database';
 
 import { markInvoicePaid, runScenarioForSelected, sendBulkReminder } from './actions';
 import { CopyPayLink, CreateInvoiceForm, DueDateButton, RemindButton } from './invoice-forms';
+import { BulkActions } from './bulk-actions';
 import { SelectAll } from './select-all';
 
 export async function generateMetadata() {
@@ -270,22 +271,12 @@ export default async function InvoicesPage({
                 <option value="email">{t.reminder.channelEmail}</option>
                 <option value="sms">{t.reminder.channelSms}</option>
               </select>
-              <button
-                type="submit"
-                className="rounded-lg bg-brand-600 px-3.5 py-1.5 text-sm font-medium text-white shadow-sm outline-none transition hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
-              >
-                {t.invoices.bulk.send}
-              </button>
-
-              {/* Same selection, but the cadence decides what goes out rather
-                  than the picker beside it. */}
-              <button
-                type="submit"
-                formAction={runScenarioForSelected}
-                className="rounded-lg border border-ink-300 bg-white px-3.5 py-1.5 text-sm font-medium text-ink-700 outline-none transition hover:bg-ink-50 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
-              >
-                {t.invoices.bulk.runScenario}
-              </button>
+                <BulkActions
+                  sendLabel={t.invoices.bulk.send}
+                  sendingLabel={t.invoices.bulk.sending}
+                  scenarioLabel={t.invoices.bulk.runScenario}
+                  runScenario={runScenarioForSelected}
+                />
             </form>
           ) : null}
           <div className="overflow-x-auto">

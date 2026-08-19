@@ -445,6 +445,7 @@ const el = {
   invoices: {
     bulk: {
       runScenario: 'Εκτέλεση σεναρίου',
+      sending: 'Αποστολή…',
       notDue: (n: number) => `${n} δεν έχουν φτάσει ακόμη σε βήμα του σεναρίου.`,
       selected: (n: number) => `${n} επιλεγμένα`,
       selectAll: 'Επιλογή όλων',
@@ -1162,6 +1163,7 @@ const en: typeof el = {
   invoices: {
     bulk: {
       runScenario: 'Run the scenario',
+      sending: 'Sending…',
       notDue: (n: number) => `${n} have not reached a step of the scenario yet.`,
       selected: (n: number) => `${n} selected`,
       selectAll: 'Select all',
