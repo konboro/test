@@ -4,7 +4,14 @@ import { isPayCode } from '@/lib/pay-code';
 
 import { PayView } from '../pay/pay-view';
 
-export const metadata = { title: 'Εξόφληση παραστατικού' };
+// A payment page names a debtor and what they owe. `robots.txt` can ask a
+// crawler not to fetch it, but not to leave the URL out of an index it heard
+// about elsewhere — and the short links live at the domain root, where no
+// prefix rule can reach them. This directive is the one that actually holds.
+export const metadata = {
+  title: 'Εξόφληση παραστατικού',
+  robots: { index: false, follow: false },
+};
 export const dynamic = 'force-dynamic';
 
 /**

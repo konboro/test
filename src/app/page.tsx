@@ -1,30 +1,39 @@
-import Link from 'next/link';
+import type { Metadata } from 'next';
 
-import { LeftaLogo, LeftaMark } from '@/components/logo';
+import { LeftaMark } from '@/components/logo';
+import { JsonLd, PublicFooter, PublicHeader } from '@/components/public-chrome';
 import { ButtonLink } from '@/components/ui';
+import { appUrl } from '@/lib/env';
 import { getDictionary } from '@/lib/i18n';
+
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getDictionary();
+
+  return {
+    alternates: { canonical: '/' },
+    openGraph: { url: '/', title: t.common.appTitle, description: t.common.appDescription },
+  };
+}
 
 export default async function HomePage() {
   const t = await getDictionary();
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-40 border-b border-ink-200/90 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-4">
-          <LeftaLogo />
-          <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="text-sm font-medium text-ink-600 transition hover:text-ink-900"
-            >
-              {t.landing.signIn}
-            </Link>
-            <ButtonLink href="/register" variant="brand">
-              {t.landing.freeTrial}
-            </ButtonLink>
-          </div>
-        </div>
-      </header>
+      <PublicHeader t={t} />
+
+      <JsonLd
+        data={{
+          '@context': 'https://schema.org',
+          '@type': 'SoftwareApplication',
+          name: 'lefta.app',
+          applicationCategory: 'BusinessApplication',
+          operatingSystem: 'Web',
+          url: appUrl(),
+          description: t.common.appDescription,
+          offers: { '@type': 'Offer', price: 0, priceCurrency: 'EUR' },
+        }}
+      />
 
       <main className="mx-auto max-w-5xl px-4">
         <section className="py-16 text-center sm:py-20">
@@ -116,12 +125,7 @@ export default async function HomePage() {
         </section>
       </main>
 
-      <footer className="border-t border-ink-200 py-8">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-4">
-          <LeftaLogo markClassName="h-6 w-6" textClassName="text-sm" />
-          <p className="text-xs text-ink-500">© {new Date().getFullYear()} lefta.app</p>
-        </div>
-      </footer>
+      <PublicFooter t={t} />
     </div>
   );
 }

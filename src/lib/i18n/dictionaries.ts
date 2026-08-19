@@ -261,6 +261,94 @@ const el = {
       },
     ],
   },
+  pricing: {
+    metaTitle: 'Τιμές',
+    metaDescription:
+      'Η lefta.app είναι δωρεάν: απεριόριστες υπενθυμίσεις με email και καμία προμήθεια στις εισπράξεις σας. Πληρώνετε μόνο τα SMS που στέλνετε.',
+    title: 'Πληρώνετε μόνο ό,τι στέλνετε',
+    subtitle:
+      'Καμία συνδρομή, καμία δέσμευση, κανένα ποσοστό στα χρήματά σας. Τα email δεν χρεώνονται· τα SMS αγοράζονται σε πακέτα, όποτε τα χρειαστείτε.',
+    planName: 'lefta.app',
+    planPrice: '0 €',
+    planPeriod: 'χωρίς συνδρομή',
+    planHint: 'Όλα όσα χρειάζεται μια επιχείρηση για να εισπράττει ό,τι της οφείλεται.',
+    includedTitle: 'Περιλαμβάνονται',
+    included: [
+      'Απεριόριστες υπενθυμίσεις με email',
+      'Συγχρονισμός παραστατικών από Elorus και myDATA (ΑΑΔΕ)',
+      'Σύνδεσμος πληρωμής με κάρτα σε κάθε υπενθύμιση',
+      'Αυτόματη αντιστοίχιση τραπεζικών εμβασμάτων',
+      'Δικά σας κείμενα σε κάθε βήμα και κάθε κανάλι',
+      'Πλήρες, αμετάβλητο αρχείο κάθε μηνύματος',
+    ],
+    smsTitle: 'SMS, με το πακέτο',
+    smsHint: 'Προπληρωμένα και χωρίς ημερομηνία λήξης.',
+    smsPerMessage: (price: string) => `${price} ανά SMS`,
+    smsNote:
+      'Τα ελληνικά μηνύματα στέλνονται σε UCS-2, οπότε ένα τμήμα SMS είναι 70 χαρακτήρες αντί για 160. Ο συντάκτης μηνυμάτων δείχνει πόσα τμήματα χρεώνεστε καθώς γράφετε.',
+    commissionTitle: 'Καμία προμήθεια στις εισπράξεις σας',
+    commissionBody:
+      'Συνδέετε τον δικό σας λογαριασμό Stripe ή Viva.com και ο πελάτης πληρώνει απευθείας εκεί. Η lefta.app δεν βρίσκεται ποτέ στη ροή του χρήματος, δεν εμφανίζεται στη συναλλαγή και δεν κρατά ποσοστό. Πληρώνετε μόνο τις προμήθειες του παρόχου καρτών που έχετε ήδη.',
+    ctaTitle: 'Δείτε σήμερα τι σας οφείλουν',
+    ctaBody: 'Η σύνδεση των βιβλίων σας παίρνει λίγα λεπτά και δεν φεύγει καμία υπενθύμιση πριν την εγκρίνετε.',
+    faqLink: 'Έχετε ερώτηση; Δείτε τις συχνές ερωτήσεις.',
+  },
+  faq: {
+    metaTitle: 'Συχνές ερωτήσεις',
+    metaDescription:
+      'Τι κοστίζει η lefta.app, ποιος εισπράττει τα χρήματα, από πού έρχονται τα τιμολόγια και τι συμβαίνει μόλις ο πελάτης πληρώσει.',
+    title: 'Συχνές ερωτήσεις',
+    subtitle: 'Ό,τι ρωτούν συνήθως οι ελληνικές επιχειρήσεις πριν ξεκινήσουν.',
+    items: [
+      {
+        q: 'Πόσο κοστίζει η lefta.app;',
+        a: 'Η χρήση είναι δωρεάν. Οι υπενθυμίσεις με email δεν χρεώνονται και δεν υπάρχει συνδρομή. Πληρώνετε μόνο τα SMS που στέλνετε, σε προπληρωμένα πακέτα.',
+      },
+      {
+        q: 'Κρατάτε προμήθεια από τις εισπράξεις μου;',
+        a: 'Όχι. Συνδέετε τον δικό σας λογαριασμό Stripe ή Viva.com και ο πελάτης πληρώνει απευθείας εκεί. Η lefta.app δεν βρίσκεται ποτέ στη ροή του χρήματος, δεν εμφανίζεται στη συναλλαγή και δεν κρατά ποσοστό.',
+      },
+      {
+        q: 'Είστε εισπρακτική εταιρεία;',
+        a: 'Όχι. Η lefta.app διαβιβάζει υπενθυμίσεις για λογαριασμό σας ως πάροχος λογισμικού. Δεν αναλαμβάνει απαιτήσεις, δεν διαπραγματεύεται οφειλές και δεν ασκεί πίεση. Κάθε πελάτης δέχεται το πολύ μία επικοινωνία ανά ημερολογιακή ημέρα, η αλληλουχία σταματά μόνη της και μπορείτε να τη διακόψετε ανά πάσα στιγμή.',
+      },
+      {
+        q: 'Από πού έρχονται τα τιμολόγια;',
+        a: 'Από το Elorus ή απευθείας από το myDATA της ΑΑΔΕ. Μπορείτε επίσης να καταχωρίσετε ένα παραστατικό με το χέρι. Ο πελάτης, το ποσό και η πραγματική ημερομηνία λήξης έρχονται από το ίδιο το παραστατικό, χωρίς να πληκτρολογήσετε τίποτα δύο φορές.',
+      },
+      {
+        q: 'Τι γίνεται όταν ο πελάτης πληρώσει;',
+        a: 'Η αλληλουχία σταματά αυτόματα. Με πληρωμή μέσω του συνδέσμου το παραστατικό κλείνει αμέσως· με έμβασμα κλείνει μόλις η lefta.app αναγνωρίσει την κίνηση στον λογαριασμό σας. Κανείς δεν λαμβάνει υπενθύμιση για οφειλή που έχει ήδη εξοφλήσει.',
+      },
+      {
+        q: 'Πώς πληρώνει ο πελάτης μου;',
+        a: 'Κάθε υπενθύμιση περιέχει έναν σύντομο σύνδεσμο της μορφής lefta.app/KWDIKOS. Ανοίγει σελίδα πληρωμής με κάρτα — χωρίς εφαρμογή, χωρίς λογαριασμό, χωρίς εγγραφή.',
+      },
+      {
+        q: 'Μπορώ να αλλάξω τα κείμενα των μηνυμάτων;',
+        a: 'Ναι, όλα. Κάθε βήμα και κάθε κανάλι έχει δικό του κείμενο, με προεπισκόπηση στα πραγματικά στοιχεία του παραστατικού. Στα SMS βλέπετε πόσα τμήματα χρεώνεστε καθώς γράφετε.',
+      },
+      {
+        q: 'Πόσο συχνά στέλνονται υπενθυμίσεις;',
+        a: 'Εσείς ορίζετε το σενάριο: πόσες ημέρες πριν ή μετά τη λήξη στέλνεται κάθε βήμα και από ποιο κανάλι. Ανεξάρτητα από τη ρύθμιση, ένας πελάτης δέχεται το πολύ μία επικοινωνία την ημέρα και οι αυτόματες υπενθυμίσεις σταματούν όταν η οφειλή ξεπεράσει τις 120 ημέρες.',
+      },
+      {
+        q: 'Χρειάζεται σύμβαση ή δέσμευση;',
+        a: 'Όχι. Δεν υπάρχει συνδρομή, ελάχιστη διάρκεια ή χρέωση διακοπής, και τα SMS που έχετε αγοράσει δεν λήγουν.',
+      },
+      {
+        q: 'Τι γίνεται με τα δεδομένα μου;',
+        a: 'Τα κλειδιά που καταχωρείτε αποθηκεύονται κρυπτογραφημένα και δεν επιστρέφονται ποτέ στον περιηγητή. Κάθε μήνυμα που φεύγει καταγράφεται με ώρα, παραλήπτη και περιεχόμενο, σε αρχείο που δεν επιδέχεται μεταγενέστερη τροποποίηση.',
+      },
+      {
+        q: 'Δουλεύει και με τραπεζικά εμβάσματα;',
+        a: 'Ναι. Η lefta.app διαβάζει τις εισερχόμενες κινήσεις του λογαριασμού σας και κλείνει τα παραστατικά που αυτές εξηγούν, ώστε τα εμβάσματα να πάψουν να είναι το τυφλό σημείο.',
+      },
+    ],
+    stillTitle: 'Κάτι άλλο;',
+    stillBody: 'Ξεκινήστε δωρεάν — δεν φεύγει καμία υπενθύμιση πριν την εγκρίνετε εσείς.',
+    pricingLink: 'Δείτε τις τιμές',
+  },
   common: {
     appTitle: 'lefta.app — Αυτοματοποιημένες εισπράξεις',
     appDescription:
@@ -977,6 +1065,94 @@ const en: typeof el = {
         body: 'How late every debt is, in one column. Every message sent is logged with its time, recipient and content.',
       },
     ],
+  },
+  pricing: {
+    metaTitle: 'Pricing',
+    metaDescription:
+      'lefta.app is free: unlimited email reminders and no commission on what you collect. You pay only for the SMS you send.',
+    title: 'You pay only for what you send',
+    subtitle:
+      'No subscription, no commitment, and no cut of your money. Email costs nothing; SMS is bought in packs, whenever you need them.',
+    planName: 'lefta.app',
+    planPrice: '€0',
+    planPeriod: 'no subscription',
+    planHint: 'Everything a business needs to collect what it is owed.',
+    includedTitle: 'Included',
+    included: [
+      'Unlimited email reminders',
+      'Invoice sync from Elorus and myDATA (AADE)',
+      'A card payment link in every reminder',
+      'Incoming bank transfers matched automatically',
+      'Your own words on every step and channel',
+      'A complete, tamper-proof record of every message',
+    ],
+    smsTitle: 'SMS, by the pack',
+    smsHint: 'Prepaid, and they do not expire.',
+    smsPerMessage: (price: string) => `${price} per SMS`,
+    smsNote:
+      'Greek messages are sent as UCS-2, so one SMS segment is 70 characters rather than 160. The message editor shows how many segments you are paying for as you type.',
+    commissionTitle: 'No commission on what you collect',
+    commissionBody:
+      'You connect your own Stripe or Viva.com account and your customer pays straight into it. lefta.app never sits in the flow of money, does not appear in the transaction and takes no percentage. You pay only the card fees you already have.',
+    ctaTitle: 'See what you are owed today',
+    ctaBody: 'Connecting your books takes a few minutes, and no reminder goes out until you have approved it.',
+    faqLink: 'Got a question? Read the FAQ.',
+  },
+  faq: {
+    metaTitle: 'Frequently asked questions',
+    metaDescription:
+      'What lefta.app costs, who collects the money, where the invoices come from, and what happens the moment your customer pays.',
+    title: 'Frequently asked questions',
+    subtitle: 'What Greek businesses usually ask before they start.',
+    items: [
+      {
+        q: 'What does lefta.app cost?',
+        a: 'It is free to use. Email reminders are not charged and there is no subscription. You pay only for the SMS you send, in prepaid packs.',
+      },
+      {
+        q: 'Do you take a commission on what I collect?',
+        a: 'No. You connect your own Stripe or Viva.com account and your customer pays straight into it. lefta.app never sits in the flow of money, does not appear in the transaction and takes no percentage.',
+      },
+      {
+        q: 'Are you a collections agency?',
+        a: 'No. lefta.app passes on reminders for you, as a software provider. It does not take over claims, negotiate debts or apply pressure. Every customer receives at most one contact per calendar day, the sequence stops by itself, and you can mute it at any moment.',
+      },
+      {
+        q: 'Where do the invoices come from?',
+        a: 'From Elorus, or straight from myDATA (AADE). You can also enter a document by hand. The customer, the amount and the real due date come from the document itself, so you never type anything twice.',
+      },
+      {
+        q: 'What happens when my customer pays?',
+        a: 'The sequence stops on its own. Paid through the link, the invoice closes immediately; paid by transfer, it closes as soon as lefta.app recognises the movement in your account. Nobody is chased for an invoice they have already settled.',
+      },
+      {
+        q: 'How does my customer pay?',
+        a: 'Every reminder carries a short link that looks like lefta.app/CODE. It opens a card payment page — no app, no account, no sign-up.',
+      },
+      {
+        q: 'Can I change the wording of the messages?',
+        a: 'All of it. Every step and every channel has its own text, previewed against the real values of the document. For SMS you see how many segments you are paying for as you type.',
+      },
+      {
+        q: 'How often are reminders sent?',
+        a: 'You set the scenario: how many days before or after the due date each step goes out, and on which channel. Whatever you choose, a customer receives at most one contact per day, and automatic reminders stop once a debt passes 120 days.',
+      },
+      {
+        q: 'Is there a contract or a commitment?',
+        a: 'No. There is no subscription, no minimum term and no cancellation fee, and the SMS you have bought do not expire.',
+      },
+      {
+        q: 'What happens to my data?',
+        a: 'The keys you enter are stored encrypted and are never read back to the browser. Every message that goes out is recorded with its time, recipient and content, in a log that cannot be altered afterwards.',
+      },
+      {
+        q: 'Does it work with bank transfers?',
+        a: 'Yes. lefta.app reads the incoming movements on your account and closes the invoices they explain, so transfers stop being the blind spot.',
+      },
+    ],
+    stillTitle: 'Anything else?',
+    stillBody: 'Start free — no reminder goes out until you have approved it.',
+    pricingLink: 'See the pricing',
   },
   common: {
     appTitle: 'lefta.app — automated receivables',
