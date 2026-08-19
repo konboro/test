@@ -153,6 +153,11 @@ export default async function HomePage() {
       <footer className="border-t border-ink-200 py-8">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-4">
           <LeftaLogo markClassName="h-6 w-6" textClassName="text-sm" />
+          {/* Without a link from here the guides are orphans: nothing on the
+              site points at them, so nothing crawls them. */}
+          <Link href="/odigos" className="text-xs text-ink-500 transition hover:text-ink-800">
+            Οδηγοί
+          </Link>
           <p className="text-xs text-ink-500">© {new Date().getFullYear()} lefta.app</p>
         </div>
       </footer>

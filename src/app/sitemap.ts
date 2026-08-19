@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
 
 import { appUrl } from '@/lib/env';
+import { GUIDES } from '@/lib/guides';
 
 /**
  * The pages worth indexing, which is a short list on purpose.
@@ -19,5 +20,19 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'weekly',
       priority: 1,
     },
+    {
+      url: `${base}/odigos`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly' as const,
+      priority: 0.6,
+    },
+    // The articles are what can rank for a question someone actually typed;
+    // the landing page only ever ranks for the product name.
+    ...GUIDES.map((guide) => ({
+      url: `${base}/odigos/${guide.slug}`,
+      lastModified: new Date(guide.published),
+      changeFrequency: 'monthly' as const,
+      priority: 0.8,
+    })),
   ];
 }
