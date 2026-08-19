@@ -151,6 +151,9 @@ export type MessageTemplateRow = {
   user_id: string;
   step: TemplateStep;
   channel: CommChannel;
+  // Names a manual wording; null is the plain manual reminder. Set only where
+  // step is null, which a check constraint enforces rather than convention.
+  variant: string | null;
   subject: string | null;
   body: string;
   created_at: string;

@@ -5,6 +5,7 @@ import {
   DEFAULT_TEMPLATES,
   EDITABLE_SLOTS,
   parseReminderChoice,
+  parseReminderSlot,
   parseSlotKey,
   REMINDER_CHOICES,
   renderEmail,
@@ -85,18 +86,23 @@ describe('template resolution', () => {
   it('every editable slot has a built-in default behind it', () => {
     for (const slot of EDITABLE_SLOTS) {
       expect(DEFAULT_TEMPLATES[slot.key]?.body ?? '').not.toBe('');
-      expect(parseSlotKey(slot.key)).toEqual({ step: slot.step, channel: slot.channel });
+      expect(parseSlotKey(slot.key)).toEqual({
+        step: slot.step,
+        channel: slot.channel,
+        variant: slot.variant ?? null,
+      });
     }
   });
 
   it('resolves every reminder choice to a renderable template', () => {
     for (const choice of REMINDER_CHOICES) {
-      const step = parseReminderChoice(choice.value);
-      expect(step).toBe(choice.step);
+      const slot = parseReminderSlot(choice.value);
+      expect(slot).toEqual({ step: choice.step, variant: choice.variant ?? null });
       // Both channels must render for any choice the picker offers, including
-      // the step-1 wording whose SMS body the ladder itself never uses.
-      expect(renderEmail(step as never, ctx).text).not.toBe('');
-      expect(renderSms(step as never, ctx)).not.toBe('');
+      // the step-1 wording whose SMS body the ladder itself never uses, and a
+      // named wording that defines only one of the two.
+      expect(renderEmail(slot!.step, ctx, {}, slot!.variant).text).not.toBe('');
+      expect(renderSms(slot!.step, ctx, {}, slot!.variant)).not.toBe('');
     }
   });
 
@@ -169,5 +175,45 @@ describe('email rendering', () => {
 
     expect(html).toContain('το ποσό είναι 1.240,00');
     expect(html).toContain('mso-hide:all');
+  });
+});
+
+describe('the Penny wording', () => {
+  it('is its own slot, not the manual one', () => {
+    const penny = renderEmail(null, ctx, {}, 'penny');
+    const manual = renderEmail(null, ctx);
+
+    expect(penny.text).not.toBe(manual.text);
+    expect(penny.subject).not.toBe(manual.subject);
+    // Addressed to a person, so the business salutation must be gone.
+    expect(penny.text).not.toContain('Αγαπητοί συνεργάτες');
+    expect(penny.text).toContain('Γεια σου');
+  });
+
+  it('does not inherit an override written for the manual slot', () => {
+    // Both live under `step is null`. Keying them together would mean editing
+    // the manual reminder silently rewrites the Penny one.
+    const overrides: TemplateOverrides = {
+      'manual:email': { subject: 'Manual subject', body: 'Manual body' },
+    };
+
+    expect(renderEmail(null, ctx, overrides).text).toBe('Manual body');
+    expect(renderEmail(null, ctx, overrides, 'penny').text).not.toBe('Manual body');
+  });
+
+  it('falls back to the plain slot on a channel it does not define', () => {
+    // `penny` is email-only. A manual send to a debtor holding both an address
+    // and a phone renders both channels, and asking for a body that was never
+    // written must not throw on the way to a message the operator expected.
+    expect(() => renderSms(null, ctx, {}, 'penny')).not.toThrow();
+    expect(renderSms(null, ctx, {}, 'penny')).toBe(renderSms(null, ctx));
+  });
+
+  it('keeps its own subject when the manual subject is overridden', () => {
+    const overrides: TemplateOverrides = {
+      'manual:email': { subject: null, body: 'Manual body' },
+    };
+
+    expect(renderEmail(null, ctx, overrides, 'penny').subject).toContain('πληρωμή');
   });
 });

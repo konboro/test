@@ -21,7 +21,13 @@ import { normalisePhone, sendSms } from '@/lib/sms/send';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { DebtorRow, InvoiceRow, TemplateStep, UserRow } from '@/types/database';
 
-import { renderEmail, renderSms, type TemplateContext, type TemplateOverrides } from './templates';
+import {
+  renderEmail,
+  renderSms,
+  type TemplateContext,
+  type TemplateOverrides,
+  type TemplateVariant,
+} from './templates';
 
 export interface DispatchOutcome {
   emailsSent: number;
@@ -75,6 +81,11 @@ export async function dispatchContact(params: {
    */
   templateStep?: TemplateStep;
   /**
+   * The named wording to render with, when the copy is not a ladder step's.
+   * Only ever set for a manual send: a rung has exactly one wording.
+   */
+  templateVariant?: TemplateVariant;
+  /**
    * Null only when the contact limits are lifted for testing, in which case no
    * contact row exists to point at. The message is still logged.
    */
@@ -86,6 +97,7 @@ export async function dispatchContact(params: {
   // `templateStep` may legitimately be null, so distinguish "not passed" from
   // "passed as null" rather than falling back with ??.
   const copyStep = params.templateStep !== undefined ? params.templateStep : step;
+  const copyVariant = params.templateVariant ?? null;
   const supabase = createAdminClient();
   const ctx = templateContext(tenant, debtor, invoice);
   // Each channel carries its own tag on {{pay_url}}, so a visit to the payment
@@ -106,7 +118,7 @@ export async function dispatchContact(params: {
   };
 
   if (channels.includes('email') && debtor.email) {
-    const email = renderEmail(copyStep, channelCtx('email'), overrides);
+    const email = renderEmail(copyStep, channelCtx('email'), overrides, copyVariant);
 
     if (!emailAvailable()) {
       // Reached only when another channel carried this contact — a step is never
@@ -151,7 +163,7 @@ export async function dispatchContact(params: {
 
   const phone = normalisePhone(debtor.phone);
   if (channels.includes('sms') && phone) {
-    const body = renderSms(copyStep, channelCtx('sms'), overrides);
+    const body = renderSms(copyStep, channelCtx('sms'), overrides, copyVariant);
 
     // Ask whether the provider exists *before* reserving a credit. Reserving
     // first would push every message through a reserve-then-refund cycle that

@@ -9,7 +9,7 @@ import {
   type ChannelChoice,
   type ReminderPreview,
 } from '@/lib/dunning/manual';
-import { parseReminderChoice } from '@/lib/dunning/templates';
+import { parseReminderSlot } from '@/lib/dunning/templates';
 import { athensDate, toCents } from '@/lib/money';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
@@ -44,8 +44,8 @@ export async function sendReminder(
   const id = String(formData.get('id') ?? '');
   if (!id) return { error: t.forms.errors.missingInvoice };
 
-  const step = parseReminderChoice(String(formData.get('choice') ?? 'manual'));
-  if (step === undefined) return { error: t.forms.errors.unknownTemplate };
+  const slot = parseReminderSlot(String(formData.get('choice') ?? 'manual'));
+  if (!slot) return { error: t.forms.errors.unknownTemplate };
 
   const supabase = await createClient();
   const {
@@ -56,7 +56,8 @@ export async function sendReminder(
   const result = await sendManualReminder({
     userId: user.id,
     invoiceId: id,
-    step,
+    step: slot.step,
+    variant: slot.variant,
     only: channelChoice(formData.get('only')),
   });
 
@@ -92,8 +93,8 @@ export async function previewReminder(
 ): Promise<ReminderPreview> {
   const t = await getDictionary();
 
-  const step = parseReminderChoice(choice);
-  if (step === undefined) return { ok: false, error: t.forms.errors.unknownTemplate };
+  const slot = parseReminderSlot(choice);
+  if (!slot) return { ok: false, error: t.forms.errors.unknownTemplate };
 
   const supabase = await createClient();
   const {
@@ -101,7 +102,13 @@ export async function previewReminder(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: t.forms.errors.unauthorized };
 
-  return previewManualReminder({ userId: user.id, invoiceId, step, only: channelChoice(only) });
+  return previewManualReminder({
+    userId: user.id,
+    invoiceId,
+    step: slot.step,
+    variant: slot.variant,
+    only: channelChoice(only),
+  });
 }
 
 /**
@@ -286,7 +293,7 @@ const BULK_LIMIT = 50;
 export async function sendBulkReminder(formData: FormData): Promise<void> {
   const ids = formData.getAll('ids').map(String).filter(Boolean);
   const back = String(formData.get('back') ?? '/invoices');
-  const step = parseReminderChoice(String(formData.get('choice') ?? 'manual'));
+  const slot = parseReminderSlot(String(formData.get('choice') ?? 'manual'));
 
   const to = (params: Record<string, string | number>) => {
     const query = new URLSearchParams(back.split('?')[1] ?? '');
@@ -298,7 +305,7 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
   // redirect instantly and change nothing. Say which it was.
   console.info('[bulk] pressed', { ids: ids.length, back });
   if (!ids.length) redirect(to({ bulk: 'none' }));
-  if (step === undefined) redirect(to({ bulk: 'unknown_template' }));
+  if (!slot) redirect(to({ bulk: 'unknown_template' }));
 
   const supabase = await createClient();
   const {
@@ -317,7 +324,13 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
   // concurrent sends to one customer would race each other into it and the
   // outcome would depend on who lost.
   for (const id of batch) {
-    const result = await sendManualReminder({ userId: user.id, invoiceId: id, step, only });
+    const result = await sendManualReminder({
+      userId: user.id,
+      invoiceId: id,
+      step: slot.step,
+      variant: slot.variant,
+      only,
+    });
 
     if (result.error) {
       if (result.code === 'daily_limit') limited += 1;

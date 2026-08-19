@@ -172,9 +172,15 @@ export async function saveTemplate(
   } = await supabase.auth.getUser();
   if (!user) return { error: t.forms.errors.unauthorized };
 
+  // The variant has to narrow the lookup as well as the step: two manual slots
+  // now share `step is null`, and matching on the step alone would overwrite
+  // whichever of them was stored first.
   const lookup = supabase.from('message_templates').select('id').eq('channel', slot.channel);
   const { data: existing } = await (slot.step === null
-    ? lookup.is('step', null)
+    ? (slot.variant ? lookup.eq('variant', slot.variant) : lookup.is('variant', null)).is(
+        'step',
+        null,
+      )
     : lookup.eq('step', slot.step)
   ).maybeSingle();
 
@@ -188,6 +194,7 @@ export async function saveTemplate(
     : await supabase.from('message_templates').insert({
         user_id: user.id,
         step: slot.step,
+        variant: slot.variant,
         channel: slot.channel,
         subject,
         body: parsed.data.body,
@@ -217,7 +224,10 @@ export async function resetTemplate(
 
   const deletion = supabase.from('message_templates').delete().eq('channel', slot.channel);
   const { error } = await (slot.step === null
-    ? deletion.is('step', null)
+    ? (slot.variant ? deletion.eq('variant', slot.variant) : deletion.is('variant', null)).is(
+        'step',
+        null,
+      )
     : deletion.eq('step', slot.step));
 
   if (error) return { error: error.message };

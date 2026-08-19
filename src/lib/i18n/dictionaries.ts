@@ -512,6 +512,7 @@ const el = {
     // the customer's language.
     choices: {
       manual: 'Χειροκίνητη υπενθύμιση',
+      penny: 'Penny email — ιδιώτης πελάτης',
       pre_due: 'Κείμενο βήματος 1 — πριν τη λήξη',
       overdue_2: 'Κείμενο βήματος 2 — ληξιπρόθεσμο',
       overdue_10: 'Κείμενο βήματος 3 — τελική υπενθύμιση',
@@ -1223,6 +1224,7 @@ const en: typeof el = {
   reminder: {
     choices: {
       manual: 'Manual reminder',
+      penny: 'Penny email — consumer',
       pre_due: 'Step 1 wording — before the due date',
       overdue_2: 'Step 2 wording — overdue',
       overdue_10: 'Step 3 wording — final reminder',

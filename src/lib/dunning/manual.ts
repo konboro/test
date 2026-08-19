@@ -27,7 +27,7 @@ import type { DebtorRow, InvoiceRow, TemplateStep, UserRow } from '@/types/datab
 
 import { dispatchContact, templateContext } from './dispatch';
 import { loadTemplateOverrides } from './template-store';
-import { renderEmail, renderSms } from './templates';
+import { renderEmail, renderSms, type TemplateVariant } from './templates';
 import { getDictionary, type Dictionary } from '@/lib/i18n';
 
 /**
@@ -175,6 +175,7 @@ export async function previewManualReminder(params: {
   userId: string;
   invoiceId: string;
   step: TemplateStep;
+  variant?: TemplateVariant;
   only?: ChannelChoice;
 }): Promise<ReminderPreview> {
   const t = await getDictionary();
@@ -192,11 +193,13 @@ export async function previewManualReminder(params: {
     params.step,
     { ...ctx, payUrl: channelTaggedUrl(ctx.payUrl, 'email') },
     overrides,
+    params.variant ?? null,
   );
   const sms = renderSms(
     params.step,
     { ...ctx, payUrl: channelTaggedUrl(ctx.payUrl, 'sms') },
     overrides,
+    params.variant ?? null,
   );
 
   const { channels: available, notes } = resolveChannels(debtor, t);
@@ -226,6 +229,7 @@ export async function sendManualReminder(params: {
   userId: string;
   invoiceId: string;
   step: TemplateStep;
+  variant?: TemplateVariant;
   only?: ChannelChoice;
 }): Promise<ManualReminderResult> {
   const t = await getDictionary();
@@ -296,6 +300,7 @@ export async function sendManualReminder(params: {
     // never suggests a ladder step fired.
     step: null,
     templateStep: step,
+    templateVariant: params.variant ?? null,
     contactId,
     channels,
     overrides: await loadTemplateOverrides(userId),

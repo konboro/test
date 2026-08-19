@@ -31,10 +31,28 @@ export interface RenderedEmail {
  * way to author arbitrary HTML in a message sent on someone else's behalf.
  */
 
-/** A slot is one ladder step (or the manual reminder) on one channel. */
-export type TemplateSlotKey = `${'pre_due' | 'overdue_2' | 'overdue_10' | 'manual'}:${CommChannel}`;
+/**
+ * A slot is one ladder step on one channel, or one named manual wording.
+ *
+ * `penny:email` is not a fourth rung. A rung fires once per invoice, is placed
+ * by the scenario and is bound by the daily contact limit; a named wording is
+ * only ever chosen by a person, and choosing it consumes nothing. Holding both
+ * in one key space is safe precisely because a variant is allowed only where
+ * the step is already null — a check constraint enforces that, not this type.
+ */
+export type TemplateSlotKey =
+  | `${'pre_due' | 'overdue_2' | 'overdue_10' | 'manual'}:${CommChannel}`
+  | 'penny:email';
 
-export function slotKey(step: TemplateStep, channel: CommChannel): TemplateSlotKey {
+/** Names a manual wording. Null is the plain manual reminder. */
+export type TemplateVariant = 'penny' | null;
+
+export function slotKey(
+  step: TemplateStep,
+  channel: CommChannel,
+  variant: TemplateVariant = null,
+): TemplateSlotKey {
+  if (variant) return `${variant}:${channel}` as TemplateSlotKey;
   return `${step ?? 'manual'}:${channel}` as TemplateSlotKey;
 }
 
@@ -53,6 +71,7 @@ export const EDITABLE_SLOTS: ReadonlyArray<{
   key: TemplateSlotKey;
   step: TemplateStep;
   channel: CommChannel;
+  variant?: TemplateVariant;
   label: string;
 }> = [
   { key: 'pre_due:email', step: 'pre_due', channel: 'email', label: 'Βήμα 1 — πριν τη λήξη (email)' },
@@ -62,14 +81,24 @@ export const EDITABLE_SLOTS: ReadonlyArray<{
   { key: 'overdue_10:sms', step: 'overdue_10', channel: 'sms', label: 'Βήμα 3 — τελική υπενθύμιση (SMS)' },
   { key: 'manual:email', step: null, channel: 'email', label: 'Χειροκίνητη υπενθύμιση (email)' },
   { key: 'manual:sms', step: null, channel: 'sms', label: 'Χειροκίνητη υπενθύμιση (SMS)' },
+  // A second manual wording, for a debtor who is a person rather than a
+  // business. Email only: the SMS side of this copy has not been written, and
+  // an editable body that nothing ever sends is worse than its absence.
+  {
+    key: 'penny:email',
+    step: null,
+    channel: 'email',
+    variant: 'penny',
+    label: 'Penny email — ιδιώτης πελάτης',
+  },
 ];
 
 /** Validates a slot key coming from a form and splits it back into its parts. */
 export function parseSlotKey(
   value: string,
-): { step: TemplateStep; channel: CommChannel } | null {
+): { step: TemplateStep; channel: CommChannel; variant: TemplateVariant } | null {
   const slot = EDITABLE_SLOTS.find((s) => s.key === value);
-  return slot ? { step: slot.step, channel: slot.channel } : null;
+  return slot ? { step: slot.step, channel: slot.channel, variant: slot.variant ?? null } : null;
 }
 
 /**
@@ -82,9 +111,11 @@ export function parseSlotKey(
 export const REMINDER_CHOICES: ReadonlyArray<{
   value: string;
   step: TemplateStep;
+  variant?: TemplateVariant;
   label: string;
 }> = [
   { value: 'manual', step: null, label: 'Χειροκίνητη υπενθύμιση' },
+  { value: 'penny', step: null, variant: 'penny', label: 'Penny email — ιδιώτης πελάτης' },
   { value: 'pre_due', step: 'pre_due', label: 'Κείμενο βήματος 1 — πριν τη λήξη' },
   { value: 'overdue_2', step: 'overdue_2', label: 'Κείμενο βήματος 2 — ληξιπρόθεσμο' },
   { value: 'overdue_10', step: 'overdue_10', label: 'Κείμενο βήματος 3 — τελική υπενθύμιση' },
@@ -99,6 +130,21 @@ export const REMINDER_CHOICES: ReadonlyArray<{
 export function parseReminderChoice(value: string): TemplateStep | undefined {
   const choice = REMINDER_CHOICES.find((c) => c.value === value);
   return choice ? choice.step : undefined;
+}
+
+/**
+ * The whole slot a picker value renders with — ladder position and wording.
+ *
+ * `parseReminderChoice` answers only the first half, and is kept for the
+ * callers that genuinely want a ladder position. Anything that renders copy
+ * wants this instead: two choices may share a step and differ in wording, and
+ * resolving by step alone quietly sends the wrong one.
+ */
+export function parseReminderSlot(
+  value: string,
+): { step: TemplateStep; variant: TemplateVariant } | undefined {
+  const choice = REMINDER_CHOICES.find((c) => c.value === value);
+  return choice ? { step: choice.step, variant: choice.variant ?? null } : undefined;
 }
 
 export interface PlaceholderInfo {
@@ -214,16 +260,66 @@ export const DEFAULT_TEMPLATES: Record<
     subject: null,
     body: '{{creditor_name}}: υπενθύμιση για το {{invoice}} ({{amount}}). Εξόφληση: {{pay_url}}',
   },
+  // Addressed to a person who owes for a ride, not to a company that owes on an
+  // invoice. Singular and informal throughout, and no gendered salutation —
+  // `{{debtor_name}}` is a name, which says nothing about how to address its
+  // owner. It names the likely cause on purpose: most of these are a card that
+  // expired, and someone who knows that fixes it instead of wondering what the
+  // message is about. The document number stays in the facts box above.
+  'penny:email': {
+    subject: 'Εκκρεμεί η πληρωμή σου — {{amount}}',
+    body: [
+      'Γεια σου {{debtor_name}},',
+      '',
+      'η χρέωση των {{amount}} για τη διαδρομή σου δεν ολοκληρώθηκε, οπότε το ποσό παραμένει ανοιχτό. Προθεσμία εξόφλησης: {{due_date}}.',
+      '',
+      'Συνήθως φταίει κάτι απλό — μια κάρτα που έληξε ή ένα προσωρινό όριο της τράπεζας.',
+      '',
+      'Μπορείς να το τακτοποιήσεις με κάρτα σε λιγότερο από ένα λεπτό, χωρίς να ανοίξεις την εφαρμογή:',
+      '{{pay_url}}',
+      '',
+      'Αν το έχεις ήδη πληρώσει, αγνόησε αυτό το μήνυμα.',
+      '',
+      'Καλές διαδρομές,',
+      '{{creditor_name}}',
+    ].join('\n'),
+  },
 };
 
-/** The template in force for a slot: the tenant's override, else the built-in. */
+/**
+ * The built-in copy for a slot, if one was written.
+ *
+ * Indexed through a partial type on purpose: a named wording does not have to
+ * cover every channel, so this lookup genuinely can miss, and the declared
+ * Record type would otherwise promise a value that is not there.
+ */
+function builtIn(key: TemplateSlotKey): { subject: string | null; body: string } | undefined {
+  const table: Partial<Record<TemplateSlotKey, { subject: string | null; body: string }>> =
+    DEFAULT_TEMPLATES;
+  return table[key];
+}
+
+/**
+ * The template in force for a slot: the tenant's override, else the built-in.
+ *
+ * A named wording falls back to the plain slot for any channel it does not
+ * define. `penny` is email-only, and a manual send to a debtor who has both an
+ * address and a phone renders both channels — without this it would ask for
+ * `penny:sms`, which was never written, and throw on the way to a message the
+ * operator had every reason to expect.
+ */
 export function templateFor(
   step: TemplateStep,
   channel: CommChannel,
   overrides: TemplateOverrides = {},
+  variant: TemplateVariant = null,
 ): { subject: string | null; body: string } {
-  const key = slotKey(step, channel);
-  return overrides[key] ?? DEFAULT_TEMPLATES[key];
+  const key = slotKey(step, channel, variant);
+  const chosen = overrides[key] ?? builtIn(key);
+  if (chosen) return chosen;
+
+  const base = slotKey(step, channel);
+  return overrides[base] ?? DEFAULT_TEMPLATES[base];
 }
 
 function escapeHtml(value: string): string {
@@ -384,10 +480,16 @@ export function renderEmail(
   step: TemplateStep,
   ctx: TemplateContext,
   overrides: TemplateOverrides = {},
+  variant: TemplateVariant = null,
 ): RenderedEmail {
-  const template = templateFor(step, 'email', overrides);
+  const template = templateFor(step, 'email', overrides, variant);
+  // A tenant may clear the subject on an override; the built-in one for the
+  // same slot then stands in, and the plain slot's behind that.
   const subject = applyPlaceholders(
-    template.subject ?? DEFAULT_TEMPLATES[slotKey(step, 'email')].subject ?? '',
+    template.subject ??
+      builtIn(slotKey(step, 'email', variant))?.subject ??
+      builtIn(slotKey(step, 'email'))?.subject ??
+      '',
     ctx,
   );
   const text = applyPlaceholders(template.body, ctx);
@@ -415,6 +517,7 @@ export function renderSms(
   step: TemplateStep,
   ctx: TemplateContext,
   overrides: TemplateOverrides = {},
+  variant: TemplateVariant = null,
 ): string {
-  return applyPlaceholders(templateFor(step, 'sms', overrides).body, ctx);
+  return applyPlaceholders(templateFor(step, 'sms', overrides, variant).body, ctx);
 }
