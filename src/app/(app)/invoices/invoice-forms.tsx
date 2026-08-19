@@ -166,6 +166,28 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
           onClose={() => setOpen(false)}
           footer={
             <>
+              {/* Beside the buttons, not at the end of the body. The preview runs
+                  to two message bodies, so a confirmation placed after it lands
+                  below the fold of a scrolling panel — and a send that reports
+                  success out of sight is indistinguishable from one that did
+                  nothing. */}
+              {state.error ? (
+                <p
+                  role="alert"
+                  className="w-full rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+                >
+                  {state.error}
+                </p>
+              ) : null}
+              {state.success ? (
+                <p
+                  role="status"
+                  className="w-full rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700"
+                >
+                  {state.success}
+                </p>
+              ) : null}
+
               <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
                 {sent ? t.common.close : t.common.cancel}
               </Button>
@@ -258,16 +280,6 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
             </p>
           )}
 
-          {state.error ? (
-            <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-              {state.error}
-            </p>
-          ) : null}
-          {state.success ? (
-            <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-              {state.success}
-            </p>
-          ) : null}
         </Modal>
       ) : null}
     </>

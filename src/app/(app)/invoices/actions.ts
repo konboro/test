@@ -284,6 +284,9 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
     return `${back.split('?')[0]}?${query}`;
   };
 
+  // A bulk press that selects nothing looks identical to one that fails: both
+  // redirect instantly and change nothing. Say which it was.
+  console.info('[bulk] pressed', { ids: ids.length, back });
   if (!ids.length) redirect(to({ bulk: 'none' }));
   if (step === undefined) redirect(to({ bulk: 'unknown_template' }));
 

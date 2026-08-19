@@ -20,7 +20,7 @@
 import { channelTaggedUrl } from '@/lib/funnel/events';
 import { contactLimitsDisabled } from '@/lib/limits';
 import { athensDate } from '@/lib/money';
-import { channelAvailable, type Channel } from '@/lib/providers';
+import { channelAvailable, providerStatus, type Channel } from '@/lib/providers';
 import { normalisePhone, segmentCount } from '@/lib/sms/send';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { DebtorRow, InvoiceRow, TemplateStep, UserRow } from '@/types/database';
@@ -215,12 +215,22 @@ export async function sendManualReminder(params: {
   const supabase = createAdminClient();
 
   const loaded = await loadTarget(userId, invoiceId);
-  if (!loaded.ok) return fail(loaded.error);
+  if (!loaded.ok) {
+    console.error('[manual:refused] loadTarget', { invoiceId, reason: loaded.error });
+    return fail(loaded.error);
+  }
 
   const { tenant, debtor, invoice } = loaded.target;
   const { channels, notes } = resolveChannels(debtor, t);
 
   if (channels.length === 0) {
+    console.error('[manual:refused] no channel', {
+      invoiceId,
+      notes,
+      hasEmail: Boolean(debtor.email),
+      hasPhone: Boolean(debtor.phone),
+      providers: providerStatus(),
+    });
     return fail(notes.join(' ') || t.manual.noChannel);
   }
 
