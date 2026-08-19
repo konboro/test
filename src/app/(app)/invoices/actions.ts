@@ -16,7 +16,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { formError, getDictionary } from '@/lib/i18n';
 import { redirect } from 'next/navigation';
-import { loadScenario, stepForInvoice } from '@/lib/dunning/engine';
+import { automationPaused, loadScenario, stepForInvoice } from '@/lib/dunning/engine';
 
 export interface InvoiceFormState {
   error?: string;
@@ -119,6 +119,38 @@ export async function previewReminder(
  * the service role — after an explicit ownership check, which is what the RLS
  * policy would otherwise have done for us.
  */
+/**
+ * Switches the automatic chasing on or off for one invoice.
+ *
+ * Written through the session client rather than the service role, unlike the
+ * settlement fields beside it: this is a preference about the tenant's own
+ * document, and the migration grants exactly this column to `authenticated`.
+ * RLS decides whose invoice it is, which is the check that matters.
+ *
+ * It governs the sweep only. The reminder button on the same row keeps working
+ * while an invoice is paused — pausing says "stop chasing this on your own",
+ * not "refuse me when I ask".
+ */
+export async function toggleInvoiceAutomation(formData: FormData) {
+  const id = String(formData.get('id') ?? '');
+  if (!id) return;
+
+  // The row sends what it is showing, so the button flips what the operator
+  // actually saw rather than re-reading a value that may have moved.
+  const enabled = String(formData.get('enabled') ?? '') === 'true';
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase.from('invoices').update({ automation_enabled: !enabled }).eq('id', id);
+
+  revalidatePath('/invoices');
+  revalidatePath('/dashboard');
+}
+
 export async function markInvoicePaid(formData: FormData) {
   const id = String(formData.get('id') ?? '');
   if (!id) return;
@@ -398,22 +430,32 @@ export async function runScenarioForSelected(formData: FormData): Promise<void> 
 
   const { data: rows } = await supabase
     .from('invoices')
-    .select('id, due_date')
+    .select('id, due_date, automation_enabled')
     .eq('user_id', user.id)
     .in('id', batch);
 
   const dueDates = new Map((rows ?? []).map((row) => [row.id, row.due_date]));
+  const paused = new Set((rows ?? []).filter(automationPaused).map((r) => r.id));
 
   let sent = 0;
   let limited = 0;
   let skipped = 0;
   let failed = 0;
   let notDue = 0;
+  let pausedCount = 0;
 
   for (const id of batch) {
     const dueDate = dueDates.get(id);
     if (!dueDate) {
       failed += 1;
+      continue;
+    }
+
+    // This button runs the scenario, and a paused invoice is one the scenario
+    // has been told to leave alone. Honouring the selection instead would make
+    // the toggle meaningless the moment somebody selects every row.
+    if (paused.has(id)) {
+      pausedCount += 1;
       continue;
     }
 
@@ -446,6 +488,7 @@ export async function runScenarioForSelected(formData: FormData): Promise<void> 
       skipped,
       failed,
       notDue,
+      paused: pausedCount,
       left: Math.max(0, ids.length - batch.length),
     }),
   );

@@ -13,7 +13,12 @@ import { settlementMethod } from '@/lib/payments/settlement';
 import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
 
-import { markInvoicePaid, runScenarioForSelected, sendBulkReminder } from './actions';
+import {
+  markInvoicePaid,
+  runScenarioForSelected,
+  sendBulkReminder,
+  toggleInvoiceAutomation,
+} from './actions';
 import { CopyPayLink, CreateInvoiceForm, DueDateButton, RemindButton } from './invoice-forms';
 import { BulkActions } from './bulk-actions';
 import { SelectAll } from './select-all';
@@ -39,6 +44,7 @@ export default async function InvoicesPage({
     skipped?: string;
     failed?: string;
     notDue?: string;
+    paused?: string;
     left?: string;
   }>;
 }) {
@@ -134,6 +140,7 @@ export default async function InvoicesPage({
   const bulkFailed = Number(params.failed ?? 0);
   const bulkLeft = Number(params.left ?? 0);
   const bulkNotDue = Number(params.notDue ?? 0);
+  const bulkPaused = Number(params.paused ?? 0);
 
   // When and how a document was settled. Only worth a column on views that can
   // contain paid rows — the default "open" view would render a column of dashes.
@@ -217,6 +224,7 @@ export default async function InvoicesPage({
           {bulkLimited ? <p className="mt-1 text-xs">{t.invoices.bulk.limited(bulkLimited)}</p> : null}
           {bulkSkipped ? <p className="mt-1 text-xs">{t.invoices.bulk.skipped(bulkSkipped)}</p> : null}
           {bulkNotDue ? <p className="mt-1 text-xs">{t.invoices.bulk.notDue(bulkNotDue)}</p> : null}
+          {bulkPaused ? <p className="mt-1 text-xs">{t.invoices.bulk.paused(bulkPaused)}</p> : null}
           {bulkFailed ? <p className="mt-1 text-xs">{t.invoices.bulk.failed(bulkFailed)}</p> : null}
           {bulkLeft ? <p className="mt-1 text-xs">{t.invoices.bulk.capped(bulkLeft)}</p> : null}
         </div>
@@ -421,7 +429,16 @@ export default async function InvoicesPage({
                         )}
                       </td>
                       <td className="px-5 py-3">
-                        <Badge tone={status.tone}>{status.label}</Badge>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge tone={status.tone}>{status.label}</Badge>
+                          {/* Shown beside the status rather than only as an
+                              action, so a row the sweep is ignoring says so at a
+                              glance. A pause nobody can see is one nobody
+                              remembers switching on. */}
+                          {invoice.automation_enabled === false ? (
+                            <Badge tone="neutral">{t.invoices.automationPaused}</Badge>
+                          ) : null}
+                        </div>
                       </td>
                       {showSettled ? (
                         <td className="px-5 py-3">
@@ -455,6 +472,27 @@ export default async function InvoicesPage({
                             {invoice.status === 'pending' ? (
                               <>
                                 <RemindButton invoiceId={invoice.id} label={label} />
+                                <form action={toggleInvoiceAutomation}>
+                                  <input type="hidden" name="id" value={invoice.id} />
+                                  <input
+                                    type="hidden"
+                                    name="enabled"
+                                    value={String(invoice.automation_enabled !== false)}
+                                  />
+                                  <button
+                                    type="submit"
+                                    className={`text-sm ${subtleLinkClass}`}
+                                    title={
+                                      invoice.automation_enabled === false
+                                        ? t.invoices.automationResumeHint
+                                        : t.invoices.automationPauseHint
+                                    }
+                                  >
+                                    {invoice.automation_enabled === false
+                                      ? t.invoices.automationResume
+                                      : t.invoices.automationPause}
+                                  </button>
+                                </form>
                                 <CopyPayLink code={invoice.short_code ?? invoice.pay_token} />
                                 <form action={markInvoicePaid}>
                                   <input type="hidden" name="id" value={invoice.id} />

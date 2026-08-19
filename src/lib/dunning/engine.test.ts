@@ -5,7 +5,7 @@ import { addDays, athensDate, daysBetween, toCents } from '@/lib/money';
 import { emailAvailable, paymentsAvailable, smsAvailable } from '@/lib/providers';
 import { normalisePhone, segmentCount } from '@/lib/sms/send';
 
-import { deliverableChannels, LADDER, reachableChannels, stepForInvoice } from './engine';
+import { deliverableChannels, LADDER, reachableChannels, stepForInvoice, automationPaused } from './engine';
 import { workflowStatus } from './status';
 
 const TODAY = '2026-08-15';
@@ -244,5 +244,21 @@ describe('sms segmentation', () => {
   it('allows 160 characters of GSM text in one segment', () => {
     expect(segmentCount('a'.repeat(160))).toBe(1);
     expect(segmentCount('a'.repeat(161))).toBe(2);
+  });
+});
+
+describe('automationPaused', () => {
+  it('is true only when the invoice was explicitly switched off', () => {
+    expect(automationPaused({ automation_enabled: false })).toBe(true);
+    expect(automationPaused({ automation_enabled: true })).toBe(false);
+  });
+
+  it('treats a missing column as chasing, not as paused', () => {
+    // The state of every row on a database that has not taken 20260819130000.
+    // Read as paused, the sweep would stop for an entire tenant and say only
+    // that everything was skipped.
+    expect(automationPaused({})).toBe(false);
+    expect(automationPaused({ automation_enabled: undefined })).toBe(false);
+    expect(automationPaused({ automation_enabled: null })).toBe(false);
   });
 });

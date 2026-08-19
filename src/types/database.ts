@@ -86,6 +86,8 @@ export type InvoiceRow = {
   issue_date: string;
   due_date: string;
   status: InvoiceStatus;
+  /** False pauses the automatic sweep for this invoice alone. Manual sends are unaffected. */
+  automation_enabled: boolean;
   paid_at: string | null;
   paid_amount_cents: number | null;
   stripe_checkout_session_id: string | null;
