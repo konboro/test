@@ -10,21 +10,33 @@ import {
   type ImportField,
   type ParsedTable,
 } from '@/lib/import/parse';
+import { useT } from '@/lib/i18n/provider';
 import { formatDate, formatMoney } from '@/lib/money';
 
 import { runImport, type ImportState } from './actions';
 
-const FIELD_LABELS: Array<{ field: ImportField; label: string; required?: boolean }> = [
-  { field: 'name', label: 'Επωνυμία πελάτη', required: true },
-  { field: 'amount', label: 'Ποσό', required: true },
-  { field: 'due_date', label: 'Ημερομηνία λήξης' },
-  { field: 'issue_date', label: 'Ημερομηνία έκδοσης' },
-  { field: 'email', label: 'Email' },
-  { field: 'phone', label: 'Τηλέφωνο' },
-  { field: 'vat_number', label: 'ΑΦΜ' },
-  { field: 'reference', label: 'Αριθμός παραστατικού' },
-  { field: 'external_ref', label: 'ID στο σύστημά σας' },
+/**
+ * The order the mapping controls appear in, and which two are required.
+ *
+ * Only the order and the requirement live here now — the labels come from the
+ * dictionary. They used to be written into this array in Greek, which meant the
+ * whole importer stayed Greek for a tenant reading the rest of the product in
+ * English.
+ */
+const FIELDS: Array<{ field: ImportField; required?: boolean }> = [
+  { field: 'name', required: true },
+  { field: 'amount', required: true },
+  { field: 'due_date' },
+  { field: 'issue_date' },
+  { field: 'email' },
+  { field: 'phone' },
+  { field: 'vat_number' },
+  { field: 'reference' },
+  { field: 'external_ref' },
 ];
+
+const PREVIEW_ROWS = 25;
+const PREVIEW_PROBLEMS = 12;
 
 /**
  * Bringing a book of debts in from a spreadsheet.
@@ -35,6 +47,7 @@ const FIELD_LABELS: Array<{ field: ImportField; label: string; required?: boolea
  * operator unable to tell a mis-mapped column from twelve broken rows.
  */
 export function ImportForm({ termDays }: { termDays: number }) {
+  const t = useT();
   const [text, setText] = useState('');
   const [mapping, setMapping] = useState<Partial<Record<ImportField, number>>>({});
   const [fileName, setFileName] = useState<string | null>(null);
@@ -60,15 +73,14 @@ export function ImportForm({ termDays }: { termDays: number }) {
     load(await file.text(), file.name);
   }
 
-  const ready = Boolean(preview?.rows.length && mapping.name !== undefined && mapping.amount !== undefined);
+  const ready = Boolean(
+    preview?.rows.length && mapping.name !== undefined && mapping.amount !== undefined,
+  );
 
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader
-          title="1. Επιλέξτε αρχείο"
-          subtitle="CSV από Excel, Google Sheets ή εξαγωγή από το σύστημά σας. Τίποτα δεν αποθηκεύεται μέχρι να εγκρίνετε."
-        />
+        <CardHeader title={t.importer.step1} subtitle={t.importer.step1Hint} />
         <div className="space-y-4 px-5 py-4">
           <input
             type="file"
@@ -79,23 +91,29 @@ export function ImportForm({ termDays }: { termDays: number }) {
 
           <details>
             <summary className="cursor-pointer text-sm text-ink-500 transition hover:text-ink-800">
-              ή επικολλήστε τα δεδομένα
+              {t.importer.orPaste}
             </summary>
             <textarea
               rows={6}
               value={text}
               onChange={(e) => load(e.target.value, null)}
-              placeholder="Επωνυμία;Ποσό;Λήξη&#10;Παπαδόπουλος ΑΕ;1.234,56;01/08/2026"
+              placeholder={t.importer.pastePlaceholder}
               className="mt-2 w-full rounded-lg border border-ink-300 bg-white px-3 py-2 font-mono text-xs text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
             />
           </details>
 
           {table ? (
             <p className="text-xs text-ink-500">
-              {fileName ? <span className="font-medium text-ink-700">{fileName}</span> : 'Επικολλημένα δεδομένα'}
+              {fileName ? (
+                <span className="font-medium text-ink-700">{fileName}</span>
+              ) : (
+                t.importer.pastedData
+              )}
               {' · '}
-              {table.rows.length} γραμμές · διαχωριστικό{' '}
-              {table.delimiter === '\t' ? 'tab' : table.delimiter}
+              {t.importer.fileSummary(
+                table.rows.length,
+                table.delimiter === '\t' ? 'tab' : table.delimiter,
+              )}
             </p>
           ) : null}
         </div>
@@ -103,15 +121,12 @@ export function ImportForm({ termDays }: { termDays: number }) {
 
       {table ? (
         <Card>
-          <CardHeader
-            title="2. Ελέγξτε τις στήλες"
-            subtitle="Συμπληρώθηκαν από τις επικεφαλίδες — διορθώστε ό,τι δεν ταιριάζει."
-          />
+          <CardHeader title={t.importer.step2} subtitle={t.importer.step2Hint} />
           <div className="grid gap-3 px-5 py-4 sm:grid-cols-2 lg:grid-cols-3">
-            {FIELD_LABELS.map(({ field, label, required }) => (
+            {FIELDS.map(({ field, required }) => (
               <label key={field} className="block">
                 <span className="text-sm font-medium text-ink-700">
-                  {label}
+                  {t.importer.fields[field]}
                   {required ? <span className="text-red-600"> *</span> : null}
                 </span>
                 <select
@@ -127,7 +142,7 @@ export function ImportForm({ termDays }: { termDays: number }) {
                   <option value="">—</option>
                   {table.headers.map((header, i) => (
                     <option key={`${header}:${i}`} value={i}>
-                      {header || `Στήλη ${i + 1}`}
+                      {header || t.importer.columnFallback(i + 1)}
                     </option>
                   ))}
                 </select>
@@ -136,10 +151,7 @@ export function ImportForm({ termDays }: { termDays: number }) {
           </div>
 
           <p className="border-t border-ink-100 px-5 py-3 text-xs leading-relaxed text-ink-500">
-            Συμπληρώστε το <strong className="font-medium text-ink-700">ID στο σύστημά σας</strong> αν
-            θέλετε να μπορείτε να ανεβάσετε ξανά ένα διορθωμένο αρχείο. Χωρίς αυτό, η επανεισαγωγή του
-            ίδιου αρχείου δεν αλλάζει τίποτα, όμως ένα <em>διορθωμένο</em> αρχείο θα προσθέσει νέες
-            εγγραφές αντί να ενημερώσει τις παλιές.
+            {t.importer.externalRefHint}
           </p>
         </Card>
       ) : null}
@@ -147,8 +159,8 @@ export function ImportForm({ termDays }: { termDays: number }) {
       {preview ? (
         <Card>
           <CardHeader
-            title="3. Προεπισκόπηση"
-            subtitle={`Προς εισαγωγή: ${preview.rows.length} · απορρίφθηκαν: ${preview.problems.length}`}
+            title={t.importer.step3}
+            subtitle={t.importer.step3Hint(preview.rows.length, preview.problems.length)}
             action={
               <span className="tabular text-sm font-semibold text-ink-900">
                 {formatMoney(preview.totalCents)}
@@ -158,26 +170,27 @@ export function ImportForm({ termDays }: { termDays: number }) {
 
           {preview.unreachable ? (
             <p className="border-b border-ink-100 bg-amber-50 px-5 py-2.5 text-xs leading-relaxed text-amber-900">
-              {preview.unreachable} εγγραφές δεν έχουν ούτε email ούτε τηλέφωνο. Θα εισαχθούν, αλλά
-              δεν μπορεί να τους σταλεί υπενθύμιση μέχρι να συμπληρώσετε στοιχεία επικοινωνίας.
+              {t.importer.unreachable(preview.unreachable)}
             </p>
           ) : null}
 
           {preview.problems.length ? (
             <div className="border-b border-ink-100 px-5 py-3">
               <p className="text-xs font-medium uppercase tracking-wide text-ink-400">
-                Απορριφθείσες γραμμές
+                {t.importer.rejected}
               </p>
               <ul className="mt-1.5 space-y-1">
-                {preview.problems.slice(0, 12).map((problem) => (
+                {preview.problems.slice(0, PREVIEW_PROBLEMS).map((problem) => (
                   <li key={problem.line} className="text-xs text-red-700">
-                    <span className="tabular font-medium">Γραμμή {problem.line}:</span>{' '}
+                    <span className="tabular font-medium">
+                      {t.importer.rejectedLine(problem.line)}
+                    </span>{' '}
                     {problem.message}
                   </li>
                 ))}
-                {preview.problems.length > 12 ? (
+                {preview.problems.length > PREVIEW_PROBLEMS ? (
                   <li className="text-xs text-ink-500">
-                    …και {preview.problems.length - 12} ακόμη
+                    {t.importer.andMore(preview.problems.length - PREVIEW_PROBLEMS)}
                   </li>
                 ) : null}
               </ul>
@@ -188,14 +201,14 @@ export function ImportForm({ termDays }: { termDays: number }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-500">
-                  <th className="px-5 py-2.5 font-medium">Πελάτης</th>
-                  <th className="px-5 py-2.5 text-right font-medium">Ποσό</th>
-                  <th className="px-5 py-2.5 font-medium">Λήξη</th>
-                  <th className="px-5 py-2.5 font-medium">Επικοινωνία</th>
+                  <th className="px-5 py-2.5 font-medium">{t.importer.colCustomer}</th>
+                  <th className="px-5 py-2.5 text-right font-medium">{t.importer.colAmount}</th>
+                  <th className="px-5 py-2.5 font-medium">{t.importer.colDue}</th>
+                  <th className="px-5 py-2.5 font-medium">{t.importer.colContact}</th>
                 </tr>
               </thead>
               <tbody>
-                {preview.rows.slice(0, 25).map((row) => (
+                {preview.rows.slice(0, PREVIEW_ROWS).map((row) => (
                   <tr key={row.line} className="border-b border-ink-100 last:border-0">
                     <td className="px-5 py-2.5 text-ink-800">{row.name}</td>
                     <td className="tabular px-5 py-2.5 text-right font-medium text-ink-900">
@@ -204,7 +217,7 @@ export function ImportForm({ termDays }: { termDays: number }) {
                     <td className="tabular px-5 py-2.5 text-ink-600">{formatDate(row.dueDate)}</td>
                     <td className="px-5 py-2.5 text-xs text-ink-500">
                       {row.email ?? row.phone ?? (
-                        <span className="text-amber-700">χωρίς στοιχεία</span>
+                        <span className="text-amber-700">{t.importer.noContact}</span>
                       )}
                     </td>
                   </tr>
@@ -213,9 +226,9 @@ export function ImportForm({ termDays }: { termDays: number }) {
             </table>
           </div>
 
-          {preview.rows.length > 25 ? (
+          {preview.rows.length > PREVIEW_ROWS ? (
             <p className="border-t border-ink-100 px-5 py-2.5 text-xs text-ink-500">
-              Εμφανίζονται 25 από {preview.rows.length}. Θα εισαχθούν όλες.
+              {t.importer.showing(PREVIEW_ROWS, preview.rows.length)}
             </p>
           ) : null}
         </Card>
@@ -228,13 +241,11 @@ export function ImportForm({ termDays }: { termDays: number }) {
           <input type="hidden" name="term_days" value={termDays} />
 
           <Button type="submit" variant="brand" disabled={!ready || busy}>
-            {busy ? 'Εισαγωγή…' : `Εισαγωγή ${preview.rows.length} εγγραφών`}
+            {busy ? t.importer.submitting : t.importer.submit(preview.rows.length)}
           </Button>
 
           {!ready && preview.rows.length === 0 ? (
-            <p className="text-sm text-ink-500">
-              Αντιστοιχίστε τουλάχιστον τη στήλη με την επωνυμία πελάτη και τη στήλη με το ποσό.
-            </p>
+            <p className="text-sm text-ink-500">{t.importer.needMapping}</p>
           ) : null}
 
           {state.error ? (
@@ -248,13 +259,13 @@ export function ImportForm({ termDays }: { termDays: number }) {
               role="status"
               className="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
             >
-              <p className="font-medium">Η εισαγωγή ολοκληρώθηκε.</p>
+              <p className="font-medium">{t.importer.doneTitle}</p>
               <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                <span>Νέοι πελάτες: {state.outcome.debtorsCreated}</span>
-                <span>Αντιστοιχίστηκαν σε υπάρχοντες: {state.outcome.debtorsMatched}</span>
-                <span>Νέες απαιτήσεις: {state.outcome.invoicesCreated}</span>
+                <span>{t.importer.doneCreated(state.outcome.debtorsCreated)}</span>
+                <span>{t.importer.doneMatched(state.outcome.debtorsMatched)}</span>
+                <span>{t.importer.doneInvoices(state.outcome.invoicesCreated)}</span>
                 {state.outcome.duplicates ? (
-                  <span>Παραλείφθηκαν ως ήδη εισηγμένες: {state.outcome.duplicates}</span>
+                  <span>{t.importer.doneDuplicates(state.outcome.duplicates)}</span>
                 ) : null}
               </p>
               {state.outcome.errors.length ? (
@@ -270,28 +281,16 @@ export function ImportForm({ termDays }: { termDays: number }) {
       ) : null}
 
       <Card>
-        <CardHeader title="Τι περιμένει το αρχείο" />
+        <CardHeader title={t.importer.expectTitle} />
         <div className="space-y-3 px-5 py-4 text-sm leading-relaxed text-ink-600">
-          <p>
-            Αρκούν δύο στήλες: <strong className="font-medium text-ink-800">επωνυμία πελάτη</strong> και{' '}
-            <strong className="font-medium text-ink-800">ποσό</strong>. Τα υπόλοιπα είναι προαιρετικά —
-            χωρίς email ή τηλέφωνο όμως δεν στέλνεται υπενθύμιση, και χωρίς ημερομηνία λήξης η απαίτηση
-            θεωρείται απαιτητή από την ημερομηνία έκδοσης.
-          </p>
-          <p>
-            Τα ποσά αναγνωρίζονται και στις δύο γραφές — <code className="rounded bg-ink-100 px-1">1.234,56</code>{' '}
-            και <code className="rounded bg-ink-100 px-1">1,234.56</code>. Οι ημερομηνίες διαβάζονται ως{' '}
-            <strong className="font-medium text-ink-800">ημέρα-μήνας-έτος</strong>.
-          </p>
+          <p>{t.importer.expectBody1}</p>
+          <p>{t.importer.expectBody2}</p>
           <div className="flex flex-wrap gap-2 pt-1">
-            <Badge tone="neutral">Επωνυμία</Badge>
-            <Badge tone="neutral">Ποσό</Badge>
-            <Badge tone="neutral">Λήξη</Badge>
-            <Badge tone="neutral">Email</Badge>
-            <Badge tone="neutral">Τηλέφωνο</Badge>
-            <Badge tone="neutral">ΑΦΜ</Badge>
-            <Badge tone="neutral">Αρ. παραστατικού</Badge>
-            <Badge tone="neutral">ID</Badge>
+            {t.importer.badges.map((badge) => (
+              <Badge key={badge} tone="neutral">
+                {badge}
+              </Badge>
+            ))}
           </div>
         </div>
       </Card>
