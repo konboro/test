@@ -80,6 +80,21 @@ export function deliverableChannels(
 }
 
 /** Which ladder step, if any, an invoice is due for today. */
+/**
+ * Whether chasing has been switched off for this one invoice.
+ *
+ * A predicate rather than an inline `!invoice.automation_enabled`, and it
+ * compares against `false` on purpose. The column does not exist until
+ * 20260819130000 is applied, so on a database that has not taken the migration
+ * the field is absent — and a truthiness test reads absent as paused, for every
+ * invoice the tenant has. Deploys and migrations do not land together, and that
+ * failure would be silent: no reminders, no error, a sweep reporting everything
+ * skipped. Pinned by a test for exactly that reason.
+ */
+export function automationPaused(invoice: { automation_enabled?: boolean | null }): boolean {
+  return invoice.automation_enabled === false;
+}
+
 export function stepForInvoice(
   dueDate: string,
   today: string,
@@ -210,6 +225,14 @@ async function processTenant(
     }
     if (debtor.muted) {
       result.skipped.push({ invoiceId: invoice.id, reason: 'debtor muted' });
+      continue;
+    }
+    // The narrowest of the three switches. The tenant's own flag gates the
+    // whole sweep before it reaches here and `muted` gates a customer; this
+    // gates one document, for the invoice that is disputed or privately
+    // arranged while the rest of that customer's are chased as usual.
+    if (automationPaused(invoice)) {
+      result.skipped.push({ invoiceId: invoice.id, reason: 'automation paused for invoice' });
       continue;
     }
 
