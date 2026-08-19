@@ -11,6 +11,7 @@ import {
 } from '@/lib/dunning/manual';
 import { parseReminderSlot } from '@/lib/dunning/templates';
 import { athensDate, toCents } from '@/lib/money';
+import { safeNextPath } from '@/lib/redirects';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { formError, getDictionary } from '@/lib/i18n';
@@ -292,7 +293,8 @@ const BULK_LIMIT = 50;
  */
 export async function sendBulkReminder(formData: FormData): Promise<void> {
   const ids = formData.getAll('ids').map(String).filter(Boolean);
-  const back = String(formData.get('back') ?? '/invoices');
+  // Form data is caller-suppliable; only a same-site path is ever followed.
+  const back = safeNextPath(formData.get('back'), '/invoices');
   const slot = parseReminderSlot(String(formData.get('choice') ?? 'manual'));
 
   const to = (params: Record<string, string | number>) => {
@@ -373,7 +375,8 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
  */
 export async function runScenarioForSelected(formData: FormData): Promise<void> {
   const ids = formData.getAll('ids').map(String).filter(Boolean);
-  const back = String(formData.get('back') ?? '/invoices');
+  // Same rule as sendBulkReminder: never redirect off-site on form input.
+  const back = safeNextPath(formData.get('back'), '/invoices');
 
   const to = (params: Record<string, string | number>) => {
     const query = new URLSearchParams(back.split('?')[1] ?? '');

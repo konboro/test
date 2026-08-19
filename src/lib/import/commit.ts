@@ -69,7 +69,7 @@ export async function commitImport(userId: string, rows: ImportRow[]): Promise<I
     .eq('user_id', userId);
 
   if (loadError) {
-    outcome.errors.push(`Nie udało się wczytać istniejących klientów: ${loadError.message}`);
+    outcome.errors.push(`Δεν ήταν δυνατή η ανάγνωση των υπαρχόντων πελατών: ${loadError.message}`);
     return outcome;
   }
 
@@ -127,7 +127,7 @@ export async function commitImport(userId: string, rows: ImportRow[]): Promise<I
       .select('id, name, vat_number, email, external_ref');
 
     if (error) {
-      outcome.errors.push(`Nie udało się dodać klientów: ${error.message}`);
+      outcome.errors.push(`Δεν ήταν δυνατή η προσθήκη πελατών: ${error.message}`);
       return outcome;
     }
 
@@ -157,7 +157,7 @@ export async function commitImport(userId: string, rows: ImportRow[]): Promise<I
       resolve(row) ?? byEmail.get(`name:${row.name}`) ?? null;
 
     if (!debtorId) {
-      outcome.errors.push(`Wiersz ${row.line}: nie udało się przypisać klienta.`);
+      outcome.errors.push(`Γραμμή ${row.line}: δεν ήταν δυνατή η αντιστοίχιση πελάτη.`);
       continue;
     }
 
@@ -187,7 +187,7 @@ export async function commitImport(userId: string, rows: ImportRow[]): Promise<I
     .select('id');
 
   if (error) {
-    outcome.errors.push(`Nie udało się zapisać należności: ${error.message}`);
+    outcome.errors.push(`Δεν ήταν δυνατή η αποθήκευση των απαιτήσεων: ${error.message}`);
     return outcome;
   }
 

@@ -13,6 +13,7 @@
  */
 
 import { decryptSecret } from '@/lib/crypto';
+import { optionalEnv } from '@/lib/env';
 import type { VivaCredentials, VivaEnvironment } from '@/lib/viva/client';
 
 export type PaymentProvider = 'stripe' | 'viva';
@@ -41,8 +42,25 @@ export function stripeConfigured(tenant: TenantPaymentRow): boolean {
   );
 }
 
+/**
+ * Whether the demo estate may serve a payment in this deployment.
+ *
+ * Demo checkout takes Viva's publicly documented test card and no real money —
+ * so in production a demo-credentialled tenant would hand every debtor a Pay
+ * button that either declines their real card or lets anyone "settle" a real
+ * invoice for zero euros. The settings screen already badges the estate; this
+ * is the debtor-facing gate. Previews and local runs keep the demo estate so
+ * the flow stays testable end to end, and `VIVA_ALLOW_DEMO=1` opts a
+ * production deployment in deliberately.
+ */
+function demoEstateAllowed(): boolean {
+  return process.env.NODE_ENV !== 'production' || optionalEnv('VIVA_ALLOW_DEMO') === '1';
+}
+
 export function vivaConfigured(tenant: TenantPaymentRow): boolean {
-  return Boolean(tenant.viva_client_id_enc && tenant.viva_client_secret_enc);
+  if (!tenant.viva_client_id_enc || !tenant.viva_client_secret_enc) return false;
+  if (environmentOf(tenant.viva_environment) === 'demo') return demoEstateAllowed();
+  return true;
 }
 
 /**
