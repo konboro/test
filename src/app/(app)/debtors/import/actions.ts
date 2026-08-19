@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { commitImport, type ImportOutcome } from '@/lib/import/commit';
 import { buildPreview, parseCsv, type ImportField } from '@/lib/import/parse';
 import { athensDate } from '@/lib/money';
+import { getDictionary } from '@/lib/i18n';
 import { createClient } from '@/lib/supabase/server';
 
 export interface ImportState {
@@ -45,11 +46,12 @@ const schema = z.object({
  * in an uploaded file can direct a debt onto another account.
  */
 export async function runImport(_prev: ImportState, formData: FormData): Promise<ImportState> {
+  const t = await getDictionary();
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: 'Sesja wygasła. Zaloguj się ponownie.' };
+  if (!user) return { error: t.importer.errors.session };
 
   let parsedInput;
   try {
@@ -59,7 +61,7 @@ export async function runImport(_prev: ImportState, formData: FormData): Promise
       termDays: Number(formData.get('term_days') ?? 0),
     });
   } catch {
-    return { error: 'Μη έγκυρα δεδομένα εισαγωγής.' };
+    return { error: t.importer.errors.invalid };
   }
 
   const table = parseCsv(parsedInput.text);
@@ -71,7 +73,7 @@ export async function runImport(_prev: ImportState, formData: FormData): Promise
   );
 
   if (!preview.rows.length) {
-    return { error: 'Καμία γραμμή δεν είναι κατάλληλη για εισαγωγή. Ελέγξτε την αντιστοίχιση των στηλών.' };
+    return { error: t.importer.errors.noRows };
   }
 
   const outcome = await commitImport(user.id, preview.rows);

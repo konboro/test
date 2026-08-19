@@ -2,14 +2,19 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { subtleLinkClass } from '@/components/ui';
+import { getDictionary } from '@/lib/i18n';
 import { createClient } from '@/lib/supabase/server';
 
 import { ImportForm } from './import-form';
 
-export const metadata = { title: 'Εισαγωγή απαιτήσεων' };
+export async function generateMetadata() {
+  return { title: (await getDictionary()).importer.title };
+}
+
 export const dynamic = 'force-dynamic';
 
 export default async function ImportPage() {
+  const t = await getDictionary();
   const supabase = await createClient();
   const {
     data: { user },
@@ -27,12 +32,11 @@ export default async function ImportPage() {
     <div className="space-y-6">
       <div>
         <Link href="/debtors" className={`text-sm ${subtleLinkClass}`}>
-          ← Πελάτες
+          ← {t.importer.back}
         </Link>
-        <h1 className="mt-2 text-xl font-semibold text-ink-900">Εισαγωγή απαιτήσεων</h1>
-        <p className="mt-0.5 text-sm text-ink-500">
-          Ανεβάστε έναν πίνακα με τους οφειλέτες σας, αν οι απαιτήσεις σας δεν βρίσκονται σε κανένα
-          από τα συνδεδεμένα συστήματα.
+        <h1 className="mt-2 text-xl font-semibold text-ink-900">{t.importer.title}</h1>
+        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-ink-500">
+          {t.importer.subtitle}
         </p>
       </div>
 

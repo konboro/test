@@ -415,6 +415,72 @@ const el = {
     stillBody: 'Ξεκινήστε δωρεάν — δεν φεύγει καμία υπενθύμιση πριν την εγκρίνετε εσείς.',
     pricingLink: 'Δείτε τις τιμές',
   },
+  importer: {
+    title: 'Εισαγωγή απαιτήσεων',
+    subtitle:
+      'Ανεβάστε έναν πίνακα με τους οφειλέτες σας, αν οι απαιτήσεις σας δεν βρίσκονται σε κανένα από τα συνδεδεμένα συστήματα.',
+    back: 'Πελάτες',
+    fields: {
+      name: 'Επωνυμία πελάτη',
+      amount: 'Ποσό',
+      due_date: 'Ημερομηνία λήξης',
+      issue_date: 'Ημερομηνία έκδοσης',
+      email: 'Email',
+      phone: 'Τηλέφωνο',
+      vat_number: 'ΑΦΜ',
+      reference: 'Αριθμός παραστατικού',
+      external_ref: 'ID στο σύστημά σας',
+    } as Record<string, string>,
+    step1: '1. Επιλέξτε αρχείο',
+    step1Hint:
+      'CSV από Excel, Google Sheets ή εξαγωγή από το σύστημά σας. Τίποτα δεν αποθηκεύεται μέχρι να εγκρίνετε.',
+    orPaste: 'ή επικολλήστε τα δεδομένα',
+    pastePlaceholder: 'Επωνυμία;Ποσό;Λήξη\nΠαπαδόπουλος ΑΕ;1.234,56;01/08/2026',
+    pastedData: 'Επικολλημένα δεδομένα',
+    fileSummary: (rows: number, delimiter: string) =>
+      `${rows} γραμμές · διαχωριστικό ${delimiter}`,
+    step2: '2. Ελέγξτε τις στήλες',
+    step2Hint: 'Συμπληρώθηκαν από τις επικεφαλίδες — διορθώστε ό,τι δεν ταιριάζει.',
+    columnFallback: (n: number) => `Στήλη ${n}`,
+    externalRefHint:
+      'Συμπληρώστε το «ID στο σύστημά σας» αν θέλετε να μπορείτε να ανεβάσετε ξανά ένα διορθωμένο αρχείο. Χωρίς αυτό, η επανεισαγωγή του ίδιου αρχείου δεν αλλάζει τίποτα, όμως ένα διορθωμένο αρχείο θα προσθέσει νέες εγγραφές αντί να ενημερώσει τις παλιές.',
+    step3: '3. Προεπισκόπηση',
+    step3Hint: (rows: number, rejected: number) =>
+      `Προς εισαγωγή: ${rows} · απορρίφθηκαν: ${rejected}`,
+    unreachable: (n: number) =>
+      `${n} εγγραφές δεν έχουν ούτε email ούτε τηλέφωνο. Θα εισαχθούν, αλλά δεν μπορεί να τους σταλεί υπενθύμιση μέχρι να συμπληρώσετε στοιχεία επικοινωνίας.`,
+    rejected: 'Απορριφθείσες γραμμές',
+    rejectedLine: (n: number) => `Γραμμή ${n}:`,
+    andMore: (n: number) => `…και ${n} ακόμη`,
+    colCustomer: 'Πελάτης',
+    colAmount: 'Ποσό',
+    colDue: 'Λήξη',
+    colContact: 'Επικοινωνία',
+    noContact: 'χωρίς στοιχεία',
+    showing: (shown: number, total: number) =>
+      `Εμφανίζονται ${shown} από ${total}. Θα εισαχθούν όλες.`,
+    submit: (n: number) => `Εισαγωγή ${n} εγγραφών`,
+    submitting: 'Εισαγωγή…',
+    needMapping:
+      'Αντιστοιχίστε τουλάχιστον τη στήλη με την επωνυμία πελάτη και τη στήλη με το ποσό.',
+    doneTitle: 'Η εισαγωγή ολοκληρώθηκε.',
+    doneCreated: (n: number) => `Νέοι πελάτες: ${n}`,
+    doneMatched: (n: number) => `Αντιστοιχίστηκαν σε υπάρχοντες: ${n}`,
+    doneInvoices: (n: number) => `Νέες απαιτήσεις: ${n}`,
+    doneDuplicates: (n: number) => `Παραλείφθηκαν ως ήδη εισηγμένες: ${n}`,
+    expectTitle: 'Τι περιμένει το αρχείο',
+    expectBody1:
+      'Αρκούν δύο στήλες: επωνυμία πελάτη και ποσό. Τα υπόλοιπα είναι προαιρετικά — χωρίς email ή τηλέφωνο όμως δεν στέλνεται υπενθύμιση, και χωρίς ημερομηνία λήξης η απαίτηση θεωρείται απαιτητή από την ημερομηνία έκδοσης.',
+    expectBody2:
+      'Τα ποσά αναγνωρίζονται και στις δύο γραφές — 1.234,56 και 1,234.56. Οι ημερομηνίες διαβάζονται ως ημέρα-μήνας-έτος.',
+    badges: ['Επωνυμία', 'Ποσό', 'Λήξη', 'Email', 'Τηλέφωνο', 'ΑΦΜ', 'Αρ. παραστατικού', 'ID'],
+    errors: {
+      session: 'Η συνεδρία έληξε. Συνδεθείτε ξανά.',
+      invalid: 'Μη έγκυρα δεδομένα εισαγωγής.',
+      noRows:
+        'Καμία γραμμή δεν είναι κατάλληλη για εισαγωγή. Ελέγξτε την αντιστοίχιση των στηλών.',
+    },
+  },
   common: {
     guides: 'Οδηγοί',
     appTitle: 'lefta.app — Αυτοματοποιημένες εισπράξεις',
@@ -1299,6 +1365,68 @@ const en: typeof el = {
     stillTitle: 'Anything else?',
     stillBody: 'Start free — no reminder goes out until you have approved it.',
     pricingLink: 'See the pricing',
+  },
+  importer: {
+    title: 'Import receivables',
+    subtitle:
+      'Upload a table of who owes you, for the debts that are not in any of the connected systems.',
+    back: 'Customers',
+    fields: {
+      name: 'Customer name',
+      amount: 'Amount',
+      due_date: 'Due date',
+      issue_date: 'Issue date',
+      email: 'Email',
+      phone: 'Phone',
+      vat_number: 'VAT number',
+      reference: 'Invoice number',
+      external_ref: 'ID in your system',
+    } as Record<string, string>,
+    step1: '1. Choose a file',
+    step1Hint:
+      'CSV from Excel, Google Sheets or an export from your own system. Nothing is saved until you approve it.',
+    orPaste: 'or paste the data',
+    pastePlaceholder: 'Name;Amount;Due\nPapadopoulos SA;1,234.56;01/08/2026',
+    pastedData: 'Pasted data',
+    fileSummary: (rows: number, delimiter: string) => `${rows} rows · delimiter ${delimiter}`,
+    step2: '2. Check the columns',
+    step2Hint: 'Filled in from the headers — correct anything that does not match.',
+    columnFallback: (n: number) => `Column ${n}`,
+    externalRefHint:
+      'Fill in "ID in your system" if you want to be able to upload a corrected file later. Without it, re-importing the same file changes nothing, but a corrected file adds new records instead of updating the old ones.',
+    step3: '3. Preview',
+    step3Hint: (rows: number, rejected: number) => `To import: ${rows} · rejected: ${rejected}`,
+    unreachable: (n: number) =>
+      `${n} records have neither an email nor a phone number. They will be imported, but no reminder can be sent to them until you fill in a contact.`,
+    rejected: 'Rejected rows',
+    rejectedLine: (n: number) => `Row ${n}:`,
+    andMore: (n: number) => `…and ${n} more`,
+    colCustomer: 'Customer',
+    colAmount: 'Amount',
+    colDue: 'Due',
+    colContact: 'Contact',
+    noContact: 'no contact',
+    showing: (shown: number, total: number) =>
+      `Showing ${shown} of ${total}. All of them will be imported.`,
+    submit: (n: number) => `Import ${n} records`,
+    submitting: 'Importing…',
+    needMapping: 'Map at least the customer name column and the amount column.',
+    doneTitle: 'The import is complete.',
+    doneCreated: (n: number) => `New customers: ${n}`,
+    doneMatched: (n: number) => `Matched to existing: ${n}`,
+    doneInvoices: (n: number) => `New receivables: ${n}`,
+    doneDuplicates: (n: number) => `Skipped as already imported: ${n}`,
+    expectTitle: 'What the file needs',
+    expectBody1:
+      'Two columns are enough: customer name and amount. The rest are optional — without an email or a phone number no reminder can go out, and without a due date the debt counts as payable from its issue date.',
+    expectBody2:
+      'Amounts are read in both conventions — 1.234,56 and 1,234.56. Dates are read as day-month-year.',
+    badges: ['Name', 'Amount', 'Due', 'Email', 'Phone', 'VAT', 'Invoice no.', 'ID'],
+    errors: {
+      session: 'Your session has expired. Please sign in again.',
+      invalid: 'The import data is not valid.',
+      noRows: 'No row is suitable for import. Check how the columns are mapped.',
+    },
   },
   common: {
     guides: 'Guides',
