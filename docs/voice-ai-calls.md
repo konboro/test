@@ -305,9 +305,18 @@ later is a config change, not a migration.
 Owned mining-rig cards change the economics of tiers 2–3 and of self-hosted
 inference — with hard caveats:
 
-- **Only NVIDIA counts.** The whole stack (XTTS/F5/Orpheus training,
-  faster-whisper, TTS serving) assumes CUDA; AMD mining cards (RX 5xx/5700)
-  are effectively scrap for this — sell them and fund the voice actor.
+- **Only NVIDIA counts in practice.** The whole stack (XTTS/F5/Orpheus
+  training, faster-whisper via CTranslate2, TTS serving) assumes CUDA. RDNA2
+  Radeons (RX 6xxx) technically run PyTorch under ROCm on Linux — 16 GB
+  6800/6900 XT are the only ones worth a second look — but the audio repos are
+  CUDA-biased enough that the friction eats the savings; older AMD is scrap
+  for this. Selling the Radeons funds the voice actor.
+- **A Pascal fleet converts.** Multiple 1080 Ti-class cards are worth more as
+  *one* used RTX 3090 (24 GB) plus studio budget than as a training cluster:
+  Pascal is fp32-only, and mining risers are x1 — fine for independent
+  single-card jobs, useless for multi-GPU training. Keep two or three serviced
+  units (faster-whisper int8 runs well on CC 6.1; Piper/VITS trains fine in
+  fp32 on 11 GB), sell the rest.
 - **Card tiers:** RTX 3090 (24 GB) is the mining-era gem — trains the tier-2
   Greek fine-tune outright (1–3 weeks wall-clock vs days on H100; time is
   cheap, the run is unattended) and serves streaming TTS + STT in real time.
