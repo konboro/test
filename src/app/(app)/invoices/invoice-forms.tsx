@@ -121,6 +121,7 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
   const t = useT();
   const [open, setOpen] = useState(false);
   const [choice, setChoice] = useState('manual');
+  const [only, setOnly] = useState('both');
   const [preview, setPreview] = useState<ReminderPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [state, action, sending] = useActionState<ReminderState, FormData>(sendReminder, {});
@@ -131,7 +132,7 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
     let cancelled = false;
     setLoading(true);
 
-    previewReminder(invoiceId, choice)
+    previewReminder(invoiceId, choice, only)
       .then((result) => {
         if (!cancelled) setPreview(result);
       })
@@ -144,7 +145,7 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
     return () => {
       cancelled = true;
     };
-  }, [open, choice, invoiceId]);
+  }, [open, choice, only, invoiceId]);
 
   const sent = Boolean(state.success);
 
@@ -166,6 +167,28 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
           onClose={() => setOpen(false)}
           footer={
             <>
+              {/* Beside the buttons, not at the end of the body. The preview runs
+                  to two message bodies, so a confirmation placed after it lands
+                  below the fold of a scrolling panel — and a send that reports
+                  success out of sight is indistinguishable from one that did
+                  nothing. */}
+              {state.error ? (
+                <p
+                  role="alert"
+                  className="w-full rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+                >
+                  {state.error}
+                </p>
+              ) : null}
+              {state.success ? (
+                <p
+                  role="status"
+                  className="w-full rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700"
+                >
+                  {state.success}
+                </p>
+              ) : null}
+
               <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
                 {sent ? t.common.close : t.common.cancel}
               </Button>
@@ -174,6 +197,7 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
                 <form action={action}>
                   <input type="hidden" name="id" value={invoiceId} />
                   <input type="hidden" name="choice" value={choice} />
+                  <input type="hidden" name="only" value={only} />
                   <Button type="submit" disabled={sending || loading || !preview?.willSend?.length}>
                     {sending ? t.reminder.sending : t.reminder.send}
                   </Button>
@@ -194,6 +218,21 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
                   {t.reminder.choices[c.value] ?? c.label}
                 </option>
               ))}
+            </select>
+          </Field>
+
+          {/* Narrows the send to one channel. The preview below re-renders for
+              the choice, so what is on screen is always what will go out. */}
+          <Field label={t.reminder.channelLabel}>
+            <select
+              value={only}
+              onChange={(e) => setOnly(e.target.value)}
+              disabled={sent}
+              className={inputClass}
+            >
+              <option value="both">{t.reminder.channelBoth}</option>
+              <option value="email">{t.reminder.channelEmail}</option>
+              <option value="sms">{t.reminder.channelSms}</option>
             </select>
           </Field>
 
@@ -258,16 +297,6 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
             </p>
           )}
 
-          {state.error ? (
-            <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-              {state.error}
-            </p>
-          ) : null}
-          {state.success ? (
-            <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-              {state.success}
-            </p>
-          ) : null}
         </Modal>
       ) : null}
     </>

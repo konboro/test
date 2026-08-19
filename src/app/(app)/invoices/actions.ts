@@ -6,6 +6,7 @@ import { z } from 'zod';
 import {
   previewManualReminder,
   sendManualReminder,
+  type ChannelChoice,
   type ReminderPreview,
 } from '@/lib/dunning/manual';
 import { parseReminderChoice } from '@/lib/dunning/templates';
@@ -29,6 +30,11 @@ export type ReminderState = InvoiceFormState;
  * Still bound by the once-per-debtor-per-day limit — see lib/dunning/manual.ts
  * — so this is a way to bring a reminder forward, not a way around the guarantee.
  */
+/** Anything unrecognised means both — the safe reading of a stale form. */
+function channelChoice(value: unknown): ChannelChoice {
+  return value === 'email' || value === 'sms' ? value : 'both';
+}
+
 export async function sendReminder(
   _prev: ReminderState,
   formData: FormData,
@@ -47,7 +53,12 @@ export async function sendReminder(
   } = await supabase.auth.getUser();
   if (!user) return { error: t.forms.errors.unauthorized };
 
-  const result = await sendManualReminder({ userId: user.id, invoiceId: id, step });
+  const result = await sendManualReminder({
+    userId: user.id,
+    invoiceId: id,
+    step,
+    only: channelChoice(formData.get('only')),
+  });
 
   revalidatePath('/invoices');
   revalidatePath('/logs');
@@ -77,6 +88,7 @@ export async function sendReminder(
 export async function previewReminder(
   invoiceId: string,
   choice: string,
+  only?: string,
 ): Promise<ReminderPreview> {
   const t = await getDictionary();
 
@@ -89,7 +101,7 @@ export async function previewReminder(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: t.forms.errors.unauthorized };
 
-  return previewManualReminder({ userId: user.id, invoiceId, step });
+  return previewManualReminder({ userId: user.id, invoiceId, step, only: channelChoice(only) });
 }
 
 /**
@@ -282,6 +294,9 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
     return `${back.split('?')[0]}?${query}`;
   };
 
+  // A bulk press that selects nothing looks identical to one that fails: both
+  // redirect instantly and change nothing. Say which it was.
+  console.info('[bulk] pressed', { ids: ids.length, back });
   if (!ids.length) redirect(to({ bulk: 'none' }));
   if (step === undefined) redirect(to({ bulk: 'unknown_template' }));
 
@@ -291,6 +306,7 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
+  const only = channelChoice(formData.get('only'));
   const batch = ids.slice(0, BULK_LIMIT);
   let sent = 0;
   let limited = 0;
@@ -301,7 +317,7 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
   // concurrent sends to one customer would race each other into it and the
   // outcome would depend on who lost.
   for (const id of batch) {
-    const result = await sendManualReminder({ userId: user.id, invoiceId: id, step });
+    const result = await sendManualReminder({ userId: user.id, invoiceId: id, step, only });
 
     if (result.error) {
       if (result.code === 'daily_limit') limited += 1;

@@ -230,10 +230,21 @@ export default async function InvoicesPage({
             body={t.invoices.emptyBody}
           />
         ) : (
-          <form id="bulk" action={sendBulkReminder}>
-          <input type="hidden" name="back" value={back} />
+          <>
+          {/* This form wraps only its own controls. It used to wrap the whole
+              table, which put each row's "mark paid" form inside it — nested
+              forms are invalid HTML, so the browser dropped the inner one, the
+              DOM stopped matching what React had rendered, and hydration failed,
+              taking every interactive control on the page with it. The checkboxes
+              join this form by id instead: that is what the `form` attribute is
+              for, and what SelectAll already assumed. */}
           {showActions ? (
-            <div className="flex flex-wrap items-center gap-2 border-b border-ink-200 px-5 py-3">
+            <form
+              id="bulk"
+              action={sendBulkReminder}
+              className="flex flex-wrap items-center gap-2 border-b border-ink-200 px-5 py-3"
+            >
+              <input type="hidden" name="back" value={back} />
               <select
                 name="choice"
                 defaultValue="manual"
@@ -244,6 +255,20 @@ export default async function InvoicesPage({
                     {t.reminder.choices[choice.value] ?? choice.label}
                   </option>
                 ))}
+              </select>
+              {/* Which channels this batch goes out on. Narrows what is possible
+                  rather than forcing anything: a customer with no phone still
+                  gets nothing when SMS-only is chosen, and is reported as
+                  skipped. */}
+              <select
+                name="only"
+                defaultValue="both"
+                aria-label={t.reminder.channelLabel}
+                className="rounded-lg border border-ink-300 bg-white px-3 py-1.5 text-sm text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+              >
+                <option value="both">{t.reminder.channelBoth}</option>
+                <option value="email">{t.reminder.channelEmail}</option>
+                <option value="sms">{t.reminder.channelSms}</option>
               </select>
               <button
                 type="submit"
@@ -261,7 +286,7 @@ export default async function InvoicesPage({
               >
                 {t.invoices.bulk.runScenario}
               </button>
-            </div>
+            </form>
           ) : null}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -335,6 +360,7 @@ export default async function InvoicesPage({
                           {invoice.status === 'pending' ? (
                             <input
                               type="checkbox"
+                              form="bulk"
                               name="ids"
                               value={invoice.id}
                               aria-label={label}
@@ -460,8 +486,7 @@ export default async function InvoicesPage({
               </tbody>
             </table>
           </div>
-
-          </form>
+          </>
         )}
       </Card>
     </div>
