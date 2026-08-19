@@ -403,6 +403,50 @@ under the same wave by voice, and roughly 300× a single email. The ladder's
 channel mix (email first, SMS from step 2, voice only for the hard tail) is
 therefore also the cost-optimal ordering, not just the polite one.
 
+## "Our own model" — what that can and cannot mean
+
+Three separate claims usually hide in that sentence. They have different
+answers:
+
+**1. Fine-tuning Claude itself — not available.** Anthropic does not offer
+fine-tuning on the public API; the only self-service path is the (old) Claude 3
+Haiku fine-tune on Amazon Bedrock, and beyond that custom training exists only
+inside enterprise contracts. Nothing we do here is "training Claude".
+
+**2. Distilling Claude into a small local model — legally gated, so treat it
+as blocked by default.** Anthropic's commercial terms prohibit using the
+service to build a competing product or to train competing AI models without
+express approval. A Greek dunning bot is not a competing LLM, and distillation
+is a normal technique — but "not obviously prohibited" is a bad foundation for
+a company's core asset. If we ever want it: ask Anthropic in writing first, or
+train only on data we own (our own transcripts, our own scripts), never on
+model outputs.
+
+**3. Training our own *voice* — yes, and it is already designed above** (tier 2:
+a licensed actor's recordings plus a Greek fine-tune of an open TTS model,
+€25–60k). That is genuine ownership of a brand asset, and unlike a language
+model it does not need to beat a frontier lab to be worth having.
+
+**The startup point, plainly: the model is not the moat.** Anyone can rent the
+same intelligence we rent, at the same price, tomorrow. What cannot be rented
+is what this repo has been accumulating: the myDATA/Elorus/Enable-Banking
+integration grind (a production XML envelope nobody documents, a Greek bank
+that sends no transaction ids, the ΑΦΜ-transliteration matcher), the
+compliance architecture that makes automated chasing defensible in Greece
+(daily lock in a unique index, append-only audit, fixed ladder bounds in check
+constraints), the money rails, and — the one that compounds — **outcome data**:
+which channel, wording and timing actually recovers money from Greek debtors.
+`funnel_events` started collecting exactly that on day one of Phase 1.
+
+So the sequencing that makes a good startup rather than a good demo:
+
+1. rent the brain (Claude), own the guardrails and the harness — shipped;
+2. own the measurement (funnel + settlement attribution) — shipped;
+3. own the voice (licensed actor) — when volume justifies the brand asset;
+4. own a *small* model, trained on our own accumulated transcripts, when cost
+   or latency demands it — a cost decision late in the story, never the
+   founding story.
+
 ## Guardrail testing is a deliverable, not a phase
 
 - A **simulator harness**: the same gateway loop driven by text (no telephony),
