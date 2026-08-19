@@ -200,66 +200,114 @@ const el = {
   landing: {
     signIn: 'Σύνδεση',
     freeTrial: 'Δωρεάν δοκιμή',
+    kicker: 'Για ελληνικές επιχειρήσεις',
     heroTitle: 'Πληρωθείτε στην ώρα σας, χωρίς δύσκολα τηλεφωνήματα.',
     heroBody:
-      'Το lefta.app παρακολουθεί τα ανεξόφλητα τιμολόγιά σας, στέλνει τις υπενθυμίσεις για λογαριασμό σας και δίνει στον πελάτη σύνδεσμο άμεσης εξόφλησης. Εσείς ασχολείστε με τη δουλειά σας.',
+      'Η lefta.app παρακολουθεί τα ανεξόφλητα παραστατικά σας, στέλνει τις υπενθυμίσεις για λογαριασμό σας και δίνει στον πελάτη έναν σύνδεσμο που εξοφλεί επιτόπου. Εσείς συνεχίζετε τη δουλειά σας.',
     startFree: 'Ξεκινήστε δωρεάν',
     haveAccount: 'Έχω λογαριασμό',
+    heroProof: ['Χωρίς συνδρομή', 'Καμία προμήθεια στις εισπράξεις', 'Έτοιμο σε λίγα λεπτά'],
+    stepsTitle: 'Πώς δουλεύει',
+    steps: [
+      {
+        title: 'Συνδέετε το σύστημα τιμολόγησής σας',
+        body: 'Το πρόγραμμα που ήδη χρησιμοποιείτε ή απευθείας το myDATA της ΑΑΔΕ. Πελάτες, ποσά και πραγματικές ημερομηνίες λήξης έρχονται μόνα τους — δεν πληκτρολογείτε τίποτα δεύτερη φορά.',
+      },
+      {
+        title: 'Οι υπενθυμίσεις φεύγουν μόνες τους',
+        body: 'Εσείς ορίζετε το σενάριο: πόσες ημέρες πριν ή μετά τη λήξη, με ποια λόγια και από ποιο κανάλι. Μπορείτε να το σταματήσετε για ένα μόνο παραστατικό.',
+      },
+      {
+        title: 'Ο πελάτης πληρώνει με ένα κλικ',
+        body: 'Κάθε μήνυμα έχει σύνδεσμο πληρωμής με κάρτα. Μόλις εξοφληθεί, η αλληλουχία σταματά μόνη της — κανείς δεν ενοχλείται για κάτι που έχει ήδη πληρώσει.',
+      },
+    ],
+    industriesTitle: 'Φτιαγμένο για τον κλάδο σας',
+    industriesBody:
+      'Η ανείσπρακτη οφειλή δεν μοιάζει ίδια παντού. Το σενάριο, τα κείμενα και τα κανάλια αλλάζουν ανάλογα με το ποιος χρωστά και γιατί.',
+    industries: [
+      {
+        title: 'Sharing και ενοικιάσεις',
+        body: 'Πατίνια, ποδήλατα, αυτοκίνητα, εξοπλισμός. Πολλές μικρές χρεώσεις που απέτυχαν στην κάρτα, με παραλήπτη ιδιώτη και όχι λογιστήριο: σύντομα μηνύματα, φιλικός τόνος και πληρωμή χωρίς καν να ανοίξει την εφαρμογή.',
+      },
+      {
+        title: 'Συνδρομές και επαναλαμβανόμενες χρεώσεις',
+        body: 'Γυμναστήρια, σχολές, υπηρεσίες λογισμικού, συμβόλαια συντήρησης. Η αποτυχημένη ανανέωση πιάνεται νωρίς, πριν γίνει διακοπή υπηρεσίας και δύσκολη συζήτηση.',
+      },
+      {
+        title: 'Υπηρεσίες προς επιχειρήσεις',
+        body: 'Γραφεία, σύμβουλοι, στούντιο, τεχνικές εταιρείες. Επίσημος τόνος προς το λογιστήριο, με το παραστατικό και τον σύνδεσμο πληρωμής στο ίδιο μήνυμα.',
+      },
+      {
+        title: 'Χονδρική και εμπόριο',
+        body: 'Πολλά τιμολόγια ανά πελάτη και πληρωμές με έμβασμα. Οι εισερχόμενες κινήσεις κλείνουν μόνες τους τα παραστατικά που εξηγούν.',
+      },
+    ],
     whatsIncluded: 'Τι περιλαμβάνει',
+    features: [
+      {
+        title: 'Συγχρονισμός παραστατικών',
+        body: 'Από το πρόγραμμα τιμολόγησής σας ή απευθείας από το myDATA. Τα ανεξόφλητα εμφανίζονται με πελάτη, ποσό και την πραγματική ημερομηνία λήξης κάθε παραστατικού.',
+      },
+      {
+        title: 'Email και SMS',
+        body: 'Η υπενθύμιση πριν τη λήξη φεύγει με email. Μόλις το παραστατικό καθυστερήσει, μπαίνει και το SMS — γιατί το SMS διαβάζεται.',
+      },
+      {
+        title: 'Με τα δικά σας λόγια',
+        body: 'Κάθε μήνυμα με ζωντανή προεπισκόπηση. Στα SMS βλέπετε πόσα τμήματα χρεώνεστε καθώς γράφετε.',
+      },
+      {
+        title: 'Σύντομος σύνδεσμος πληρωμής',
+        body: 'Της μορφής lefta.app/KWDIKOS — χωράει σε ένα SMS και δεν μοιάζει με spam.',
+      },
+      {
+        title: 'Αντιστοίχιση εμβασμάτων',
+        body: 'Διαβάζει τον λογαριασμό σας και κλείνει τα παραστατικά που εξηγούν οι εισπράξεις. Τα εμβάσματα παύουν να είναι το τυφλό σημείο.',
+      },
+      {
+        title: 'Έλεγχος και πλήρες αρχείο',
+        body: 'Σταματήστε τον αυτοματισμό για ένα μόνο παραστατικό. Κάθε μήνυμα που φεύγει καταγράφεται με ώρα, παραλήπτη και περιεχόμενο.',
+      },
+    ],
+    integrationsTitle: 'Συνδέεται με ό,τι ήδη χρησιμοποιείτε',
+    integrations: [
+      {
+        title: 'Συστήματα τιμολόγησης',
+        body: 'Εμπορικά προγράμματα και απευθείας το myDATA της ΑΑΔΕ.',
+      },
+      {
+        title: 'Πάροχοι πληρωμών',
+        body: 'Ο δικός σας λογαριασμός. Τα χρήματα δεν περνούν ποτέ από εμάς.',
+      },
+      {
+        title: 'Ο τραπεζικός σας λογαριασμός',
+        body: 'Οι εισερχόμενες κινήσεις διαβάζονται και αντιστοιχίζονται στα παραστατικά.',
+      },
+      {
+        title: 'Email και SMS',
+        body: 'Με το δικό σας όνομα αποστολέα και τα δικά σας κείμενα.',
+      },
+    ],
     moneyTitle: 'Τα χρήματα πηγαίνουν απευθείας σε εσάς',
     moneyIntro: 'Συνδέετε τον δικό σας λογαριασμό',
     moneyOr: 'ή',
     moneyRest:
-      'και οι πληρωμές εισπράττονται εκεί. Το lefta.app δεν μεσολαβεί στη ροή χρημάτων, δεν κρατά προμήθεια και δεν εμφανίζεται στη συναλλαγή. Δεν περιμένετε κανέναν να σας αποδώσει τα δικά σας χρήματα.',
+      'και οι πληρωμές εισπράττονται εκεί. Η lefta.app δεν βρίσκεται ποτέ στη ροή του χρήματος, δεν κρατά προμήθεια και δεν εμφανίζεται στη συναλλαγή. Δεν περιμένετε κανέναν να σας επιστρέψει τα δικά σας χρήματα.',
     complianceTitle: 'Πάροχος λογισμικού, όχι εισπρακτική εταιρεία',
     complianceIntro:
-      'Το lefta.app διαβιβάζει υπενθυμίσεις για λογαριασμό σας. Δεν αναλαμβάνει απαιτήσεις, δεν διαπραγματεύεται οφειλές και δεν ασκεί πίεση. Η ροή είναι σταθερή, με ανώτατο όριο',
+      'Η lefta.app διαβιβάζει υπενθυμίσεις για λογαριασμό σας. Δεν αναλαμβάνει απαιτήσεις, δεν διαπραγματεύεται οφειλές και δεν ασκεί πίεση. Ο ρυθμός είναι ορισμένος, με όριο',
     complianceLimit: 'μία επαφή ανά πελάτη ανά ημέρα',
     complianceRest:
-      ', κάθε μήνυμα καταγράφεται σε πλήρες, μη τροποποιήσιμο αρχείο, και μπορείτε ανά πάσα στιγμή να θέσετε έναν πελάτη σε παύση.',
-    closingTitle: 'Δείτε τι σας χρωστούν σήμερα',
+      ', κάθε μήνυμα καταγράφεται σε αρχείο που δεν επιδέχεται τροποποίηση, και μπορείτε να σταματήσετε έναν πελάτη ανά πάσα στιγμή.',
+    pricingTeaserTitle: 'Δωρεάν — πληρώνετε μόνο τα SMS',
+    pricingTeaserBody:
+      'Καμία συνδρομή, καμία δέσμευση και κανένα ποσοστό στις εισπράξεις σας. Οι υπενθυμίσεις με email δεν χρεώνονται καθόλου.',
+    pricingTeaserLink: 'Δείτε τις τιμές',
+    closingTitle: 'Δείτε τι σας οφείλουν σήμερα',
     closingBody:
-      'Η σύνδεση με τα βιβλία σας παίρνει λίγα λεπτά. Καμία υπενθύμιση δεν φεύγει προτού την εγκρίνετε εσείς.',
-    steps: [
-      {
-        title: 'Συνδέετε τα βιβλία σας',
-        body: 'Elorus ή myDATA (ΑΑΔΕ), μία φορά. Πελάτες, ποσά και πραγματικές ημερομηνίες λήξης συγχρονίζονται μόνα τους — δεν πληκτρολογείτε τίποτα δύο φορές.',
-      },
-      {
-        title: 'Οι υπενθυμίσεις φεύγουν μόνες τους',
-        body: 'Τρία σταθερά βήματα, με τα δικά σας κείμενα: ευγενική υπενθύμιση πριν τη λήξη, ειδοποίηση στις 2 ημέρες καθυστέρησης, τελική στις 10.',
-      },
-      {
-        title: 'Ο πελάτης πληρώνει με ένα κλικ',
-        body: 'Κάθε μήνυμα έχει σύνδεσμο πληρωμής με κάρτα. Μόλις εξοφληθεί, η ροή σταματά αυτόματα — κανείς δεν λαμβάνει υπενθύμιση για τιμολόγιο που πλήρωσε.',
-      },
-    ],
-    features: [
-      {
-        title: 'Συγχρονισμός τιμολογίων',
-        body: 'Elorus και myDATA. Τα ανεξόφλητα εμφανίζονται με το όνομα του πελάτη, το ποσό και την πραγματική ημερομηνία λήξης του κάθε παραστατικού.',
-      },
-      {
-        title: 'Email και SMS',
-        body: 'Η υπενθύμιση πριν τη λήξη φεύγει με email. Στις καθυστερήσεις προστίθεται και SMS, γιατί διαβάζεται.',
-      },
-      {
-        title: 'Τα δικά σας λόγια',
-        body: 'Επεξεργάζεστε κάθε μήνυμα με ζωντανή προεπισκόπηση. Στα SMS βλέπετε πόσα τμήματα χρεώνονται όσο γράφετε.',
-      },
-      {
-        title: 'Σύντομος σύνδεσμος πληρωμής',
-        body: 'Της μορφής lefta.app/KΩΔΙΚΟΣ — χωρεί σε ένα SMS και δεν μοιάζει με ανεπιθύμητο μήνυμα.',
-      },
-      {
-        title: 'Αντιστοίχιση εμβασμάτων',
-        body: 'Διαβάζει τον λογαριασμό σας και κλείνει τα τιμολόγια που εξηγούν οι εισπράξεις. Τα εμβάσματα σταματούν να είναι το τυφλό σημείο.',
-      },
-      {
-        title: 'Ηλικίωση και πλήρες αρχείο',
-        body: 'Πόσο καθυστερεί κάθε οφειλή, σε μία στήλη. Κάθε μήνυμα που στάλθηκε καταγράφεται με ώρα, παραλήπτη και περιεχόμενο.',
-      },
-    ],
+      'Η σύνδεση των βιβλίων σας παίρνει λίγα λεπτά. Καμία υπενθύμιση δεν φεύγει πριν την εγκρίνετε.',
+    faqLink: 'Έχετε ερώτηση; Δείτε τις συχνές ερωτήσεις.',
   },
   pricing: {
     metaTitle: 'Τιμές',
@@ -275,7 +323,7 @@ const el = {
     includedTitle: 'Περιλαμβάνονται',
     included: [
       'Απεριόριστες υπενθυμίσεις με email',
-      'Συγχρονισμός παραστατικών από Elorus και myDATA (ΑΑΔΕ)',
+      'Συγχρονισμός παραστατικών από το σύστημα τιμολόγησής σας και το myDATA (ΑΑΔΕ)',
       'Σύνδεσμος πληρωμής με κάρτα σε κάθε υπενθύμιση',
       'Αυτόματη αντιστοίχιση τραπεζικών εμβασμάτων',
       'Δικά σας κείμενα σε κάθε βήμα και κάθε κανάλι',
@@ -314,7 +362,7 @@ const el = {
       },
       {
         q: 'Από πού έρχονται τα τιμολόγια;',
-        a: 'Από το Elorus ή απευθείας από το myDATA της ΑΑΔΕ. Μπορείτε επίσης να καταχωρίσετε ένα παραστατικό με το χέρι. Ο πελάτης, το ποσό και η πραγματική ημερομηνία λήξης έρχονται από το ίδιο το παραστατικό, χωρίς να πληκτρολογήσετε τίποτα δύο φορές.',
+        a: 'Από το πρόγραμμα τιμολόγησης που ήδη χρησιμοποιείτε ή απευθείας από το myDATA της ΑΑΔΕ. Μπορείτε επίσης να καταχωρίσετε ένα παραστατικό με το χέρι. Ο πελάτης, το ποσό και η πραγματική ημερομηνία λήξης έρχονται από το ίδιο το παραστατικό, χωρίς να πληκτρολογήσετε τίποτα δύο φορές.',
       },
       {
         q: 'Τι γίνεται όταν ο πελάτης πληρώσει;',
@@ -1019,44 +1067,54 @@ const en: typeof el = {
   landing: {
     signIn: 'Sign in',
     freeTrial: 'Try it free',
+    kicker: 'For Greek businesses',
     heroTitle: 'Get paid on time, without the awkward phone calls.',
     heroBody:
       'lefta.app watches your unpaid invoices, sends the reminders on your behalf, and gives your customer a link that settles the invoice on the spot. You get on with the work.',
     startFree: 'Start free',
     haveAccount: 'I have an account',
-    whatsIncluded: "What's included",
-    moneyTitle: 'The money goes straight to you',
-    moneyIntro: 'You connect your own',
-    moneyOr: 'or',
-    moneyRest:
-      'account and payments are collected there. lefta.app never sits in the flow of money, takes no commission and does not appear in the transaction. You are not waiting on anyone to pass your own money back to you.',
-    complianceTitle: 'A software provider, not a collections agency',
-    complianceIntro:
-      'lefta.app passes on reminders for you. It does not take over claims, negotiate debts or apply pressure. The cadence is fixed, capped at',
-    complianceLimit: 'one contact per customer per day',
-    complianceRest:
-      ', every message is written to a complete, tamper-proof record, and you can mute a customer at any moment.',
-    closingTitle: 'See what you are owed today',
-    closingBody:
-      'Connecting your books takes a few minutes. No reminder goes out until you have approved it.',
+    heroProof: ['No subscription', 'No commission on what you collect', 'Running in minutes'],
+    stepsTitle: 'How it works',
     steps: [
       {
-        title: 'Connect your books',
-        body: 'Elorus or myDATA (AADE), once. Customers, amounts and real due dates sync themselves — you never type anything twice.',
+        title: 'Connect your invoicing system',
+        body: 'The software you already use, or myDATA (AADE) directly. Customers, amounts and real due dates arrive on their own — you never type anything twice.',
       },
       {
         title: 'Reminders send themselves',
-        body: 'Three fixed steps, in your own words: a polite nudge before the due date, a notice two days late, a final one at ten.',
+        body: 'You set the scenario: how many days before or after the due date, in whose words, and on which channel. You can switch it off for a single invoice.',
       },
       {
         title: 'Your customer pays in one click',
         body: 'Every message carries a card payment link. The moment it is settled the sequence stops by itself — nobody is chased for an invoice they have already paid.',
       },
     ],
+    industriesTitle: 'Built for what you actually sell',
+    industriesBody:
+      'An unpaid balance does not look the same everywhere. The scenario, the wording and the channels change with who owes and why.',
+    industries: [
+      {
+        title: 'Sharing and rental',
+        body: 'Scooters, bikes, cars, equipment. Many small charges that failed on the card, addressed to a person rather than an accounts department: short messages, a friendly tone, and payment without so much as opening the app.',
+      },
+      {
+        title: 'Subscriptions and recurring charges',
+        body: 'Gyms, schools, software, maintenance contracts. A failed renewal is caught early, before it becomes a suspended service and a difficult conversation.',
+      },
+      {
+        title: 'Business services',
+        body: 'Agencies, consultants, studios, engineering firms. A formal tone aimed at an accounts department, with the document and the payment link in the same message.',
+      },
+      {
+        title: 'Wholesale and trade',
+        body: 'Many invoices per customer, and payment by transfer. Incoming movements close the documents they explain on their own.',
+      },
+    ],
+    whatsIncluded: "What's included",
     features: [
       {
         title: 'Invoice sync',
-        body: 'Elorus and myDATA. Outstanding invoices appear with the customer name, the amount and the real due date of each document.',
+        body: 'From your invoicing software or straight from myDATA. Outstanding invoices appear with the customer name, the amount and the real due date of each document.',
       },
       {
         title: 'Email and SMS',
@@ -1075,10 +1133,48 @@ const en: typeof el = {
         body: 'Reads your account and closes the invoices your incoming payments explain. Transfers stop being the blind spot.',
       },
       {
-        title: 'Ageing and a full record',
-        body: 'How late every debt is, in one column. Every message sent is logged with its time, recipient and content.',
+        title: 'Control, and a full record',
+        body: 'Switch the automation off for one invoice on its own. Every message sent is logged with its time, recipient and content.',
       },
     ],
+    integrationsTitle: 'Works with what you already use',
+    integrations: [
+      {
+        title: 'Invoicing systems',
+        body: 'Commercial software, and myDATA (AADE) directly.',
+      },
+      {
+        title: 'Payment providers',
+        body: 'Your own account. The money never passes through us.',
+      },
+      {
+        title: 'Your bank account',
+        body: 'Incoming movements are read and matched against your invoices.',
+      },
+      {
+        title: 'Email and SMS',
+        body: 'Under your own sender name, in your own words.',
+      },
+    ],
+    moneyTitle: 'The money goes straight to you',
+    moneyIntro: 'You connect your own',
+    moneyOr: 'or',
+    moneyRest:
+      'account and payments are collected there. lefta.app never sits in the flow of money, takes no commission and does not appear in the transaction. You are not waiting on anyone to pass your own money back to you.',
+    complianceTitle: 'A software provider, not a collections agency',
+    complianceIntro:
+      'lefta.app passes on reminders for you. It does not take over claims, negotiate debts or apply pressure. The cadence is fixed, capped at',
+    complianceLimit: 'one contact per customer per day',
+    complianceRest:
+      ', every message is written to a complete, tamper-proof record, and you can mute a customer at any moment.',
+    pricingTeaserTitle: 'Free — you pay only for SMS',
+    pricingTeaserBody:
+      'No subscription, no commitment and no cut of what you collect. Email reminders are not charged at all.',
+    pricingTeaserLink: 'See the pricing',
+    closingTitle: 'See what you are owed today',
+    closingBody:
+      'Connecting your books takes a few minutes. No reminder goes out until you have approved it.',
+    faqLink: 'Got a question? Read the FAQ.',
   },
   pricing: {
     metaTitle: 'Pricing',
@@ -1094,7 +1190,7 @@ const en: typeof el = {
     includedTitle: 'Included',
     included: [
       'Unlimited email reminders',
-      'Invoice sync from Elorus and myDATA (AADE)',
+      'Invoice sync from your invoicing software and myDATA (AADE)',
       'A card payment link in every reminder',
       'Incoming bank transfers matched automatically',
       'Your own words on every step and channel',
@@ -1133,7 +1229,7 @@ const en: typeof el = {
       },
       {
         q: 'Where do the invoices come from?',
-        a: 'From Elorus, or straight from myDATA (AADE). You can also enter a document by hand. The customer, the amount and the real due date come from the document itself, so you never type anything twice.',
+        a: 'From the invoicing software you already use, or straight from myDATA (AADE). You can also enter a document by hand. The customer, the amount and the real due date come from the document itself, so you never type anything twice.',
       },
       {
         q: 'What happens when my customer pays?',
