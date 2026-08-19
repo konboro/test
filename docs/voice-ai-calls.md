@@ -251,6 +251,55 @@ if M0 finds CR's Greek quality wanting.
 in place; go in-house when multi-tenant volume, latency or data-residency
 demands it — jambonz first, LiveKit/pipecat if we outgrow it.
 
+## Training our own voice model
+
+Three tiers, and only the middle one is a business decision rather than a
+research program or a shortcut:
+
+1. **True from-scratch pretraining** — tens of thousands of hours of speech, a
+   GPU cluster for months, a speech-ML team; $0.5–5M before the first usable
+   voice. This is ElevenLabs' business, not a feature of ours. Not on the table.
+2. **New-language fine-tune of an open model — the realistic "own model".**
+   XTTS-v2 has a documented precedent (Persian was added by fine-tuning the GPT
+   component with the rest frozen); F5-TTS and Orpheus are the current
+   quality leaders and fine-tunable. Greek is NOT among XTTS-v2's 17 stock
+   languages, so this is a genuine language addition, in two data layers:
+   - *language layer*: every public Greek speech corpus we can assemble
+     (Common Voice el, CSS10, LibriVox audiobooks, parliament recordings —
+     realistically 50–200 h after cleaning);
+   - *brand-voice layer*: 5–20 h of studio recordings from a hired voice actor
+     with a **full buy-out licence** — this is what makes the voice ours, and
+     it is the honest version of "own voice" (a licensed human, not a clone).
+   Compute is small (one A100/H100 for days–2 weeks, €500–3k rented); the real
+   work is the data pipeline, Greek phonemization/stress handling and evals —
+   one audio-experienced ML engineer, 6–10 weeks. Serving: one inference GPU
+   (~€150–400/mo) streams sentences fast enough for the call loop.
+3. **Piper/VITS trained only on our studio data** — a small per-voice model,
+   days of training, **CPU inference**. Ceiling is "clean and pleasant", not
+   "ElevenLabs" — but see the phone reality below.
+
+**Budget for tier 2**: voice actor + studio €5–15k, engineering €15–35k,
+compute €1–3k, serving €2–5k/yr → **€25–60k to the first production voice**,
+then a near-zero marginal cost per minute.
+
+**Phone reality check:** calls are 8 kHz μ-law. Most of the audible difference
+between a premium model and a well-trained mid-tier voice is above that band —
+over a handset, tier 3 gets surprisingly close to tier 2. Which means the case
+for an own model is **never cost or audible quality alone** (Azure TTS costs
+~$0.05/call; break-even sits at hundreds of thousands of calls): it is brand
+ownership of the voice, vendor independence, data residency, and the option to
+serve fully offline.
+
+**Own STT — no.** Whisper/Deepgram fine-tuning would need in-domain telephone
+audio, and our v1 policy deliberately records nothing — there is no training
+corpus to build on. If this ever changes it changes as a consent decision
+first, an ML decision second.
+
+**Sequencing:** this slots in *behind* the TTS interface renderSpeech already
+targets — the pilot runs on CR/Azure voices, the own-voice project can start
+in parallel (actor casting + data assembly first), and swapping the voice
+later is a config change, not a migration.
+
 ## Guardrail testing is a deliverable, not a phase
 
 - A **simulator harness**: the same gateway loop driven by text (no telephony),
