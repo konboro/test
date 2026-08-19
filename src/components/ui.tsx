@@ -109,7 +109,7 @@ export function ButtonLink({
  */
 function buttonClass(variant: ButtonVariant) {
   const base =
-    'inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
+    'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 
   if (variant === 'primary') {
     return `${base} bg-ink-900 text-white hover:bg-ink-800 focus-visible:ring-ink-400`;

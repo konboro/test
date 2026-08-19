@@ -200,7 +200,7 @@ const el = {
   landing: {
     signIn: 'Σύνδεση',
     freeTrial: 'Δωρεάν δοκιμή',
-    kicker: 'Για ελληνικές επιχειρήσεις',
+    kicker: 'Αυτοματοποιημένη διαχείριση εισπράξεων',
     heroTitle: 'Πληρωθείτε στην ώρα σας, χωρίς δύσκολα τηλεφωνήματα.',
     heroBody:
       'Η lefta.app παρακολουθεί τα ανεξόφλητα παραστατικά σας, στέλνει τις υπενθυμίσεις για λογαριασμό σας και δίνει στον πελάτη έναν σύνδεσμο που εξοφλεί επιτόπου. Εσείς συνεχίζετε τη δουλειά σας.',
@@ -208,6 +208,24 @@ const el = {
     haveAccount: 'Έχω λογαριασμό',
     heroProof: ['Χωρίς συνδρομή', 'Καμία προμήθεια στις εισπράξεις', 'Έτοιμο σε λίγα λεπτά'],
     stepsTitle: 'Πώς δουλεύει',
+    tagline: 'Αυτοματοποιημένη διαχείριση εισπράξεων για κάθε επιχείρηση',
+    market: 'Για ελληνικές επιχειρήσεις',
+    eyebrowSteps: 'Πώς δουλεύει',
+    eyebrowIndustries: 'Κλάδοι',
+    eyebrowFeatures: 'Δυνατότητες',
+    eyebrowIntegrations: 'Συνδέσεις',
+    timelineTitle: 'Ένα σενάριο που ορίζετε εσείς',
+    timelineNote:
+      'Η προεπιλογή, ως παράδειγμα. Αλλάζετε ημέρες, κείμενα και κανάλια — ή σταματάτε τον αυτοματισμό για ένα μόνο παραστατικό.',
+    timeline: [
+      { day: '−3 ημέρες', title: 'Ευγενική υπενθύμιση', channel: 'Email' },
+      { day: '+2 ημέρες', title: 'Ληξιπρόθεσμο', channel: 'Email + SMS' },
+      { day: '+10 ημέρες', title: 'Τελική υπενθύμιση', channel: 'Email + SMS' },
+      { day: 'Εξόφληση', title: 'Η αλληλουχία σταματά', channel: 'Αυτόματα' },
+    ],
+    footerProduct: 'Προϊόν',
+    footerAccount: 'Λογαριασμός',
+    register: 'Εγγραφή',
     steps: [
       {
         title: 'Συνδέετε το σύστημα τιμολόγησής σας',
@@ -1067,7 +1085,7 @@ const en: typeof el = {
   landing: {
     signIn: 'Sign in',
     freeTrial: 'Try it free',
-    kicker: 'For Greek businesses',
+    kicker: 'Automated credit management',
     heroTitle: 'Get paid on time, without the awkward phone calls.',
     heroBody:
       'lefta.app watches your unpaid invoices, sends the reminders on your behalf, and gives your customer a link that settles the invoice on the spot. You get on with the work.',
@@ -1075,6 +1093,24 @@ const en: typeof el = {
     haveAccount: 'I have an account',
     heroProof: ['No subscription', 'No commission on what you collect', 'Running in minutes'],
     stepsTitle: 'How it works',
+    tagline: 'Automated credit management for every business',
+    market: 'For Greek businesses',
+    eyebrowSteps: 'How it works',
+    eyebrowIndustries: 'Industries',
+    eyebrowFeatures: 'Capabilities',
+    eyebrowIntegrations: 'Connections',
+    timelineTitle: 'A scenario you set yourself',
+    timelineNote:
+      'The default, as an example. You change the days, the wording and the channels — or switch the automation off for a single invoice.',
+    timeline: [
+      { day: '−3 days', title: 'A polite nudge', channel: 'Email' },
+      { day: '+2 days', title: 'Overdue', channel: 'Email + SMS' },
+      { day: '+10 days', title: 'Final reminder', channel: 'Email + SMS' },
+      { day: 'Paid', title: 'The sequence stops', channel: 'Automatic' },
+    ],
+    footerProduct: 'Product',
+    footerAccount: 'Account',
+    register: 'Sign up',
     steps: [
       {
         title: 'Connect your invoicing system',
