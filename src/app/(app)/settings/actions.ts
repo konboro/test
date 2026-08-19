@@ -30,7 +30,6 @@ const profileSchema = z.object({
     .refine((v) => v === null || z.string().email().safeParse(v).success, {
       message: 'invalidReplyEmail',
     }),
-  automation_enabled: z.boolean(),
 });
 
 export async function updateProfile(
@@ -43,7 +42,6 @@ export async function updateProfile(
     company_name: formData.get('company_name'),
     vat_number: formData.get('vat_number'),
     reply_to_email: formData.get('reply_to_email'),
-    automation_enabled: formData.get('automation_enabled') === 'on',
   });
 
   if (!parsed.success) return { error: formError(t, parsed.error.issues[0]?.message) };
@@ -62,6 +60,48 @@ export async function updateProfile(
   revalidatePath('/settings');
   revalidatePath('/dashboard');
   return { success: t.forms.success.settingsSaved };
+}
+
+/**
+ * Turns the whole reminder automation on or off.
+ *
+ * Deliberately not part of the profile form. It used to ride along with the
+ * company name, which meant saving an unrelated field re-sent whatever the
+ * checkbox happened to show — and a form that silently decides whether 290
+ * invoices get chased is the wrong shape for a setting this consequential.
+ *
+ * Written through the browser session: `automation_enabled` is in the update
+ * grant for `authenticated`, so RLS confines it to the tenant's own row.
+ */
+export async function setAutomation(
+  _prev: SettingsState,
+  formData: FormData,
+): Promise<SettingsState> {
+  const t = await getDictionary();
+
+  // Anything that is not an explicit "on" means off. Off is the safe reading of
+  // a malformed request: it stops messages rather than starting them.
+  const enabled = formData.get('enabled') === 'on';
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: t.forms.errors.unauthorized };
+
+  const { error } = await supabase
+    .from('users')
+    .update({ automation_enabled: enabled })
+    .eq('id', user.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath('/settings');
+  revalidatePath('/dashboard');
+
+  return {
+    success: enabled ? t.forms.success.automationOn : t.forms.success.automationOff,
+  };
 }
 
 

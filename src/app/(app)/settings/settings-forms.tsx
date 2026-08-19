@@ -27,7 +27,6 @@ export function ProfileForm({
     company_name: string | null;
     vat_number: string | null;
     reply_to_email: string | null;
-    automation_enabled: boolean;
   };
 }) {
   const t = useT();
@@ -62,23 +61,6 @@ export function ProfileForm({
         </Field>
 
       </div>
-
-      <label className="flex items-start gap-3 rounded-lg border border-ink-200 bg-ink-50 px-4 py-3">
-        <input
-          name="automation_enabled"
-          type="checkbox"
-          defaultChecked={profile.automation_enabled}
-          className="mt-0.5 h-4 w-4 rounded border-ink-300"
-        />
-        <span>
-          <span className="block text-sm font-medium text-ink-900">
-            {t.fields.automationOn}
-          </span>
-          <span className="block text-xs text-ink-500">
-            {t.fields.automationHint}
-          </span>
-        </span>
-      </label>
 
       {state.error ? (
         <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
