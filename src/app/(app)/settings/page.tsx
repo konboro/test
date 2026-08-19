@@ -316,6 +316,13 @@ export default async function SettingsPage({
                 <Badge tone={profile.stripe_charges_enabled ? 'positive' : 'warning'}>
                   {profile.stripe_charges_enabled ? t.settings.stripeActive : t.settings.stripePending}
                 </Badge>
+              ) : hasOwnStripeKey ? (
+                // The own-key arrangement never fills stripe_account_id — that
+                // column belongs to Connect. Reading the badge off it alone told
+                // a tenant whose payments were verified and live that they were
+                // "not connected", on the same card that had just accepted the
+                // key.
+                <Badge tone="positive">{t.settings.stripeOwnKey}</Badge>
               ) : (
                 <Badge tone="warning">{t.settings.notConnected}</Badge>
               )
