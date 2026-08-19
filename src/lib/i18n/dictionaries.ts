@@ -188,6 +188,8 @@ const el = {
       debtorAdded: 'Ο πελάτης προστέθηκε.',
       debtorUpdated: 'Τα στοιχεία ενημερώθηκαν.',
       settingsSaved: 'Οι ρυθμίσεις αποθηκεύτηκαν.',
+      automationOn: 'Οι αυτόματες υπενθυμίσεις ενεργοποιήθηκαν.',
+      automationOff: 'Οι αυτόματες υπενθυμίσεις απενεργοποιήθηκαν. Δεν φεύγει κανένα μήνυμα.',
       templateSaved: 'Το πρότυπο αποθηκεύτηκε.',
       templateReset: 'Επαναφέρθηκε το προεπιλεγμένο κείμενο.',
       reminderSent: (channels: string) => `Η υπενθύμιση στάλθηκε (${channels}).`,
@@ -739,6 +741,18 @@ const el = {
     creditsSuccess:
       'Η πληρωμή ολοκληρώθηκε. Τα SMS πιστώνονται μόλις επιβεβαιωθεί από το Stripe — συνήθως σε λίγα δευτερόλεπτα.',
     creditsCancelled: 'Η αγορά ακυρώθηκε. Δεν χρεωθήκατε.',
+    automation: {
+      title: 'Αυτόματες υπενθυμίσεις',
+      subtitle: 'Ο κεντρικός διακόπτης. Όσο είναι κλειστός, δεν φεύγει κανένα μήνυμα σε κανέναν πελάτη.',
+      stateOn: 'Ενεργές',
+      stateOff: 'Ανενεργές',
+      confirmTitle: 'Να ενεργοποιηθούν οι αυτόματες υπενθυμίσεις;',
+      confirmBody: (open: number) =>
+        `Από εδώ και πέρα το lefta.app στέλνει υπενθυμίσεις μόνο του, με βάση το σενάριό σας. ` +
+        `Αυτή τη στιγμή ${open === 1 ? 'υπάρχει' : 'υπάρχουν'} ${open} ${open === 1 ? 'ανοιχτό τιμολόγιο' : 'ανοιχτά τιμολόγια'}.`,
+      confirmYes: 'Ναι, ενεργοποίηση',
+      cancel: 'Άκυρο',
+    },
     stripeNotices: {
       connected: 'Ο λογαριασμός Stripe συνδέθηκε. Οι πελάτες σας μπορούν πλέον να πληρώνουν με κάρτα.',
       pending:
@@ -1055,6 +1069,8 @@ const en: typeof el = {
       debtorAdded: 'Customer added.',
       debtorUpdated: 'Details updated.',
       settingsSaved: 'Settings saved.',
+      automationOn: 'Automatic reminders are on.',
+      automationOff: 'Automatic reminders are off. Nothing goes out.',
       templateSaved: 'Template saved.',
       templateReset: 'The default text has been restored.',
       reminderSent: (channels: string) => `Reminder sent (${channels}).`,
@@ -1600,6 +1616,18 @@ const en: typeof el = {
     creditsSuccess:
       'Payment complete. The SMS credits appear as soon as Stripe confirms — usually within seconds.',
     creditsCancelled: 'The purchase was cancelled. You have not been charged.',
+    automation: {
+      title: 'Automatic reminders',
+      subtitle: 'The master switch. While it is off, nothing goes out to any customer.',
+      stateOn: 'On',
+      stateOff: 'Off',
+      confirmTitle: 'Turn automatic reminders on?',
+      confirmBody: (open: number) =>
+        `From now on lefta.app sends reminders by itself, following your scenario. ` +
+        `There ${open === 1 ? 'is' : 'are'} ${open} open ${open === 1 ? 'invoice' : 'invoices'} right now.`,
+      confirmYes: 'Yes, turn it on',
+      cancel: 'Cancel',
+    },
     stripeNotices: {
       connected: 'Stripe account connected. Your customers can now pay by card.',
       pending:

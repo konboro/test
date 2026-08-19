@@ -15,6 +15,7 @@ import { createClient } from '@/lib/supabase/server';
 import { ElorusForm } from './elorus-forms';
 import { BankConnect } from './bank-forms';
 import { ScenarioForm } from './scenario-forms';
+import { AutomationSwitch } from './automation-switch';
 import { CreditPacks, MyDataForm, ProfileForm } from './settings-forms';
 import { ProviderChooser } from './provider-chooser';
 import { StripeConnect } from './stripe-forms';
@@ -182,6 +183,13 @@ export default async function SettingsPage({
 
   if (!profile) redirect('/login');
 
+  // What the confirmation is actually asking about. A switch that warns
+  // "reminders will start going out" is abstract; the same warning naming a
+  // number is the difference between a setting and a decision.
+  const { count: openInvoices } = await supabase
+    .from('invoices')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'pending');
   const stripeMessage = stripeNotice(t, stripe);
   const scenario = await loadScenario(user.id);
   const bankOutcome = bankNotice(t, bank, { seen, settled, queued, reason, fetched, accounts });
@@ -277,6 +285,18 @@ export default async function SettingsPage({
         </div>
       ) : null}
 
+      <Card>
+        <div id="automation" className="scroll-mt-20">
+          <CardHeader
+            title={t.settings.automation.title}
+            subtitle={t.settings.automation.subtitle}
+          />
+          <AutomationSwitch
+            enabled={profile.automation_enabled}
+            openInvoices={openInvoices ?? 0}
+          />
+        </div>
+      </Card>
       <Card>
         <CardHeader title={t.settings.business} />
         <ProfileForm profile={profile} />
