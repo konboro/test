@@ -13,13 +13,14 @@ import { settlementMethod } from '@/lib/payments/settlement';
 import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
 
+import { markInvoicePaid, runScenarioForSelected, sendBulkReminder } from './actions';
 import {
-  markInvoicePaid,
-  runScenarioForSelected,
-  sendBulkReminder,
-  toggleInvoiceAutomation,
-} from './actions';
-import { CopyPayLink, CreateInvoiceForm, DueDateButton, RemindButton } from './invoice-forms';
+  AutomationCheckbox,
+  CopyPayLink,
+  CreateInvoiceForm,
+  DueDateButton,
+  RemindButton,
+} from './invoice-forms';
 import { BulkActions } from './bulk-actions';
 import { SelectAll } from './select-all';
 
@@ -323,6 +324,9 @@ export default async function InvoicesPage({
                   </th>
                   <th className="px-5 py-2.5 font-medium">{t.invoices.colAging}</th>
                   <th className="px-5 py-2.5 font-medium">{t.invoices.colStatus}</th>
+                  <th className="px-5 py-2.5 text-center font-medium">
+                    {t.invoices.colAutomation}
+                  </th>
                   {showSettled ? (
                     <th className="px-5 py-2.5 font-medium">{t.invoices.colPaid}</th>
                   ) : null}
@@ -429,16 +433,22 @@ export default async function InvoicesPage({
                         )}
                       </td>
                       <td className="px-5 py-3">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <Badge tone={status.tone}>{status.label}</Badge>
-                          {/* Shown beside the status rather than only as an
-                              action, so a row the sweep is ignoring says so at a
-                              glance. A pause nobody can see is one nobody
-                              remembers switching on. */}
-                          {invoice.automation_enabled === false ? (
-                            <Badge tone="neutral">{t.invoices.automationPaused}</Badge>
-                          ) : null}
-                        </div>
+                        <Badge tone={status.tone}>{status.label}</Badge>
+                      </td>
+                      <td className="px-5 py-3 text-center">
+                        {/* Only where it means something. A settled invoice is
+                            out of the scenario whatever this said, and an empty
+                            box against it would read as a switch someone turned
+                            off. */}
+                        {invoice.status === 'pending' ? (
+                          <AutomationCheckbox
+                            invoiceId={invoice.id}
+                            enabled={invoice.automation_enabled !== false}
+                            label={label}
+                          />
+                        ) : (
+                          <span className="text-ink-400">—</span>
+                        )}
                       </td>
                       {showSettled ? (
                         <td className="px-5 py-3">
@@ -472,27 +482,6 @@ export default async function InvoicesPage({
                             {invoice.status === 'pending' ? (
                               <>
                                 <RemindButton invoiceId={invoice.id} label={label} />
-                                <form action={toggleInvoiceAutomation}>
-                                  <input type="hidden" name="id" value={invoice.id} />
-                                  <input
-                                    type="hidden"
-                                    name="enabled"
-                                    value={String(invoice.automation_enabled !== false)}
-                                  />
-                                  <button
-                                    type="submit"
-                                    className={`text-sm ${subtleLinkClass}`}
-                                    title={
-                                      invoice.automation_enabled === false
-                                        ? t.invoices.automationResumeHint
-                                        : t.invoices.automationPauseHint
-                                    }
-                                  >
-                                    {invoice.automation_enabled === false
-                                      ? t.invoices.automationResume
-                                      : t.invoices.automationPause}
-                                  </button>
-                                </form>
                                 <CopyPayLink code={invoice.short_code ?? invoice.pay_token} />
                                 <form action={markInvoicePaid}>
                                   <input type="hidden" name="id" value={invoice.id} />

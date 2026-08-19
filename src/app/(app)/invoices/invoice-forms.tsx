@@ -14,6 +14,7 @@ import {
   createInvoice,
   previewReminder,
   sendReminder,
+  toggleInvoiceAutomation,
   updateDueDate,
   type InvoiceFormState,
   type ReminderState,
@@ -300,6 +301,57 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
         </Modal>
       ) : null}
     </>
+  );
+}
+
+/**
+ * Whether the automatic scenario runs for this invoice.
+ *
+ * A checkbox rather than a button, because the question it answers is "is this
+ * one being chased?" and a column of boxes answers that for the whole page at a
+ * glance. A button labelled "pause" states the action and leaves the reader to
+ * infer the state from it.
+ *
+ * It submits on change, so there is no save step for a two-state control. The
+ * form carries the state the row was rendered with and the action flips that,
+ * rather than sending the new value — so a double click cannot land two writes
+ * that disagree about where they started.
+ */
+function AutomationBox({ enabled, label }: { enabled: boolean; label: string }) {
+  const t = useT();
+  const { pending } = useFormStatus();
+
+  return (
+    <input
+      type="checkbox"
+      // Remounted whenever the server's answer changes, so the box shows what
+      // was actually saved rather than what was clicked.
+      key={String(enabled)}
+      defaultChecked={enabled}
+      disabled={pending}
+      onChange={(event) => event.currentTarget.form?.requestSubmit()}
+      aria-label={t.invoices.automationAria(label)}
+      title={enabled ? t.invoices.automationPauseHint : t.invoices.automationResumeHint}
+      className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-600 disabled:cursor-wait disabled:opacity-50"
+    />
+  );
+}
+
+export function AutomationCheckbox({
+  invoiceId,
+  enabled,
+  label,
+}: {
+  invoiceId: string;
+  enabled: boolean;
+  label: string;
+}) {
+  return (
+    <form action={toggleInvoiceAutomation}>
+      <input type="hidden" name="id" value={invoiceId} />
+      <input type="hidden" name="enabled" value={String(enabled)} />
+      <AutomationBox enabled={enabled} label={label} />
+    </form>
   );
 }
 

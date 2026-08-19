@@ -590,9 +590,8 @@ const el = {
     noNumber: 'Χωρίς αριθμό',
     markPaid: 'Εξοφλήθηκε',
     markPaidHint: 'Καταχώρηση εξόφλησης εκτός πλατφόρμας (π.χ. τραπεζικό έμβασμα)',
-    automationPaused: 'Σε παύση',
-    automationPause: 'Παύση',
-    automationResume: 'Συνέχεια',
+    colAutomation: 'Αυτόματα',
+    automationAria: (label: string) => `Αυτόματο σενάριο για το παραστατικό ${label}`,
     automationPauseHint:
       'Διακοπή των αυτόματων υπενθυμίσεων μόνο για αυτό το παραστατικό. Η χειροκίνητη αποστολή εξακολουθεί να λειτουργεί.',
     automationResumeHint: 'Επαναφορά των αυτόματων υπενθυμίσεων για αυτό το παραστατικό.',
@@ -1408,9 +1407,8 @@ const en: typeof el = {
     noNumber: 'No number',
     markPaid: 'Mark paid',
     markPaidHint: 'Record a payment made outside the platform (e.g. bank transfer)',
-    automationPaused: 'Paused',
-    automationPause: 'Pause',
-    automationResume: 'Resume',
+    colAutomation: 'Automatic',
+    automationAria: (label: string) => `Automatic scenario for invoice ${label}`,
     automationPauseHint:
       'Stop the automatic reminders for this invoice only. Sending one by hand still works.',
     automationResumeHint: 'Let the automatic reminders chase this invoice again.',
