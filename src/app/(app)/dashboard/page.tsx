@@ -10,7 +10,7 @@ import { athensDate, daysBetween, formatDate, formatMoney } from '@/lib/money';
 import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
 
-import { ElorusSyncButton, SyncButton } from './sync-button';
+import { DataSources } from './data-sources';
 
 export async function generateMetadata() {
   return { title: (await getDictionary()).dashboard.title };
@@ -42,6 +42,7 @@ export default async function DashboardPage() {
     { data: recentPayments },
     { data: recentComms },
     { data: funnelEvents },
+    { data: bankConnections },
   ] = await Promise.all([
       supabase
         .from('users')
@@ -75,6 +76,9 @@ export default async function DashboardPage() {
         .select('invoice_id, debtor_id, channel, event, occurred_at')
         .gte('occurred_at', funnelSince)
         .limit(5000),
+      // The third data source. Its freshness belongs beside the other two, and
+      // until now it was only visible from the settings screen.
+      supabase.from('bank_connections').select('status, last_synced_at'),
     ]);
 
   const allInvoices = invoices ?? [];
@@ -244,28 +248,19 @@ export default async function DashboardPage() {
     .filter((row) => row.count > 0)
     .sort((a, b) => b.total - a.total);
 
+  const bankActive = (bankConnections ?? []).filter((c) => c.status === 'active');
+
   const unreachable = (debtors ?? []).filter(
     (d) => !d.email && !d.phone && pending.some((i) => i.debtor_id === d.id),
   ).length;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-ink-900">{t.dashboard.title}</h1>
-          <p className="mt-0.5 text-sm text-ink-500">
-            {profile?.mydata_last_sync_at
-              ? t.dashboard.lastSync(
-                  new Date(profile.mydata_last_sync_at).toLocaleString(t.dateTimeTag),
-                )
-              : t.dashboard.neverSynced}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-start gap-2">
-          <ElorusSyncButton configured={Boolean(profile?.elorus_organization_id)} />
-          <SyncButton configured={Boolean(profile?.mydata_user_id)} />
-        </div>
-      </div>
+      {/* The title stands alone now. It used to carry myDATA's last sync time
+          as though that spoke for every source, which it never did — the
+          billing system and the bank had their own clocks and neither was
+          shown. All three are reported together, further down. */}
+      <h1 className="text-xl font-semibold text-ink-900">{t.dashboard.title}</h1>
 
       {profile && !profile.automation_enabled ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -285,8 +280,11 @@ export default async function DashboardPage() {
         </div>
       ) : null}
 
+      {/* Two columns on a phone rather than one. Four full-width tiles pushed
+          everything else below the fold, and these are the numbers the page
+          exists to show. */}
       <div
-        className={`grid gap-4 sm:grid-cols-2 ${
+        className={`grid grid-cols-2 gap-3 sm:gap-4 ${
           smsCreditsEnforced() ? 'lg:grid-cols-4' : 'lg:grid-cols-3'
         }`}
       >
@@ -316,6 +314,30 @@ export default async function DashboardPage() {
           />
         ) : null}
       </div>
+
+      <DataSources
+        sources={{
+          billing: {
+            configured: Boolean(profile?.elorus_organization_id),
+            lastSync: profile?.elorus_last_sync_at ?? null,
+          },
+          mydata: {
+            configured: Boolean(profile?.mydata_user_id),
+            lastSync: profile?.mydata_last_sync_at ?? null,
+          },
+          bank: {
+            configured: bankActive.length > 0,
+            // The most recent read across every connected account: one stale
+            // account among several is still a reason to press the button.
+            lastSync:
+              bankActive
+                .map((c) => c.last_synced_at)
+                .filter((at): at is string => Boolean(at))
+                .sort()
+                .at(-1) ?? null,
+          },
+        }}
+      />
 
       {outstandingCents > 0 ? (
         <Card>
@@ -548,7 +570,58 @@ export default async function DashboardPage() {
             body={t.dashboard.emptyBody}
           />
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            {/* Six columns do not survive a phone. Below `md` the same rows are
+                stacked as cards, so the balance and the state are readable
+                without dragging a table sideways; from `md` up the table is
+                still the better shape for comparing customers. */}
+            <ul className="divide-y divide-ink-100 md:hidden">
+              {rows.map(({ debtor, count, total, oldest, status, lastContact }) => (
+                <li key={debtor.id} className="px-5 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <Link
+                        href={`/debtors/${debtor.id}`}
+                        className="font-medium text-ink-900 underline-offset-2 transition hover:text-brand-600 hover:underline"
+                      >
+                        {debtor.name}
+                      </Link>
+                      <p className="mt-0.5 text-xs text-ink-500">
+                        {t.dashboard.colInvoices}: {count}
+                      </p>
+                    </div>
+                    <span className="tabular shrink-0 text-base font-semibold text-ink-900">
+                      {formatMoney(total)}
+                    </span>
+                  </div>
+
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                    {status ? <Badge tone={status.tone}>{status.label}</Badge> : null}
+                    {debtor.muted ? <Badge tone="neutral">{t.dashboard.muted}</Badge> : null}
+                    {!debtor.email && !debtor.phone ? (
+                      <Badge tone="danger">{t.dashboard.noContact}</Badge>
+                    ) : null}
+                  </div>
+
+                  <dl className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1 text-xs text-ink-500">
+                    <div className="flex gap-1.5">
+                      <dt>{t.dashboard.colOldestDue}:</dt>
+                      <dd className="tabular text-ink-700">
+                        {oldest ? formatDate(oldest.due_date) : '—'}
+                      </dd>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <dt>{t.dashboard.colLastContact}:</dt>
+                      <dd className="tabular text-ink-700">
+                        {lastContact ? formatDate(lastContact) : '—'}
+                      </dd>
+                    </div>
+                  </dl>
+                </li>
+              ))}
+            </ul>
+
+            <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-500">
@@ -564,7 +637,10 @@ export default async function DashboardPage() {
                 {rows.map(({ debtor, count, total, oldest, status, lastContact }) => (
                   <tr key={debtor.id} className="border-b border-ink-100 last:border-0">
                     <td className="px-5 py-3">
-                      <Link href="/debtors" className="font-medium text-ink-900 underline-offset-2 transition hover:text-brand-600 hover:underline">
+                      <Link
+                        href={`/debtors/${debtor.id}`}
+                        className="font-medium text-ink-900 underline-offset-2 transition hover:text-brand-600 hover:underline"
+                      >
                         {debtor.name}
                       </Link>
                       <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-500">
@@ -592,7 +668,8 @@ export default async function DashboardPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+          </>
         )}
       </Card>
     </div>

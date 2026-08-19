@@ -909,6 +909,16 @@ const el = {
     result: (fetched: number, invoices: number, debtors: number) =>
       `Ελήφθησαν ${fetched} παραστατικά · ${invoices} νέα · ${debtors} νέοι πελάτες.`,
     more: 'Υπάρχουν κι άλλα — πατήστε ξανά για συνέχεια.',
+    sourcesTitle: 'Πηγές δεδομένων',
+    sourcesHint: 'Από πού έρχονται τα παραστατικά και οι εισπράξεις σας.',
+    sourceBilling: 'Σύστημα τιμολόγησης',
+    sourceMydata: 'myDATA (ΑΑΔΕ)',
+    sourceBank: 'Τραπεζικός λογαριασμός',
+    notConnected: 'Μη συνδεδεμένο',
+    connectSource: 'Σύνδεση',
+    syncNow: 'Συγχρονισμός',
+    bankResult: (fetched: number, settled: number, queued: number) =>
+      `Κινήσεις: ${fetched} · Εξοφλήθηκαν: ${settled} · Προς έλεγχο: ${queued}.`,
   },
 
   invoiceForm: {
@@ -1848,6 +1858,16 @@ const en: typeof el = {
     result: (fetched: number, invoices: number, debtors: number) =>
       `${fetched} documents fetched · ${invoices} new · ${debtors} new customers.`,
     more: 'More remain — press again to continue.',
+    sourcesTitle: 'Data sources',
+    sourcesHint: 'Where your documents and your payments come from.',
+    sourceBilling: 'Invoicing system',
+    sourceMydata: 'myDATA (AADE)',
+    sourceBank: 'Bank account',
+    notConnected: 'Not connected',
+    connectSource: 'Connect',
+    syncNow: 'Sync',
+    bankResult: (fetched: number, settled: number, queued: number) =>
+      `Movements: ${fetched} · Settled: ${settled} · To review: ${queued}.`,
   },
 
   invoiceForm: {
