@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { safeNextPath } from '@/lib/redirects';
 import { createClient } from '@/lib/supabase/server';
+import { appUrl } from '@/lib/env';
 import { formError, getDictionary } from '@/lib/i18n';
 
 export interface AuthState {
@@ -57,9 +58,16 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     ...parsed.data,
-    // Consumed by the `handle_new_auth_user` trigger, which provisions the
-    // tenant row in public.users.
-    options: { data: { company_name: companyName } },
+    options: {
+      // Consumed by the `handle_new_auth_user` trigger, which provisions the
+      // tenant row in public.users.
+      data: { company_name: companyName },
+      // Said explicitly rather than left to the project's Site URL. The link
+      // in the confirmation email is the first thing a new tenant clicks, and
+      // a Site URL still pointing at a preview deployment sends them to a
+      // stranger's copy of the app with a valid code in the query string.
+      emailRedirectTo: `${appUrl()}/auth/callback`,
+    },
   });
 
   if (error) {
