@@ -6,6 +6,43 @@ import { emailAvailable } from '@/lib/providers';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 /**
+ * Who hears that money arrived.
+ *
+ * The account holder always, and the reply-to address as well when it differs.
+ *
+ * Reply-to used to be the only recipient, on the reasoning that replies about
+ * money should reach whoever handles it. That confuses two different addresses:
+ * reply-to is where a *debtor* answering a reminder lands, which is routinely a
+ * shared inbox nobody watches for their own notifications. Setting it silently
+ * redirected every payment notice away from the person who signed up — they were
+ * being sent, to somewhere he never looks.
+ *
+ * Deduplicated case-insensitively, because the two fields holding the same
+ * address in different case is a configuration detail, not a request for two
+ * copies.
+ */
+export function notificationRecipients(tenant: {
+  email?: string | null;
+  reply_to_email?: string | null;
+}): string[] {
+  const chosen: string[] = [];
+  const seen = new Set<string>();
+
+  for (const address of [tenant.email, tenant.reply_to_email]) {
+    const trimmed = address?.trim();
+    if (!trimmed) continue;
+
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+
+    seen.add(key);
+    chosen.push(trimmed);
+  }
+
+  return chosen;
+}
+
+/**
  * Tells the creditor that one of their invoices has been paid.
  *
  * Deliberately not written to `communications_log`. That table is the record of
@@ -38,10 +75,10 @@ export async function notifyPaymentReceived(invoiceId: string): Promise<void> {
 
     if (!tenant) return;
 
-    // Replies about a payment should reach whoever handles the money, which is
-    // the reply-to address when one is set.
-    const to = tenant.reply_to_email || tenant.email;
-    if (!to) return;
+    // Replies still go to the money desk; the notice itself goes to everyone
+    // who should know, the account holder included.
+    const recipients = notificationRecipients(tenant);
+    if (recipients.length === 0) return;
 
     const t = DICTIONARIES[isLocale(tenant.locale) ? tenant.locale : 'el'];
     const amount = formatMoney(invoice.paid_amount_cents ?? invoice.amount_cents, invoice.currency);
@@ -59,14 +96,21 @@ export async function notifyPaymentReceived(invoiceId: string): Promise<void> {
 
     const text = lines.join('\n');
 
-    await sendEmail({
-      to,
-      subject: t.paymentReceived.subject(amount, label),
-      text,
-      html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px;line-height:1.65;color:#334155;">${lines
-        .map((line) => (line ? `<p style="margin:0 0 12px;">${escapeHtml(line)}</p>` : ''))
-        .join('')}</div>`,
-    });
+    for (const to of recipients) {
+      await sendEmail({
+        to,
+        subject: t.paymentReceived.subject(amount, label),
+        text,
+        html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px;line-height:1.65;color:#334155;">${lines
+          .map((line) => (line ? `<p style="margin:0 0 12px;">${escapeHtml(line)}</p>` : ''))
+          .join('')}</div>`,
+      });
+    }
+
+    // Nothing records this: it is deliberately kept out of communications_log,
+    // which is the record of what went to debtors. One line in the runtime log
+    // is the only way to answer "was I told?" after the fact.
+    console.info('[payments:notify] sent', { invoiceId, recipients: recipients.length });
   } catch (cause) {
     // Settlement already happened and is recorded; this is a courtesy on top.
     console.error('[payments:notify] could not notify the creditor', String(cause));
