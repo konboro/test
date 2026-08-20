@@ -810,6 +810,9 @@ const el = {
     mute: 'Παύση',
     unmute: 'Ενεργοποίηση',
     backToList: '← Όλοι οι πελάτες',
+    notificationsLabel: 'Αυτόματες υπενθυμίσεις για αυτόν τον πελάτη',
+    notificationsOn: 'Ενεργές',
+    notificationsOff: 'Σε παύση',
     messagesTitle: 'Ιστορικό μηνυμάτων',
     messagesCount: (n: number) =>
       n === 1 ? '1 μήνυμα' : `${n} μηνύματα`,
@@ -1830,6 +1833,9 @@ const en: typeof el = {
     mute: 'Mute',
     unmute: 'Unmute',
     backToList: '← All customers',
+    notificationsLabel: 'Automatic reminders for this customer',
+    notificationsOn: 'On',
+    notificationsOff: 'Paused',
     messagesTitle: 'Message history',
     messagesCount: (n: number) =>
       n === 1 ? '1 message' : `${n} messages`,
