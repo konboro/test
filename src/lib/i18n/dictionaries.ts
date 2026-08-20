@@ -922,6 +922,7 @@ const el = {
       no_text_layer: 'Το PDF δεν περιέχει κείμενο — είναι σάρωση. Συμπληρώστε τα πεδία.',
       vision_unavailable: 'Η ανάγνωση εικόνων δεν είναι ενεργή. Συμπληρώστε τα πεδία.',
       unreadable: 'Δεν κατάφερα να διαβάσω το αρχείο. Συμπληρώστε τα πεδία.',
+      too_many_pages: 'Το αρχείο έχει πολλές σελίδες για αυτόματη ανάγνωση. Ανεβάστε ένα τιμολόγιο τη φορά ή συμπληρώστε τα πεδία.',
     } as Record<string, string>,
     errors: {
       no_files: 'Δεν επιλέχθηκε αρχείο.',
@@ -2006,6 +2007,7 @@ const en: typeof el = {
       no_text_layer: 'This PDF holds no text — it is a scan. Please fill the fields in.',
       vision_unavailable: 'Reading images is not switched on. Please fill the fields in.',
       unreadable: 'I could not read this file. Please fill the fields in.',
+      too_many_pages: 'This file has too many pages to read automatically. Upload one invoice at a time, or fill the fields in.',
     } as Record<string, string>,
     errors: {
       no_files: 'No file chosen.',
