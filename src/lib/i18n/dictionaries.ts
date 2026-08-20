@@ -131,9 +131,13 @@ const el = {
     buy: 'Αγορά',
   },
   snooze: {
-    action: 'Παύση υπενθυμίσεων',
-    activeUntil: (until: string) => `Σε παύση έως ${until}`,
-    badge: (until: string) => `Παύση έως ${until}`,
+    action: 'Παύση',
+    change: 'Αλλαγή παύσης',
+    badge: 'Σε παύση',
+    /** Πάνω από την ημερομηνία λήξης, στη σειρά του πελάτη. */
+    blockLabel: 'Παύση έως',
+    daysLeft: (n: number) =>
+      n === 0 ? 'λήγει σήμερα' : n === 1 ? 'άλλη 1 ημέρα' : `άλλες ${n} ημέρες`,
     hint: 'Ο πελάτης υποσχέθηκε πληρωμή — καμία υπενθύμιση μέχρι την ημερομηνία.',
     title: 'Παύση υπενθυμίσεων',
     subtitle:
@@ -141,6 +145,9 @@ const el = {
     days: (n: number) => `${n} ημέρες`,
     untilLabel: 'Ή συγκεκριμένη ημερομηνία',
     untilHint: 'Η υπενθύμιση ξεκινά ξανά την επόμενη ημέρα.',
+    noteLabel: 'Σημείωση',
+    noteHint: 'Προαιρετικά. Φαίνεται δίπλα στην ημερομηνία και σβήνει με την άρση.',
+    notePlaceholder: 'π.χ. υποσχέθηκε έμβασμα στις 15/09',
     save: 'Αποθήκευση',
     resume: 'Άρση παύσης',
   },
@@ -664,7 +671,8 @@ const el = {
   },
 
   dashboard: {
-    muted: 'σε παύση',
+    // Σίγαση, όχι παύση: η παύση έχει ημερομηνία λήξης, η σίγαση όχι.
+    muted: 'σε σίγαση',
     noContact: 'χωρίς στοιχεία',
     title: 'Επισκόπηση',
     lastSync: (when: string) => `Τελευταίος συγχρονισμός myDATA: ${when}`,
@@ -835,7 +843,7 @@ const el = {
     sortName: 'Επωνυμία',
     sortDebt: 'Οφειλή',
     filterAll: 'Όλοι',
-    filterMuted: 'Σε παύση',
+    filterMuted: 'Σε σίγαση',
     filterUnreachable: 'Χωρίς στοιχεία',
     title: 'Πελάτες',
     subtitle:
@@ -852,22 +860,25 @@ const el = {
     phoneLabel: 'Τηλέφωνο',
     notSet: '—',
     outstandingLabel: 'Ανοιχτό υπόλοιπο',
-    muted: 'σε παύση',
+    muted: 'σε σίγαση',
     noContact: 'χωρίς στοιχεία επικοινωνίας',
     noEmail: '— χωρίς email',
     noPhone: '— χωρίς τηλέφωνο',
     openCount: (n: number) => `${n} ανοιχτά`,
-    mute: 'Παύση',
-    unmute: 'Ενεργοποίηση',
+    mute: 'Σίγαση',
+    unmute: 'Άρση σίγασης',
     backToList: '← Όλοι οι πελάτες',
+    importLink: 'Εισαγωγή από αρχείο',
     notificationsLabel: 'Αυτόματες υπενθυμίσεις για αυτόν τον πελάτη',
+    /** Πάνω από τον διακόπτη: ένας διακόπτης χωρίς όνομα δεν λέει τι κάνει. */
+    notificationsCaption: 'Αυτόματες υπενθυμίσεις',
     deleteTitle: 'Διαγραφή πελάτη;',
     deleteBody: (name: string, invoices: number, messages: number) =>
       `Ο πελάτης ${name} θα διαγραφεί μαζί με ${invoices} ${invoices === 1 ? 'παραστατικό' : 'παραστατικά'} και ${messages} ${messages === 1 ? 'μήνυμα' : 'μηνύματα'}.`,
     deleteHistoryWarning:
       'Το ιστορικό επικοινωνίας διαγράφεται μαζί του — είναι η καταγραφή του τι στάλθηκε σε αυτό το πρόσωπο εκ μέρους σας.',
     notificationsOn: 'Ενεργές',
-    notificationsOff: 'Σε παύση',
+    notificationsOff: 'Ανενεργές',
     messagesTitle: 'Ιστορικό μηνυμάτων',
     messagesCount: (n: number) =>
       n === 1 ? '1 μήνυμα' : `${n} μηνύματα`,
@@ -1229,9 +1240,13 @@ const en: typeof el = {
     buy: 'Buy',
   },
   snooze: {
-    action: 'Pause reminders',
-    activeUntil: (until: string) => `Paused until ${until}`,
-    badge: (until: string) => `Paused until ${until}`,
+    action: 'Pause',
+    change: 'Change pause',
+    badge: 'Paused',
+    /** Above the end date, on the customer's row. */
+    blockLabel: 'Paused until',
+    daysLeft: (n: number) =>
+      n === 0 ? 'ends today' : n === 1 ? '1 day left' : `${n} days left`,
     hint: 'The customer promised to pay — no reminders until the date.',
     title: 'Pause reminders',
     subtitle:
@@ -1239,6 +1254,9 @@ const en: typeof el = {
     days: (n: number) => `${n} days`,
     untilLabel: 'Or a specific date',
     untilHint: 'Chasing resumes the day after.',
+    noteLabel: 'Note',
+    noteHint: 'Optional. Shown next to the date, and cleared when the pause is lifted.',
+    notePlaceholder: 'e.g. promised a transfer on the 15th',
     save: 'Save',
     resume: 'Resume now',
   },
@@ -1945,14 +1963,18 @@ const en: typeof el = {
     mute: 'Mute',
     unmute: 'Unmute',
     backToList: '← All customers',
+    importLink: 'Import from a file',
     notificationsLabel: 'Automatic reminders for this customer',
+    /** Above the switch: an unlabelled switch does not say what it does. */
+    notificationsCaption: 'Automatic reminders',
     deleteTitle: 'Delete this customer?',
     deleteBody: (name: string, invoices: number, messages: number) =>
       `${name} will be deleted, along with ${invoices} ${invoices === 1 ? 'invoice' : 'invoices'} and ${messages} ${messages === 1 ? 'message' : 'messages'}.`,
     deleteHistoryWarning:
       'The correspondence goes with them — that is the record of what was sent to a real person on your behalf.',
     notificationsOn: 'On',
-    notificationsOff: 'Paused',
+    // Not "Paused" — that word now belongs to the dated pause beside it.
+    notificationsOff: 'Off',
     messagesTitle: 'Message history',
     messagesCount: (n: number) =>
       n === 1 ? '1 message' : `${n} messages`,

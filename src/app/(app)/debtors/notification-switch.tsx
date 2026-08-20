@@ -39,16 +39,30 @@ export function NotificationSwitch({
 }: {
   debtorId: string;
   muted: boolean;
-  /** The list needs the switch alone; the customer's own page names it. */
+  /** Adds the on/off word beside the switch, where there is room for it. */
   withLabel?: boolean;
 }) {
+  const t = useT();
+
   return (
-    <form action={toggleMute} className="flex items-center gap-2">
+    <form action={toggleMute} className="text-right">
       <input type="hidden" name="id" value={debtorId} />
       {/* What is currently stored, so the action flips what the operator saw. */}
       <input type="hidden" name="muted" value={String(muted)} />
-      <Control muted={muted} />
-      {withLabel ? <Label muted={muted} /> : null}
+
+      {/*
+        Named, like every other value in the row. A bare switch beside an
+        amount and a date is the one control on the screen that does not say
+        what it governs, and the guess an operator makes about it — mute this
+        customer? mute everyone? — is the one they get wrong.
+      */}
+      <p className="text-xs uppercase tracking-wide text-ink-400">
+        {t.debtors.notificationsCaption}
+      </p>
+      <div className="mt-1 flex items-center justify-end gap-2">
+        <Control muted={muted} />
+        {withLabel ? <Label muted={muted} /> : null}
+      </div>
     </form>
   );
 }

@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation';
 import { Badge, Card, CardHeader, EmptyState, linkClass, Stat, subtleLinkClass } from '@/components/ui';
 import { aging } from '@/lib/aging';
 import { displayName } from '@/lib/debtors';
+import { isSnoozed, snoozeDaysLeft } from '@/lib/dunning/snooze';
 import { workflowStatus } from '@/lib/dunning/status';
 import { MessageLog } from '@/components/message-log';
 import { getDictionary } from '@/lib/i18n';
@@ -17,6 +18,7 @@ import { deleteDebtor } from '../actions';
 import { NotificationSwitch } from '../notification-switch';
 import { DueDateButton } from '../../invoices/invoice-forms';
 import { EditDebtorForm } from '../debtor-forms';
+import { SnoozeButton } from '../snooze-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -117,6 +119,7 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
   const name = displayName(debtor);
   const reachable = Boolean(debtor.email || debtor.phone);
   const today = athensDate();
+  const paused = isSnoozed(debtor, today);
 
   return (
     <div className="space-y-6">
@@ -133,15 +136,38 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
               <h1 className="text-xl font-semibold italic text-ink-400">{t.debtors.nameMissing}</h1>
             )}
             {debtor.muted ? <Badge tone="neutral">{t.debtors.muted}</Badge> : null}
+            {paused ? <Badge tone="info">{t.snooze.badge}</Badge> : null}
             {!reachable ? <Badge tone="danger">{t.debtors.noContact}</Badge> : null}
           </div>
           {!name ? (
             <p className="mt-1 text-xs text-amber-700">{t.debtors.nameMissingHint}</p>
           ) : null}
+          {/* The whole pause on one line, directly under the name: until when,
+              how long that still is, and why it was given. */}
+          {paused ? (
+            <p className="mt-1.5 text-sm text-brand-700">
+              {t.snooze.blockLabel}{' '}
+              <span className="tabular font-semibold">
+                {formatDate(debtor.snoozed_until as string)}
+              </span>
+              <span className="text-ink-500">
+                {' · '}
+                {t.snooze.daysLeft(snoozeDaysLeft(debtor, today) ?? 0)}
+              </span>
+              {debtor.snooze_note ? (
+                <span className="text-ink-600">{` — ${debtor.snooze_note}`}</span>
+              ) : null}
+            </p>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-4">
           <EditDebtorForm debtor={debtor} />
+          <SnoozeButton
+            debtorId={debtor.id}
+            snoozedUntil={paused ? debtor.snoozed_until : null}
+            note={paused ? debtor.snooze_note : null}
+          />
           <NotificationSwitch debtorId={debtor.id} muted={debtor.muted} withLabel />
           <DeleteButton
             action={deleteDebtor}
