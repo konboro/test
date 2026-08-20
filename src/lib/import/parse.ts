@@ -266,6 +266,51 @@ export function guessColumns(headers: string[]): Partial<Record<ImportField, num
   return mapping;
 }
 
+/**
+ * How much of a leftover column set is worth carrying.
+ *
+ * `debtors.notes` is validated at 1000 characters upstream; this stays well
+ * under so an import can never be the thing that fails that check.
+ */
+const MAX_NOTE = 500;
+
+/**
+ * Everything in the row that no field claimed, as a note.
+ *
+ * A real export carries columns this product has no place for — an order
+ * number, a salesperson, a cost centre, a comment someone typed. Dropping them
+ * silently is the wrong default: the operator can see them in their own file, so
+ * a customer created here without them looks like data loss, and often the one
+ * unmapped column is the one that explains the debt.
+ *
+ * Header and value together, because a bare value says nothing once it is out of
+ * its column.
+ */
+export function leftoverNotes(
+  headers: string[],
+  row: string[],
+  mapping: Partial<Record<ImportField, number>>,
+): string | null {
+  const used = new Set(Object.values(mapping));
+
+  const parts: string[] = [];
+
+  headers.forEach((header, index) => {
+    if (used.has(index)) return;
+
+    const label = header.trim();
+    const value = (row[index] ?? '').trim();
+    if (!label || !value) return;
+
+    parts.push(`${label}: ${value}`);
+  });
+
+  if (parts.length === 0) return null;
+
+  const note = parts.join('\n');
+  return note.length <= MAX_NOTE ? note : `${note.slice(0, MAX_NOTE - 1)}…`;
+}
+
 export interface ImportRow {
   line: number;
   name: string;
@@ -277,6 +322,8 @@ export interface ImportRow {
   issueDate: string;
   reference: string | null;
   externalRef: string | null;
+  /** Columns the mapping did not claim, kept rather than dropped. */
+  notes: string | null;
 }
 
 export interface RowProblem {
@@ -360,6 +407,7 @@ export function buildPreview(
       issueDate,
       reference: cell(row, 'reference') || null,
       externalRef: cell(row, 'external_ref') || null,
+      notes: leftoverNotes(table.headers, row, mapping),
     });
   });
 

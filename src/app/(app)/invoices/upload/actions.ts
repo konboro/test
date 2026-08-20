@@ -178,6 +178,8 @@ export async function commitUpload(_prev: UploadState, formData: FormData): Prom
     dueDate: dueDate ?? athensDate(),
     reference: text('invoiceNumber'),
     externalRef: null,
+    // A scanned invoice has no leftover columns; the reviewer typed the fields.
+    notes: null,
   };
 
   // `commitImport` reports in the reader's language now rather than pasting the

@@ -4,7 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { commitImport, type ImportOutcome } from '@/lib/import/commit';
-import { buildPreview, parseCsv, type ImportField } from '@/lib/import/parse';
+import { buildPreview, guessColumns, parseCsv, type ImportField } from '@/lib/import/parse';
+import { suggestMapping } from '@/lib/import/ai-mapping';
 import { readSpreadsheet, tableToTsv } from '@/lib/import/sheet';
 import { athensDate } from '@/lib/money';
 import { getDictionary } from '@/lib/i18n';
@@ -23,6 +24,10 @@ export interface SheetReadResult {
   sheets?: string[];
   headerRow?: number;
   truncated?: boolean;
+  /** The best mapping we have, for the screen to show and the operator to fix. */
+  mapping?: Partial<Record<ImportField, number>>;
+  /** Whether the header words were enough, or a model had to be asked. */
+  mappedBy?: 'headers' | 'ai';
 }
 
 /** Mirrors what a spreadsheet reader can actually open. */
@@ -66,18 +71,64 @@ export async function readSheetFile(formData: FormData): Promise<SheetReadResult
     const table = await readSpreadsheet(new Uint8Array(await file.arrayBuffer()));
     if (!table || table.rows.length === 0) return { error: t.importer.sheetErrors.noRows };
 
+    const { mapping, mappedBy } = await mapColumns(table.headers, table.rows);
+
     return {
       text: tableToTsv(table),
       sheetName: table.sheetName,
       sheets: table.sheets,
       headerRow: table.headerRow,
       truncated: table.truncated,
+      mapping,
+      mappedBy,
     };
   } catch (cause) {
     // A password-protected or corrupt workbook is a normal thing to be handed.
     console.error('[import:sheet]', String(cause));
     return { error: t.importer.sheetErrors.unreadable };
   }
+}
+
+/**
+ * The column mapping, asking a model only if the header words were not enough.
+ *
+ * Deterministic first, always: the guesser is free, instant and tested, and it
+ * handles the ordinary export. The model is consulted only when the two fields
+ * without which nothing can be imported — who owes, and how much — are still
+ * unmapped, and even then whatever the guesser did work out is kept: a header
+ * that plainly says "E-mail" does not need a second opinion.
+ */
+async function mapColumns(
+  headers: string[],
+  rows: string[][],
+): Promise<{ mapping: Partial<Record<ImportField, number>>; mappedBy: 'headers' | 'ai' }> {
+  const guessed = guessColumns(headers);
+  if (guessed.name !== undefined && guessed.amount !== undefined) {
+    return { mapping: guessed, mappedBy: 'headers' };
+  }
+
+  const suggested = await suggestMapping(headers, rows);
+  if (!suggested) return { mapping: guessed, mappedBy: 'headers' };
+
+  // The guesser wins every column it claimed; the model only fills the holes.
+  const merged: Partial<Record<ImportField, number>> = { ...suggested, ...guessed };
+  return { mapping: merged, mappedBy: 'ai' };
+}
+
+/**
+ * The same help for a pasted table or a CSV, which the browser parses itself.
+ */
+export async function assistMapping(
+  headers: string[],
+  rows: string[][],
+): Promise<{ mapping: Partial<Record<ImportField, number>>; mappedBy: 'headers' | 'ai' }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { mapping: {}, mappedBy: 'headers' };
+
+  return mapColumns(headers, rows);
 }
 
 const FIELDS = [

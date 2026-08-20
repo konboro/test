@@ -13,7 +13,7 @@ import {
 import { useT } from '@/lib/i18n/provider';
 import { formatDate, formatMoney } from '@/lib/money';
 
-import { readSheetFile, runImport, type ImportState } from './actions';
+import { assistMapping, readSheetFile, runImport, type ImportState } from './actions';
 
 /**
  * The order the mapping controls appear in, and which two are required.
@@ -62,11 +62,37 @@ export function ImportForm({ termDays }: { termDays: number }) {
     return buildPreview(table, mapping, new Date().toISOString().slice(0, 10), termDays);
   }, [table, mapping, termDays]);
 
-  function load(raw: string, name: string | null) {
+  function load(raw: string, name: string | null, ready?: Partial<Record<ImportField, number>>) {
     const parsed = parseCsv(raw);
     setText(raw);
     setFileName(name);
-    setMapping(guessColumns(parsed.headers));
+    setMapping(ready ?? guessColumns(parsed.headers));
+  }
+
+  /**
+   * For a CSV or a pasted table, which the browser parses itself.
+   *
+   * Only asks the server when the header words left the two fields nothing can
+   * be imported without still unmapped — otherwise a perfectly readable file
+   * would make a network call, and a model call, for nothing.
+   */
+  async function loadText(raw: string, name: string | null) {
+    const parsed = parseCsv(raw);
+    const guessed = guessColumns(parsed.headers);
+
+    if (guessed.name !== undefined && guessed.amount !== undefined) {
+      load(raw, name, guessed);
+      return;
+    }
+
+    setReading(true);
+    try {
+      const helped = await assistMapping(parsed.headers, parsed.rows.slice(0, 3));
+      if (helped.mappedBy === 'ai') setSheetNote([t.importer.mappedByAi]);
+      load(raw, name, helped.mapping);
+    } finally {
+      setReading(false);
+    }
   }
 
   const isSpreadsheet = (file: File) => /.xlsx$|.xlsm$/i.test(file.name);
@@ -80,7 +106,7 @@ export function ImportForm({ termDays }: { termDays: number }) {
     // A CSV is already text; a workbook has to be opened on the server, where
     // the parser lives and where the file does not have to leave the request.
     if (!isSpreadsheet(file)) {
-      load(await file.text(), file.name);
+      await loadText(await file.text(), file.name);
       return;
     }
 
@@ -102,8 +128,10 @@ export function ImportForm({ termDays }: { termDays: number }) {
       if (others.length) notes.push(t.importer.sheetOthers(others.join(', ')));
       if (result.truncated) notes.push(t.importer.sheetTruncated);
 
+      if (result.mappedBy === 'ai') notes.push(t.importer.mappedByAi);
+
       setSheetNote(notes);
-      load(result.text, file.name);
+      load(result.text, file.name, result.mapping);
     } finally {
       setReading(false);
     }
@@ -142,7 +170,7 @@ export function ImportForm({ termDays }: { termDays: number }) {
             <textarea
               rows={6}
               value={text}
-              onChange={(e) => load(e.target.value, null)}
+              onChange={(e) => void loadText(e.target.value, null)}
               placeholder={t.importer.pastePlaceholder}
               className="mt-2 w-full rounded-lg border border-ink-300 bg-white px-3 py-2 font-mono text-xs text-ink-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
             />

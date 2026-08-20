@@ -133,6 +133,9 @@ export async function commitImport(
           email: row.email,
           phone: row.phone,
           external_ref: row.externalRef,
+          // Only on creation. An existing customer may have notes somebody wrote
+          // deliberately, and an import is not entitled to overwrite them.
+          notes: row.notes,
         })),
       )
       .select('id, name, vat_number, email, external_ref');

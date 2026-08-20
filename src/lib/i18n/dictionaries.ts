@@ -496,6 +496,7 @@ const el = {
     sheetOthers: (names: string) => `Άλλα φύλλα: ${names}.`,
     sheetTruncated: 'Το φύλλο είναι πολύ μεγάλο· διαβάστηκαν οι πρώτες 20.000 γραμμές.',
     reading: 'Ανάγνωση αρχείου…',
+    mappedByAi: 'Οι επικεφαλίδες δεν αναγνωρίστηκαν, οπότε οι στήλες αντιστοιχίστηκαν αυτόματα. Ελέγξτε τες.',
     step1: '1. Επιλέξτε αρχείο',
     step1Hint:
       'CSV από Excel, Google Sheets ή εξαγωγή από το σύστημά σας. Τίποτα δεν αποθηκεύεται μέχρι να εγκρίνετε.',
@@ -1620,6 +1621,7 @@ const en: typeof el = {
     sheetOthers: (names: string) => `Other sheets: ${names}.`,
     sheetTruncated: 'That sheet is very large — the first 20,000 rows were read.',
     reading: 'Reading the file…',
+    mappedByAi: 'The headers were not recognised, so the columns were matched automatically. Please check them.',
     step1: '1. Choose a file',
     step1Hint:
       'CSV from Excel, Google Sheets or an export from your own system. Nothing is saved until you approve it.',
