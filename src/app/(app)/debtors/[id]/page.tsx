@@ -5,12 +5,16 @@ import { Badge, Card, CardHeader, EmptyState, linkClass, Stat, subtleLinkClass }
 import { aging } from '@/lib/aging';
 import { displayName } from '@/lib/debtors';
 import { workflowStatus } from '@/lib/dunning/status';
+import { MessageLog } from '@/components/message-log';
 import { getDictionary } from '@/lib/i18n';
 import { athensDate, formatDate, formatMoney } from '@/lib/money';
 import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
 
-import { toggleMute } from '../actions';
+import { DeleteButton } from '@/components/delete-button';
+
+import { deleteDebtor } from '../actions';
+import { NotificationSwitch } from '../notification-switch';
 import { DueDateButton } from '../../invoices/invoice-forms';
 import { EditDebtorForm } from '../debtor-forms';
 
@@ -60,7 +64,13 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
 
   // RLS scopes both of these to the tenant, so a foreign id simply returns
   // nothing rather than another tenant's customer.
-  const [{ data: debtor }, { data: invoices }, { data: contacts }] = await Promise.all([
+  const [
+    { data: debtor },
+    { data: invoices },
+    { data: contacts },
+    { data: messages },
+    { count: messageCount },
+  ] = await Promise.all([
     supabase.from('debtors').select('*').eq('id', id).maybeSingle(),
     supabase
       .from('invoices')
@@ -68,11 +78,27 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
       .eq('debtor_id', id)
       .order('due_date', { ascending: false }),
     supabase.from('dunning_contacts').select('invoice_id, step').eq('debtor_id', id),
+    // Newest first, and capped: this is the recent history of a conversation,
+    // not an export. The full record stays on /logs, which the card links to.
+    supabase
+      .from('communications_log')
+      .select('*')
+      .eq('debtor_id', id)
+      .order('sent_at', { ascending: false })
+      .limit(50),
+    // Counted rather than measured off the list above, which is capped at 50.
+    // The delete dialog quotes this number, and a confirmation that understates
+    // what it is about to destroy is worse than no confirmation at all.
+    supabase
+      .from('communications_log')
+      .select('id', { count: 'exact', head: true })
+      .eq('debtor_id', id),
   ]);
 
   if (!debtor) notFound();
 
   const rows = invoices ?? [];
+  const sentMessages = messages ?? [];
   const pending = rows.filter((i) => i.status === 'pending');
   const outstanding = pending.reduce((sum, i) => sum + i.amount_cents, 0);
   const paid = rows
@@ -116,13 +142,16 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
 
         <div className="flex items-center gap-4">
           <EditDebtorForm debtor={debtor} />
-          <form action={toggleMute}>
-            <input type="hidden" name="id" value={debtor.id} />
-            <input type="hidden" name="muted" value={String(debtor.muted)} />
-            <button type="submit" className={`text-sm ${subtleLinkClass}`}>
-              {debtor.muted ? t.debtors.unmute : t.debtors.mute}
-            </button>
-          </form>
+          <NotificationSwitch debtorId={debtor.id} muted={debtor.muted} withLabel />
+          <DeleteButton
+            action={deleteDebtor}
+            id={debtor.id}
+            trigger={t.common.delete}
+            title={t.debtors.deleteTitle}
+            body={t.debtors.deleteBody(name ?? t.debtors.nameMissing, rows.length, messageCount ?? 0)}
+            warning={(messageCount ?? 0) > 0 ? t.debtors.deleteHistoryWarning : undefined}
+            confirmLabel={t.common.delete}
+          />
         </div>
       </div>
 
@@ -290,6 +319,29 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
             </table>
             </div>
           </>
+        )}
+      </Card>
+
+      {/*
+        Under the invoices, not above them: what is owed is why anyone opens a
+        customer, and the correspondence is what they read next — usually to
+        answer "have we actually chased this person, and did it arrive?".
+      */}
+      <Card>
+        <CardHeader
+          title={t.debtors.messagesTitle}
+          subtitle={t.debtors.messagesCount(sentMessages.length)}
+          action={
+            <Link href="/logs" className={`text-sm ${linkClass}`}>
+              {t.debtors.messagesAll}
+            </Link>
+          }
+        />
+
+        {sentMessages.length === 0 ? (
+          <EmptyState title={t.debtors.noMessagesTitle} body={t.debtors.noMessagesBody} />
+        ) : (
+          <MessageLog entries={sentMessages} />
         )}
       </Card>
     </div>

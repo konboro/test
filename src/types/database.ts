@@ -13,7 +13,9 @@ export type DunningStep = 'pre_due' | 'overdue_2' | 'overdue_10';
 export type MyDataEnvironment = 'production' | 'sandbox';
 /** Viva runs two separate estates; a credential pair belongs to exactly one. */
 export type VivaEstate = 'demo' | 'production';
-export type PaymentProviderName = 'stripe' | 'viva';
+/** Revolut runs two estates too; a Merchant key belongs to exactly one. */
+export type RevolutEstate = 'sandbox' | 'production';
+export type PaymentProviderName = 'stripe' | 'viva' | 'revolut';
 /** Portal interface language. Reminder copy is unaffected. */
 export type UserLocale = 'el' | 'en';
 
@@ -46,6 +48,9 @@ export type UserRow = {
   /** Null books orders against the account's default source. */
   viva_source_code: string | null;
   viva_environment: VivaEstate;
+  /** Revolut Merchant API key, same envelope as the Stripe and Viva ones. */
+  revolut_secret_key_enc: string | null;
+  revolut_environment: RevolutEstate;
   /** Preferred provider when both are set up. Null resolves to whichever is. */
   payment_provider: PaymentProviderName | null;
   sms_credits: number;
@@ -98,6 +103,8 @@ export type InvoiceRow = {
   viva_order_code: string | null;
   /** Set only after the transaction was read back from Viva, never from a redirect. */
   viva_transaction_id: string | null;
+  /** Set only after the order was read back from Revolut, never from a redirect. */
+  revolut_order_id: string | null;
   pay_token: string;
   /** The short public credential the reminder link carries. */
   short_code: string;
@@ -249,6 +256,16 @@ export type VivaOrderRow = {
   created_at: string;
 }
 
+/** One minted Revolut order. Every press of Pay adds a row; none is ever lost. */
+export type RevolutOrderRow = {
+  order_id: string;
+  user_id: string;
+  invoice_id: string;
+  /** What the order was minted for — the amount Revolut actually charges. */
+  amount_cents: number;
+  created_at: string;
+}
+
 export type FunnelEventRow = {
   id: string;
   user_id: string;
@@ -258,6 +275,30 @@ export type FunnelEventRow = {
   channel: 'email' | 'sms' | 'other' | null;
   event: 'page_view' | 'checkout_started';
   occurred_at: string;
+}
+
+/**
+ * A document dropped on the uploader, and what we managed to read from it.
+ *
+ * A proposal until someone confirms it: `status` stays 'pending' and no invoice
+ * exists yet. See supabase/migrations/20260819150000_invoice_uploads.sql.
+ */
+export type InvoiceUploadRow = {
+  id: string;
+  user_id: string;
+  storage_path: string;
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  /** How the fields were obtained: the PDF's own text, a model, or nothing. */
+  source: 'pdf_text' | 'vision' | 'manual';
+  extracted: Record<string, unknown>;
+  /** Required fields the reader could not find, for the review screen to flag. */
+  missing: string[];
+  status: 'pending' | 'committed' | 'discarded';
+  invoice_id: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export type PaymentPageInvoice = {
@@ -374,6 +415,12 @@ export interface Database {
         Update: Partial<BankTransactionRow>;
         Relationships: NoRelationships;
       };
+      invoice_uploads: {
+        Row: InvoiceUploadRow;
+        Insert: InsertOf<InvoiceUploadRow, 'user_id' | 'storage_path' | 'filename' | 'mime_type' | 'size_bytes' | 'source'>;
+        Update: Partial<InvoiceUploadRow>;
+        Relationships: NoRelationships;
+      };
       funnel_events: {
         Row: FunnelEventRow;
         Insert: InsertOf<FunnelEventRow, 'user_id' | 'invoice_id' | 'event'>;
@@ -384,6 +431,12 @@ export interface Database {
         Row: VivaOrderRow;
         Insert: InsertOf<VivaOrderRow, 'order_code' | 'user_id' | 'invoice_id' | 'amount_cents'>;
         Update: Partial<VivaOrderRow>;
+        Relationships: NoRelationships;
+      };
+      revolut_orders: {
+        Row: RevolutOrderRow;
+        Insert: InsertOf<RevolutOrderRow, 'order_id' | 'user_id' | 'invoice_id' | 'amount_cents'>;
+        Update: Partial<RevolutOrderRow>;
         Relationships: NoRelationships;
       };
     };

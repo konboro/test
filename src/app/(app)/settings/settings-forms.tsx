@@ -27,6 +27,7 @@ export function ProfileForm({
     company_name: string | null;
     vat_number: string | null;
     reply_to_email: string | null;
+    email: string | null;
   };
 }) {
   const t = useT();
@@ -52,9 +53,14 @@ export function ProfileForm({
           label={t.fields.replyTo}
           hint={t.fields.replyToHint}
         >
+          {/* The placeholder is the account address, which is exactly what is
+              used when this is left empty. Stating it here is the difference
+              between an empty field that looks unset and one that shows where
+              replies are going. */}
           <input
             name="reply_to_email"
             type="email"
+            placeholder={profile.email ?? ''}
             defaultValue={profile.reply_to_email ?? ''}
             className={inputClass}
           />

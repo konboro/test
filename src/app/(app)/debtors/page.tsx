@@ -7,7 +7,7 @@ import { getDictionary } from '@/lib/i18n';
 import { formatMoney } from '@/lib/money';
 import { createClient } from '@/lib/supabase/server';
 
-import { toggleMute } from './actions';
+import { NotificationSwitch } from './notification-switch';
 import { CreateDebtorForm, EditDebtorForm } from './debtor-forms';
 
 export async function generateMetadata() {
@@ -234,16 +234,7 @@ export default async function DebtorsPage({
 
                       <EditDebtorForm debtor={debtor} />
 
-                      <form action={toggleMute}>
-                        <input type="hidden" name="id" value={debtor.id} />
-                        <input type="hidden" name="muted" value={String(debtor.muted)} />
-                        <button
-                          type="submit"
-                          className={`text-sm ${subtleLinkClass}`}
-                        >
-                          {debtor.muted ? t.debtors.unmute : t.debtors.mute}
-                        </button>
-                      </form>
+                      <NotificationSwitch debtorId={debtor.id} muted={debtor.muted} />
                     </div>
                   </div>
 

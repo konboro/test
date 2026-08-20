@@ -3,6 +3,7 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
+import { Switch } from '@/components/switch';
 import { Button } from '@/components/ui';
 import { useT } from '@/lib/i18n/provider';
 
@@ -21,26 +22,15 @@ function Control({ on, onRequestEnable }: { on: boolean; onRequestEnable: () => 
   const { pending } = useFormStatus();
 
   return (
-    <button
-      // Off → on goes through the confirmation panel, so the control is only a
-      // submit button in the direction that needs no confirming.
-      type={on ? 'submit' : 'button'}
+    <Switch
+      on={on}
+      label={t.settings.automation.title}
+      // Off → on goes through the confirmation panel, so the control only
+      // submits in the direction that needs no confirming.
+      submit={on}
       onClick={on ? undefined : onRequestEnable}
-      role="switch"
-      aria-checked={on}
-      aria-label={t.settings.automation.title}
       disabled={pending}
-      className={`relative inline-flex h-9 w-16 shrink-0 items-center rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:opacity-60 ${
-        on ? 'bg-emerald-500' : 'bg-ink-300'
-      }`}
-    >
-      <span
-        aria-hidden
-        className={`inline-block h-7 w-7 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
-          on ? 'translate-x-8' : 'translate-x-1'
-        }`}
-      />
-    </button>
+    />
   );
 }
 

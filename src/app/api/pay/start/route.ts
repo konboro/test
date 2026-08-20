@@ -5,7 +5,13 @@ import { z } from 'zod';
 import { appUrl } from '@/lib/env';
 import { channelFromTag, recordFunnelEvent } from '@/lib/funnel/events';
 import { PAY_CODE_LENGTH, payCredentialColumn, payPath } from '@/lib/pay-code';
-import { PAYMENT_COLUMNS, providerFor, vivaCredentialsFor } from '@/lib/payments/provider';
+import {
+  PAYMENT_COLUMNS,
+  providerFor,
+  revolutCredentialsFor,
+  vivaCredentialsFor,
+} from '@/lib/payments/provider';
+import { createOrder as createRevolutOrder } from '@/lib/revolut/client';
 import { paymentsFor } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { checkoutUrl, createOrder } from '@/lib/viva/client';
@@ -80,6 +86,72 @@ export async function POST(request: Request) {
     [invoice.series, invoice.invoice_number].filter(Boolean).join(' ') ||
     invoice.mark ||
     invoice.id.slice(0, 8);
+
+  if (provider === 'revolut') {
+    const credentials = revolutCredentialsFor(creditor!);
+    if (!credentials) {
+      return NextResponse.json({ error: 'Revolut is not configured.' }, { status: 409 });
+    }
+
+    let order;
+    try {
+      order = await createRevolutOrder(credentials, {
+        amountCents: invoice.amount_cents,
+        currency: invoice.currency,
+        description: `Παραστατικό ${label}`,
+        // Ours, and the whole binding: the return route settles only an order
+        // whose reference names this invoice.
+        reference: invoice.id,
+        customerEmail: debtor?.email ?? null,
+        // Per order — so the debtor comes back to their own payment page
+        // rather than to a static address configured by hand.
+        redirectUrl: `${appUrl()}/api/revolut/return?token=${token}`,
+      });
+    } catch (cause) {
+      console.error('[pay:start] Revolut refused the order', String(cause));
+      return NextResponse.json(
+        { error: 'Δεν ήταν δυνατή η έναρξη της πληρωμής. Δοκιμάστε ξανά.' },
+        { status: 502 },
+      );
+    }
+
+    if (!order.checkoutUrl) {
+      console.error('[pay:start] Revolut order without a checkout url', order.id);
+      return NextResponse.json(
+        { error: 'Δεν ήταν δυνατή η έναρξη της πληρωμής. Δοκιμάστε ξανά.' },
+        { status: 502 },
+      );
+    }
+
+    // Recorded before the debtor is sent anywhere: an order the database does
+    // not know about can never settle. Every order is kept — a second press of
+    // Pay must not orphan a first one that is still payable — and the amount
+    // stored here is what Revolut will charge.
+    const { error: recordError } = await admin.from('revolut_orders').insert({
+      order_id: order.id,
+      user_id: invoice.user_id,
+      invoice_id: invoice.id,
+      amount_cents: invoice.amount_cents,
+    });
+
+    if (recordError) {
+      console.error('[pay:start] revolut_orders write failed', recordError.message);
+      return NextResponse.json(
+        { error: 'Δεν ήταν δυνατή η έναρξη της πληρωμής. Δοκιμάστε ξανά.' },
+        { status: 502 },
+      );
+    }
+
+    await recordFunnelEvent({
+      userId: invoice.user_id,
+      invoiceId: invoice.id,
+      debtorId: invoice.debtor_id,
+      channel: channelFromTag(parsed.data.c),
+      event: 'checkout_started',
+    });
+
+    return NextResponse.json({ url: order.checkoutUrl });
+  }
 
   if (provider === 'viva') {
     // Viva books the order in the merchant wallet's currency and the order

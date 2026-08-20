@@ -70,6 +70,23 @@ const el = {
       returnPage: 'API Access',
       returnRest: 'ορίστε ως διεύθυνση επιτυχίας και αποτυχίας της πηγής πληρωμών:',
     },
+    revolut: {
+      savedProduction: 'Το κλειδί αποθηκεύτηκε. Λογαριασμός παραγωγής — οι πληρωμές είναι πραγματικές.',
+      savedSandbox: 'Το κλειδί αποθηκεύτηκε. Κλειδί sandbox — οι πληρωμές δεν είναι πραγματικές.',
+      removeConfirm:
+        'Αφαίρεση του κλειδιού Revolut; Οι πελάτες σας δεν θα μπορούν να πληρώνουν μέσω Revolut.',
+      whereIntro: 'Στο Revolut Business:',
+      wherePath: 'Merchant → API → Secret key',
+      whereMiddle: '. Οι πληρωμές εισπράττονται',
+      whereEmphasis: 'απευθείας στον λογαριασμό σας',
+      whereRest: '— το lefta.app δεν μεσολαβεί στη ροή χρημάτων.',
+      production: 'Παραγωγή',
+      sandbox: 'Sandbox',
+      keyLabel: 'Secret key',
+      keyHint: 'Χρειάζεται ενεργός λογαριασμός Merchant στο Revolut Business.',
+      returnNote:
+        'Δεν χρειάζεται καμία άλλη ρύθμιση: η διεύθυνση επιστροφής ορίζεται από εμάς σε κάθε πληρωμή.',
+    },
   },
 
   fields: {
@@ -88,7 +105,8 @@ const el = {
     mobileHint: 'Μορφή +30 69XXXXXXXX. Απαραίτητο για SMS.',
     notes: 'Σημειώσεις',
     replyTo: 'Email απάντησης',
-    replyToHint: 'Εκεί θα απαντούν οι πελάτες στις υπενθυμίσεις.',
+    replyToHint:
+      'Εκεί θα απαντούν οι πελάτες στις υπενθυμίσεις. Αν το αφήσετε κενό, χρησιμοποιείται το email του λογαριασμού σας.',
     automationOn: 'Ενεργή αυτοματοποίηση υπενθυμίσεων',
     automationHint: 'Όταν είναι απενεργοποιημένη, δεν στέλνεται κανένα μήνυμα σε κανέναν πελάτη.',
     localeAuto: 'Αυτόματα',
@@ -158,6 +176,7 @@ const el = {
       stripeKeyPrefix: 'Το κλειδί πρέπει να ξεκινά με sk_ ή rk_.',
       stripeRejected: (detail: string) => `Το Stripe απέρριψε το κλειδί: ${detail}`,
       vivaRejected: (detail: string) => `Η Viva απέρριψε τα στοιχεία: ${detail}`,
+      revolutRejected: (detail: string) => `Η Revolut απέρριψε το κλειδί: ${detail}`,
       disconnectFailed: 'Δεν ήταν δυνατή η αποσύνδεση.',
     },
     errors: {
@@ -366,6 +385,11 @@ const el = {
     ctaBody: 'Η σύνδεση των βιβλίων σας παίρνει λίγα λεπτά και δεν φεύγει καμία υπενθύμιση πριν την εγκρίνετε.',
     faqLink: 'Έχετε ερώτηση; Δείτε τις συχνές ερωτήσεις.',
   },
+  legal: {
+    footerHeading: 'Νομικά',
+    privacy: 'Απόρρητο',
+    terms: 'Όροι χρήσης',
+  },
   faq: {
     metaTitle: 'Συχνές ερωτήσεις',
     metaDescription:
@@ -500,6 +524,9 @@ const el = {
     close: 'Κλείσιμο',
     edit: 'Επεξεργασία',
     signOut: 'Έξοδος',
+    delete: 'Διαγραφή',
+    deleting: 'Διαγραφή…',
+    deleteIrreversible: 'Η ενέργεια δεν αναιρείται.',
     unknownCustomer: 'Άγνωστος πελάτης',
     email: 'Email',
     sms: 'SMS',
@@ -562,6 +589,7 @@ const el = {
       transfer: 'Έμβασμα',
       stripe: 'Κάρτα · Stripe',
       viva: 'Κάρτα · Viva.com',
+      revolut: 'Κάρτα · Revolut',
     },
     needsReview: 'Χρειάζονται επιβεβαίωση',
     needsReviewHint: 'Το ποσό ταιριάζει σε παραπάνω από ένα παραστατικό.',
@@ -741,6 +769,11 @@ const el = {
     payLinkCopied: 'Αντιγράφηκε',
     remind: 'Υπενθύμιση',
     remindHint: 'Προεπισκόπηση και αποστολή υπενθύμισης',
+    deleteTitle: 'Διαγραφή παραστατικού;',
+    deleteBody: (label: string) =>
+      `Το ${label} θα διαγραφεί, μαζί με τις απόπειρες πληρωμής και τη δραστηριότητα του συνδέσμου. Τα μηνύματα που έχουν ήδη σταλεί παραμένουν.`,
+    deletePaidWarning:
+      'Αυτό το παραστατικό είναι εξοφλημένο. Διαγράφοντάς το χάνετε την καταγραφή ότι πληρώθηκε.',
     newManual: 'Χειροκίνητο παραστατικό',
     limitsOffTitle: 'Δοκιμαστική λειτουργία — το ημερήσιο όριο είναι ανενεργό.',
     limitsOffBody:
@@ -810,6 +843,20 @@ const el = {
     mute: 'Παύση',
     unmute: 'Ενεργοποίηση',
     backToList: '← Όλοι οι πελάτες',
+    notificationsLabel: 'Αυτόματες υπενθυμίσεις για αυτόν τον πελάτη',
+    deleteTitle: 'Διαγραφή πελάτη;',
+    deleteBody: (name: string, invoices: number, messages: number) =>
+      `Ο πελάτης ${name} θα διαγραφεί μαζί με ${invoices} ${invoices === 1 ? 'παραστατικό' : 'παραστατικά'} και ${messages} ${messages === 1 ? 'μήνυμα' : 'μηνύματα'}.`,
+    deleteHistoryWarning:
+      'Το ιστορικό επικοινωνίας διαγράφεται μαζί του — είναι η καταγραφή του τι στάλθηκε σε αυτό το πρόσωπο εκ μέρους σας.',
+    notificationsOn: 'Ενεργές',
+    notificationsOff: 'Σε παύση',
+    messagesTitle: 'Ιστορικό μηνυμάτων',
+    messagesCount: (n: number) =>
+      n === 1 ? '1 μήνυμα' : `${n} μηνύματα`,
+    messagesAll: 'Όλα τα μηνύματα',
+    noMessagesTitle: 'Δεν έχει σταλεί κανένα μήνυμα.',
+    noMessagesBody: 'Ό,τι σταλεί σε αυτόν τον πελάτη — email ή SMS — θα εμφανίζεται εδώ.',
     invoicesTitle: 'Παραστατικά πελάτη',
     noInvoicesTitle: 'Κανένα παραστατικό',
     noInvoicesBody: 'Δεν υπάρχει ακόμη παραστατικό για αυτόν τον πελάτη.',
@@ -831,6 +878,47 @@ const el = {
     statusSkipped: 'Παραλείφθηκε',
   },
 
+  upload: {
+    title: 'Ανέβασμα τιμολογίων',
+    subtitle: 'Σύρετε αρχεία PDF ή φωτογραφίες. Διαβάζουμε τα στοιχεία και τα δείχνουμε για έλεγχο πριν καταχωρηθούν.',
+    dropHere: 'Σύρετε εδώ τα τιμολόγια',
+    dropHint: 'PDF, PNG, JPG ή WEBP — έως 25 αρχεία, έως 20 MB το καθένα',
+    reading: 'Ανάγνωση…',
+    readCount: (n: number) => (n === 1 ? 'Ανάγνωση 1 αρχείου' : `Ανάγνωση ${n} αρχείων`),
+    readDone: (read: number, attention: number) =>
+      attention > 0
+        ? `Διαβάστηκαν ${read}. ${attention} χρειάζονται συμπλήρωση.`
+        : `Διαβάστηκαν ${read}. Ελέγξτε τα και καταχωρήστε τα.`,
+    queue: 'Προς έλεγχο',
+    queueEmpty: 'Δεν υπάρχει τίποτα σε αναμονή.',
+    queueEmptyHint: 'Ό,τι ανεβάσετε εμφανίζεται εδώ πριν γίνει τιμολόγιο.',
+    openFile: 'Άνοιγμα αρχείου',
+    commit: 'Καταχώρηση',
+    committing: 'Καταχώρηση…',
+    discard: 'Απόρριψη',
+    remove: 'Αφαίρεση',
+    sourcePdf: 'Από το κείμενο του PDF',
+    sourceVision: 'Από ανάγνωση σάρωσης',
+    sourceManual: 'Χρειάζεται συμπλήρωση',
+    missingNote: 'Δεν βρέθηκαν: ',
+    problems: {
+      no_text_layer: 'Το PDF δεν περιέχει κείμενο — είναι σάρωση. Συμπληρώστε τα πεδία.',
+      vision_unavailable: 'Η ανάγνωση εικόνων δεν είναι ενεργή. Συμπληρώστε τα πεδία.',
+      unreadable: 'Δεν κατάφερα να διαβάσω το αρχείο. Συμπληρώστε τα πεδία.',
+    } as Record<string, string>,
+    errors: {
+      no_files: 'Δεν επιλέχθηκε αρχείο.',
+      too_many: 'Έως 25 αρχεία τη φορά.',
+      bad_type: 'Δεκτά μόνο PDF, PNG, JPG και WEBP.',
+      too_big: 'Το αρχείο ξεπερνά τα 20 MB.',
+      unauthorized: 'Η σύνδεση έληξε.',
+      missing: 'Η εγγραφή δεν βρέθηκε.',
+      already_done: 'Έχει ήδη καταχωρηθεί.',
+      need_name: 'Συμπληρώστε την επωνυμία του πελάτη.',
+      need_amount: 'Συμπληρώστε το ποσό.',
+      need_issue_date: 'Συμπληρώστε την ημερομηνία έκδοσης.',
+    } as Record<string, string>,
+  },
   settings: {
     creditsSuccess:
       'Η πληρωμή ολοκληρώθηκε. Τα SMS πιστώνονται μόλις επιβεβαιωθεί από το Stripe — συνήθως σε λίγα δευτερόλεπτα.',
@@ -884,12 +972,18 @@ const el = {
       'Εισπράξεις με κάρτα μέσω του δικού σας λογαριασμού Viva. Τα χρήματα πηγαίνουν απευθείας σε εσάς.',
     vivaProduction: 'Παραγωγή',
     vivaDemo: 'Demo',
+    revolut: 'Revolut',
+    revolutHint:
+      'Εισπράξεις με κάρτα ή με την εφαρμογή Revolut, μέσω του δικού σας λογαριασμού Revolut Business.',
+    revolutProduction: 'Παραγωγή',
+    revolutSandbox: 'Sandbox',
     providerTitle: 'Πάροχος πληρωμών',
     providerHint: 'Ποιον πάροχο χρησιμοποιεί το κουμπί πληρωμής στα παραστατικά σας.',
     providerAuto: 'Αυτόματα',
     providerAutoHint: 'Όποιος είναι ρυθμισμένος. Με δύο ρυθμισμένους, προτεραιότητα στο Stripe.',
     providerStripeHint: 'Πάντα Stripe.',
     providerVivaHint: 'Πάντα Viva.com.',
+    providerRevolutHint: 'Πάντα Revolut.',
     stripeActive: 'Ενεργό',
     stripeOwnKey: 'Ενεργό — δικό σας κλειδί',
     stripePending: 'Σε εκκρεμότητα',
@@ -1056,6 +1150,23 @@ const en: typeof el = {
       returnPage: 'API Access',
       returnRest: 'page, set the success and failure address of the payment source to:',
     },
+    revolut: {
+      savedProduction: 'Key saved. Production account — payments are real.',
+      savedSandbox: 'Key saved. Sandbox key — payments are not real.',
+      removeConfirm:
+        'Remove the Revolut key? Your customers will not be able to pay through Revolut.',
+      whereIntro: 'In Revolut Business:',
+      wherePath: 'Merchant → API → Secret key',
+      whereMiddle: '. Payments are collected',
+      whereEmphasis: 'straight into your account',
+      whereRest: '— lefta.app never sits in the flow of money.',
+      production: 'Production',
+      sandbox: 'Sandbox',
+      keyLabel: 'Secret key',
+      keyHint: 'Requires an active Merchant account in Revolut Business.',
+      returnNote:
+        'Nothing else to configure: the return address is set by us on every payment.',
+    },
   },
 
   fields: {
@@ -1074,7 +1185,8 @@ const en: typeof el = {
     mobileHint: 'Format +30 69XXXXXXXX. Required for SMS.',
     notes: 'Notes',
     replyTo: 'Reply-to email',
-    replyToHint: 'Where customers reply to reminders.',
+    replyToHint:
+      'Where customers reply to reminders. Left empty, your account email is used.',
     automationOn: 'Reminder automation on',
     automationHint: 'While it is off, no message goes to any customer.',
     localeAuto: 'Automatic',
@@ -1143,6 +1255,7 @@ const en: typeof el = {
       stripeKeyPrefix: 'The key has to start with sk_ or rk_.',
       stripeRejected: (detail: string) => `Stripe rejected the key: ${detail}`,
       vivaRejected: (detail: string) => `Viva rejected the credentials: ${detail}`,
+      revolutRejected: (detail: string) => `Revolut rejected the key: ${detail}`,
       disconnectFailed: 'The account could not be disconnected.',
     },
     errors: {
@@ -1351,6 +1464,11 @@ const en: typeof el = {
     ctaBody: 'Connecting your books takes a few minutes, and no reminder goes out until you have approved it.',
     faqLink: 'Got a question? Read the FAQ.',
   },
+  legal: {
+    footerHeading: 'Legal',
+    privacy: 'Privacy',
+    terms: 'Terms',
+  },
   faq: {
     metaTitle: 'Frequently asked questions',
     metaDescription:
@@ -1481,6 +1599,9 @@ const en: typeof el = {
     close: 'Close',
     edit: 'Edit',
     signOut: 'Sign out',
+    delete: 'Delete',
+    deleting: 'Deleting…',
+    deleteIrreversible: 'This cannot be undone.',
     unknownCustomer: 'Unknown customer',
     email: 'Email',
     sms: 'SMS',
@@ -1543,6 +1664,7 @@ const en: typeof el = {
       transfer: 'Transfer',
       stripe: 'Card · Stripe',
       viva: 'Card · Viva.com',
+      revolut: 'Card · Revolut',
     },
     needsReview: 'Need confirming',
     needsReviewHint: 'The amount fits more than one invoice.',
@@ -1720,6 +1842,11 @@ const en: typeof el = {
     payLinkCopied: 'Copied',
     remind: 'Remind',
     remindHint: 'Preview and send a reminder',
+    deleteTitle: 'Delete this invoice?',
+    deleteBody: (label: string) =>
+      `${label} will be deleted, along with its payment attempts and link activity. Messages already sent stay.`,
+    deletePaidWarning:
+      'This invoice is settled. Deleting it loses the record that it was paid.',
     newManual: 'Manual invoice',
     limitsOffTitle: 'Testing mode — the daily contact limit is off.',
     limitsOffBody:
@@ -1783,6 +1910,20 @@ const en: typeof el = {
     mute: 'Mute',
     unmute: 'Unmute',
     backToList: '← All customers',
+    notificationsLabel: 'Automatic reminders for this customer',
+    deleteTitle: 'Delete this customer?',
+    deleteBody: (name: string, invoices: number, messages: number) =>
+      `${name} will be deleted, along with ${invoices} ${invoices === 1 ? 'invoice' : 'invoices'} and ${messages} ${messages === 1 ? 'message' : 'messages'}.`,
+    deleteHistoryWarning:
+      'The correspondence goes with them — that is the record of what was sent to a real person on your behalf.',
+    notificationsOn: 'On',
+    notificationsOff: 'Paused',
+    messagesTitle: 'Message history',
+    messagesCount: (n: number) =>
+      n === 1 ? '1 message' : `${n} messages`,
+    messagesAll: 'All messages',
+    noMessagesTitle: 'Nothing has been sent yet.',
+    noMessagesBody: 'Everything sent to this customer — email or SMS — appears here.',
     invoicesTitle: 'Customer documents',
     noInvoicesTitle: 'No documents',
     noInvoicesBody: 'There is no document for this customer yet.',
@@ -1804,6 +1945,47 @@ const en: typeof el = {
     statusSkipped: 'Skipped',
   },
 
+  upload: {
+    title: 'Upload invoices',
+    subtitle: 'Drop in PDFs or photos. We read the details and show them for checking before anything is created.',
+    dropHere: 'Drop invoices here',
+    dropHint: 'PDF, PNG, JPG or WEBP — up to 25 files, 20 MB each',
+    reading: 'Reading…',
+    readCount: (n: number) => (n === 1 ? 'Read 1 file' : `Read ${n} files`),
+    readDone: (read: number, attention: number) =>
+      attention > 0
+        ? `Read ${read}. ${attention} need filling in.`
+        : `Read ${read}. Check them over and create them.`,
+    queue: 'Waiting for review',
+    queueEmpty: 'Nothing is waiting.',
+    queueEmptyHint: 'Anything you upload appears here before it becomes an invoice.',
+    openFile: 'Open file',
+    commit: 'Create invoice',
+    committing: 'Creating…',
+    discard: 'Discard',
+    remove: 'Remove',
+    sourcePdf: 'From the PDF text',
+    sourceVision: 'Read from a scan',
+    sourceManual: 'Needs filling in',
+    missingNote: 'Not found: ',
+    problems: {
+      no_text_layer: 'This PDF holds no text — it is a scan. Please fill the fields in.',
+      vision_unavailable: 'Reading images is not switched on. Please fill the fields in.',
+      unreadable: 'I could not read this file. Please fill the fields in.',
+    } as Record<string, string>,
+    errors: {
+      no_files: 'No file chosen.',
+      too_many: 'Up to 25 files at a time.',
+      bad_type: 'Only PDF, PNG, JPG and WEBP are accepted.',
+      too_big: 'That file is over 20 MB.',
+      unauthorized: 'Your session has expired.',
+      missing: 'That entry no longer exists.',
+      already_done: 'It has already been created.',
+      need_name: 'Fill in the customer name.',
+      need_amount: 'Fill in the amount.',
+      need_issue_date: 'Fill in the issue date.',
+    } as Record<string, string>,
+  },
   settings: {
     creditsSuccess:
       'Payment complete. The SMS credits appear as soon as Stripe confirms — usually within seconds.',
@@ -1856,12 +2038,18 @@ const en: typeof el = {
       'Card payments through your own Viva account. The money goes straight to you.',
     vivaProduction: 'Production',
     vivaDemo: 'Demo',
+    revolut: 'Revolut',
+    revolutHint:
+      'Card and Revolut-app payments through your own Revolut Business account.',
+    revolutProduction: 'Production',
+    revolutSandbox: 'Sandbox',
     providerTitle: 'Payment provider',
     providerHint: 'Which provider the payment button on your invoices uses.',
     providerAuto: 'Automatic',
     providerAutoHint: 'Whichever is set up. With both, Stripe goes first.',
     providerStripeHint: 'Always Stripe.',
     providerVivaHint: 'Always Viva.com.',
+    providerRevolutHint: 'Always Revolut.',
     stripeActive: 'Active',
     stripeOwnKey: 'Active — your own key',
     stripePending: 'Pending',

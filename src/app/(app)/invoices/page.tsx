@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
-import { Badge, Card, CardHeader, EmptyState, subtleLinkClass } from '@/components/ui';
+import { Badge, Card, CardHeader, EmptyState, linkClass, subtleLinkClass } from '@/components/ui';
 import { aging } from '@/lib/aging';
 import { displayName } from '@/lib/debtors';
 import { workflowStatus } from '@/lib/dunning/status';
@@ -13,9 +13,16 @@ import { settlementMethod } from '@/lib/payments/settlement';
 import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
 
-import { markInvoicePaid, runScenarioForSelected, sendBulkReminder } from './actions';
+import { DeleteButton } from '@/components/delete-button';
+
 import {
-  AutomationCheckbox,
+  deleteInvoice,
+  markInvoicePaid,
+  runScenarioForSelected,
+  sendBulkReminder,
+} from './actions';
+import {
+  InvoiceAutomationSwitch,
   CopyPayLink,
   CreateInvoiceForm,
   DueDateButton,
@@ -148,7 +155,10 @@ export default async function InvoicesPage({
   const showSettled = filter !== 'pending';
   // The actions cell is only ever populated for pending rows, so a paid-only
   // view would render an empty column that just pushes the table wider.
-  const showActions = filter !== 'paid';
+  // The selection column serves the bulk send, which only applies to open
+  // invoices. The actions column beside it is no longer tied to this: every
+  // row can be deleted, including a settled one.
+  const showBulk = filter !== 'paid';
 
   /**
    * Everything a row needs, derived once.
@@ -185,6 +195,7 @@ export default async function InvoicesPage({
   const methodLabel = {
     card_stripe: t.bank.channels.stripe,
     card_viva: t.bank.channels.viva,
+    card_revolut: t.bank.channels.revolut,
     transfer: t.bank.channels.transfer,
     external: t.invoices.paidMethodExternal,
     billing_system: t.invoices.paidMethodBilling,
@@ -199,7 +210,12 @@ export default async function InvoicesPage({
             {t.invoices.subtitle}
           </p>
         </div>
-        <CreateInvoiceForm debtors={debtors ?? []} />
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/invoices/upload" className={`text-sm ${linkClass}`}>
+            {t.upload.title}
+          </Link>
+          <CreateInvoiceForm debtors={debtors ?? []} />
+        </div>
       </div>
 
       {contactLimitsDisabled() ? (
@@ -280,7 +296,7 @@ export default async function InvoicesPage({
               taking every interactive control on the page with it. The checkboxes
               join this form by id instead: that is what the `form` attribute is
               for, and what SelectAll already assumed. */}
-          {showActions ? (
+          {showBulk ? (
             <form
               id="bulk"
               action={sendBulkReminder}
@@ -345,7 +361,7 @@ export default async function InvoicesPage({
           <ul className="divide-y divide-ink-100 md:hidden">
             {visible.map((invoice) => {
               const { status, number, label, debtor, customer, age } = view(invoice);
-              const selectable = showActions && invoice.status === 'pending';
+              const selectable = showBulk && invoice.status === 'pending';
 
               return (
                 <li key={invoice.id} className="px-4 py-4">
@@ -400,20 +416,33 @@ export default async function InvoicesPage({
                         />
                       </p>
 
-                      {invoice.status === 'pending' ? (
-                        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-                          <RemindButton invoiceId={invoice.id} label={label} />
-                          <CopyPayLink code={invoice.short_code ?? invoice.pay_token} />
-                          <label className="flex items-center gap-2 text-sm text-ink-600">
-                            <AutomationCheckbox
-                              invoiceId={invoice.id}
-                              enabled={invoice.automation_enabled !== false}
-                              label={label}
-                            />
-                            {t.invoices.colAutomation}
-                          </label>
-                        </div>
-                      ) : null}
+                      {/* Chasing only makes sense for an open invoice; deleting one
+                          applies to any row, so the wrapper is no longer gated. */}
+                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                        {invoice.status === 'pending' ? (
+                          <>
+                            <RemindButton invoiceId={invoice.id} label={label} />
+                            <CopyPayLink code={invoice.short_code ?? invoice.pay_token} />
+                            <label className="flex items-center gap-2 text-sm text-ink-600">
+                              <InvoiceAutomationSwitch
+                                invoiceId={invoice.id}
+                                enabled={invoice.automation_enabled !== false}
+                                label={label}
+                              />
+                              {t.invoices.colAutomation}
+                            </label>
+                          </>
+                        ) : null}
+                        <DeleteButton
+                          action={deleteInvoice}
+                          id={invoice.id}
+                          trigger={t.common.delete}
+                          title={t.invoices.deleteTitle}
+                          body={t.invoices.deleteBody(label)}
+                          warning={invoice.status === 'paid' ? t.invoices.deletePaidWarning : undefined}
+                          confirmLabel={t.common.delete}
+                        />
+                      </div>
                     </div>
                   </div>
                 </li>
@@ -425,7 +454,7 @@ export default async function InvoicesPage({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-500">
-                  {showActions ? (
+                  {showBulk ? (
                     <th className="w-10 px-5 py-2.5">
                       <SelectAll form="bulk" />
                     </th>
@@ -463,9 +492,7 @@ export default async function InvoicesPage({
                   {showSettled ? (
                     <th className="px-5 py-2.5 font-medium">{t.invoices.colPaid}</th>
                   ) : null}
-                  {showActions ? (
-                    <th className="px-5 py-2.5 text-right font-medium">{t.invoices.colActions}</th>
-                  ) : null}
+                  <th className="px-5 py-2.5 text-right font-medium">{t.invoices.colActions}</th>
                 </tr>
               </thead>
               <tbody>
@@ -474,7 +501,7 @@ export default async function InvoicesPage({
 
                   return (
                     <tr key={invoice.id} className="border-b border-ink-100 last:border-0">
-                      {showActions ? (
+                      {showBulk ? (
                         <td className="px-5 py-3">
                           {/* Only an open invoice can be reminded about, so a paid
                               row offers nothing to select. */}
@@ -555,11 +582,11 @@ export default async function InvoicesPage({
                       </td>
                       <td className="px-5 py-3 text-center">
                         {/* Only where it means something. A settled invoice is
-                            out of the scenario whatever this said, and an empty
-                            box against it would read as a switch someone turned
-                            off. */}
+                            out of the scenario whatever this said, and a switch
+                            sitting off against it would read as a decision
+                            somebody made. */}
                         {invoice.status === 'pending' ? (
-                          <AutomationCheckbox
+                          <InvoiceAutomationSwitch
                             invoiceId={invoice.id}
                             enabled={invoice.automation_enabled !== false}
                             label={label}
@@ -594,28 +621,35 @@ export default async function InvoicesPage({
                           })()}
                         </td>
                       ) : null}
-                      {showActions ? (
-                        <td className="px-5 py-3">
-                          <div className="flex items-center justify-end gap-3">
-                            {invoice.status === 'pending' ? (
-                              <>
-                                <RemindButton invoiceId={invoice.id} label={label} />
-                                <CopyPayLink code={invoice.short_code ?? invoice.pay_token} />
-                                <form action={markInvoicePaid}>
-                                  <input type="hidden" name="id" value={invoice.id} />
-                                  <button
-                                    type="submit"
-                                    className={`text-sm ${subtleLinkClass}`}
-                                    title={t.invoices.markPaidHint}
-                                  >
-                                    {t.invoices.markPaid}
-                                  </button>
-                                </form>
-                              </>
-                            ) : null}
-                          </div>
-                        </td>
-                      ) : null}
+                      <td className="px-5 py-3">
+                        <div className="flex items-center justify-end gap-3">
+                          {invoice.status === 'pending' ? (
+                            <>
+                              <RemindButton invoiceId={invoice.id} label={label} />
+                              <CopyPayLink code={invoice.short_code ?? invoice.pay_token} />
+                              <form action={markInvoicePaid}>
+                                <input type="hidden" name="id" value={invoice.id} />
+                                <button
+                                  type="submit"
+                                  className={`text-sm ${subtleLinkClass}`}
+                                  title={t.invoices.markPaidHint}
+                                >
+                                  {t.invoices.markPaid}
+                                </button>
+                              </form>
+                            </>
+                          ) : null}
+                          <DeleteButton
+                            action={deleteInvoice}
+                            id={invoice.id}
+                            trigger={t.common.delete}
+                            title={t.invoices.deleteTitle}
+                            body={t.invoices.deleteBody(label)}
+                            warning={invoice.status === 'paid' ? t.invoices.deletePaidWarning : undefined}
+                            confirmLabel={t.common.delete}
+                          />
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}

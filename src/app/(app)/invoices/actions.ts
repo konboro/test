@@ -190,6 +190,56 @@ export async function markInvoicePaid(formData: FormData) {
   revalidatePath('/dashboard');
 }
 
+
+/**
+ * Deletes one invoice.
+ *
+ * The row goes and takes its payment attempts, its link activity and its rung
+ * bookkeeping with it — those cascade in the schema. Messages already sent
+ * survive: `communications_log.invoice_id` is set null rather than cascaded, so
+ * the record of what was said to a customer outlives the document it was about.
+ * That asymmetry is deliberate and worth keeping.
+ *
+ * Runs under the service role, so the ownership check here is doing the work RLS
+ * would otherwise do. `confirm` is required because a delete should not be one
+ * stray request away; only the dialog sets it.
+ */
+export async function deleteInvoice(
+  _prev: { error?: string },
+  formData: FormData,
+): Promise<{ error?: string }> {
+  const t = await getDictionary();
+
+  const id = String(formData.get('id') ?? '');
+  if (!id) return { error: t.forms.errors.missingInvoice };
+  if (formData.get('confirm') !== 'yes') return { error: t.forms.errors.missingInvoice };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: t.forms.errors.unauthorized };
+
+  const admin = createAdminClient();
+
+  const { data: invoice } = await admin
+    .from('invoices')
+    .select('id, user_id')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (!invoice || invoice.user_id !== user.id) return { error: t.forms.errors.missingInvoice };
+
+  const { error } = await admin.from('invoices').delete().eq('id', id).eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath('/invoices');
+  revalidatePath('/debtors');
+  revalidatePath('/dashboard');
+
+  return {};
+}
+
 const dueDateSchema = z.object({
   id: z.string().uuid(),
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

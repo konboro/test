@@ -34,6 +34,19 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly' as const,
       priority: 0.8,
     },
+    // Listed, but at the bottom of the priority list. Nobody searches for these;
+    // they are here so that a crawler can confirm they exist and a reader can
+    // find them without hunting.
+    {
+      url: `${base}/aporrito`,
+      changeFrequency: 'yearly' as const,
+      priority: 0.2,
+    },
+    {
+      url: `${base}/oroi`,
+      changeFrequency: 'yearly' as const,
+      priority: 0.2,
+    },
     {
       url: `${base}/odigos`,
       lastModified: new Date(),

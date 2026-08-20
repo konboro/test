@@ -7,6 +7,7 @@ import { Modal } from '@/components/modal';
 import { Button, Field, inputClass, linkClass, subtleLinkClass } from '@/components/ui';
 import type { ReminderPreview } from '@/lib/dunning/manual';
 import { REMINDER_CHOICES } from '@/lib/dunning/templates';
+import { Switch } from '@/components/switch';
 import { useT } from '@/lib/i18n/provider';
 import { payPath } from '@/lib/pay-code';
 
@@ -332,37 +333,31 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
 /**
  * Whether the automatic scenario runs for this invoice.
  *
- * A checkbox rather than a button, because the question it answers is "is this
- * one being chased?" and a column of boxes answers that for the whole page at a
- * glance. A button labelled "pause" states the action and leaves the reader to
- * infer the state from it.
+ * The same switch as the customer and tenant ones, at the smallest size. It was
+ * a checkbox, which read as "tick to select" in a table whose other checkbox
+ * does exactly that — two identical boxes in one row, one selecting for a bulk
+ * send and one deciding whether an invoice is chased at all.
  *
- * It submits on change, so there is no save step for a two-state control. The
- * form carries the state the row was rendered with and the action flips that,
- * rather than sending the new value — so a double click cannot land two writes
- * that disagree about where they started.
+ * Pressing it submits. The form carries the state the row was rendered with and
+ * the action flips that, rather than sending a new value, so a double press
+ * cannot land two writes that disagree about where they started.
  */
-function AutomationBox({ enabled, label }: { enabled: boolean; label: string }) {
+function AutomationControl({ enabled, label }: { enabled: boolean; label: string }) {
   const t = useT();
   const { pending } = useFormStatus();
 
   return (
-    <input
-      type="checkbox"
-      // Remounted whenever the server's answer changes, so the box shows what
-      // was actually saved rather than what was clicked.
-      key={String(enabled)}
-      defaultChecked={enabled}
-      disabled={pending}
-      onChange={(event) => event.currentTarget.form?.requestSubmit()}
-      aria-label={t.invoices.automationAria(label)}
+    <Switch
+      on={enabled}
+      size="sm"
+      label={t.invoices.automationAria(label)}
       title={enabled ? t.invoices.automationPauseHint : t.invoices.automationResumeHint}
-      className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-600 disabled:cursor-wait disabled:opacity-50"
+      disabled={pending}
     />
   );
 }
 
-export function AutomationCheckbox({
+export function InvoiceAutomationSwitch({
   invoiceId,
   enabled,
   label,
@@ -375,7 +370,7 @@ export function AutomationCheckbox({
     <form action={toggleInvoiceAutomation}>
       <input type="hidden" name="id" value={invoiceId} />
       <input type="hidden" name="enabled" value={String(enabled)} />
-      <AutomationBox enabled={enabled} label={label} />
+      <AutomationControl enabled={enabled} label={label} />
     </form>
   );
 }
