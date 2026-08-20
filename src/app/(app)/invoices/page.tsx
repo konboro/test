@@ -15,7 +15,7 @@ import type { DunningStep } from '@/types/database';
 
 import { markInvoicePaid, runScenarioForSelected, sendBulkReminder } from './actions';
 import {
-  AutomationCheckbox,
+  InvoiceAutomationSwitch,
   CopyPayLink,
   CreateInvoiceForm,
   DueDateButton,
@@ -411,7 +411,7 @@ export default async function InvoicesPage({
                           <RemindButton invoiceId={invoice.id} label={label} />
                           <CopyPayLink code={invoice.short_code ?? invoice.pay_token} />
                           <label className="flex items-center gap-2 text-sm text-ink-600">
-                            <AutomationCheckbox
+                            <InvoiceAutomationSwitch
                               invoiceId={invoice.id}
                               enabled={invoice.automation_enabled !== false}
                               label={label}
@@ -561,11 +561,11 @@ export default async function InvoicesPage({
                       </td>
                       <td className="px-5 py-3 text-center">
                         {/* Only where it means something. A settled invoice is
-                            out of the scenario whatever this said, and an empty
-                            box against it would read as a switch someone turned
-                            off. */}
+                            out of the scenario whatever this said, and a switch
+                            sitting off against it would read as a decision
+                            somebody made. */}
                         {invoice.status === 'pending' ? (
-                          <AutomationCheckbox
+                          <InvoiceAutomationSwitch
                             invoiceId={invoice.id}
                             enabled={invoice.automation_enabled !== false}
                             label={label}

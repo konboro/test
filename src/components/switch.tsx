@@ -17,6 +17,7 @@ const SIZES = {
 export function Switch({
   on,
   label,
+  title,
   size = 'lg',
   submit = true,
   disabled = false,
@@ -25,6 +26,14 @@ export function Switch({
   on: boolean;
   /** Read out by a screen reader in place of the shape itself. */
   label: string;
+  /**
+   * Hover text, when it should say something the label does not.
+   *
+   * The two diverge where the label names the thing being switched — "reminders
+   * for invoice A 1042" — and the hint names what pressing it will do. Defaults
+   * to the label, which is right whenever there is nothing extra to add.
+   */
+  title?: string;
   size?: keyof typeof SIZES;
   /**
    * Whether pressing it submits the surrounding form. False when the press has
@@ -45,7 +54,7 @@ export function Switch({
       aria-label={label}
       // Same text as a tooltip: in a dense list the shape alone does not say
       // what it governs, and only a screen reader was being told.
-      title={label}
+      title={title ?? label}
       disabled={disabled}
       className={`relative inline-flex ${s.track} shrink-0 items-center rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:opacity-60 ${
         on ? 'bg-emerald-500' : 'bg-ink-300'
