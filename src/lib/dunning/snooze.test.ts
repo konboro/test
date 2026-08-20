@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest';
 import {
   isSnoozed,
   MAX_SNOOZE_DAYS,
+  MAX_SNOOZE_NOTE,
   normaliseSnoozeDate,
+  normaliseSnoozeNote,
+  resolveSnooze,
   snoozeDaysLeft,
   snoozeUntil,
 } from './snooze';
@@ -59,6 +62,55 @@ describe('normaliseSnoozeDate', () => {
     expect(normaliseSnoozeDate('2026-08-19', TODAY)).toBeNull();
     expect(normaliseSnoozeDate('nope', TODAY)).toBeNull();
     expect(normaliseSnoozeDate('2030-01-01', TODAY)).toBeNull();
+  });
+});
+
+describe('resolveSnooze', () => {
+  // The dialog posts every field it holds, and the date input is prefilled
+  // with the pause that is already running — so each button arrives carrying
+  // the other buttons' data.
+  const RUNNING = '2026-09-04';
+
+  it('lifts the pause even though the old date rides along', () => {
+    expect(resolveSnooze({ resume: true, until: RUNNING, days: '' }, TODAY)).toBeNull();
+  });
+
+  it('lets a preset change a pause that is already running', () => {
+    expect(resolveSnooze({ days: '7', until: RUNNING }, TODAY)).toBe('2026-08-26');
+  });
+
+  it('takes the typed date when no preset was pressed', () => {
+    expect(resolveSnooze({ days: '', until: '2026-09-15' }, TODAY)).toBe('2026-09-15');
+  });
+
+  it('is nothing at all when nothing was asked for', () => {
+    expect(resolveSnooze({}, TODAY)).toBeNull();
+    expect(resolveSnooze({ days: '', until: '' }, TODAY)).toBeNull();
+  });
+
+  it('still refuses what the validators refuse', () => {
+    expect(resolveSnooze({ days: '9999' }, TODAY)).toBeNull();
+    expect(resolveSnooze({ until: '2026-08-19' }, TODAY)).toBeNull();
+    expect(resolveSnooze({ until: 'nope' }, TODAY)).toBeNull();
+  });
+});
+
+describe('normaliseSnoozeNote', () => {
+  it('keeps one tidy line', () => {
+    expect(normaliseSnoozeNote('  promised a transfer\n  on the 15th ')).toBe(
+      'promised a transfer on the 15th',
+    );
+  });
+
+  it('is null when there is nothing to say', () => {
+    expect(normaliseSnoozeNote('')).toBeNull();
+    expect(normaliseSnoozeNote('   ')).toBeNull();
+    expect(normaliseSnoozeNote(null)).toBeNull();
+    expect(normaliseSnoozeNote(undefined)).toBeNull();
+  });
+
+  it('is bounded, because it renders on a list row', () => {
+    expect(normaliseSnoozeNote('x'.repeat(500))).toHaveLength(MAX_SNOOZE_NOTE);
   });
 });
 

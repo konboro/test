@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
-import { normaliseSnoozeDate, snoozeUntil } from '@/lib/dunning/snooze';
+import { normaliseSnoozeNote, resolveSnooze } from '@/lib/dunning/snooze';
 import { athensDate } from '@/lib/money';
 import { normalisePhone } from '@/lib/sms/send';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -218,21 +218,31 @@ export async function snoozeDebtor(formData: FormData) {
   if (!id) return;
 
   const today = athensDate();
-  const days = Number(formData.get('days') ?? '');
-  const until = String(formData.get('until') ?? '').trim();
 
   // "Resume now" is the same action with nothing to set, so lifting a snooze
-  // needs no second code path that could disagree with this one.
-  const resolved = until
-    ? normaliseSnoozeDate(until, today)
-    : Number.isFinite(days) && days > 0
-      ? snoozeUntil(today, days)
-      : null;
+  // needs no second code path that could disagree with this one. Which of the
+  // posted fields decides is `resolveSnooze`, and it is tested there.
+  const resolved = resolveSnooze(
+    {
+      resume: formData.get('resume') !== null,
+      days: String(formData.get('days') ?? ''),
+      until: String(formData.get('until') ?? ''),
+    },
+    today,
+  );
+
+  // The reason travels with the date and dies with it: a note explaining a
+  // pause that is no longer running is just a stale claim about a customer.
+  const note = resolved ? normaliseSnoozeNote(String(formData.get('note') ?? '')) : null;
 
   const supabase = await createClient();
-  await supabase.from('debtors').update({ snoozed_until: resolved }).eq('id', id);
+  await supabase
+    .from('debtors')
+    .update({ snoozed_until: resolved, snooze_note: note })
+    .eq('id', id);
 
   revalidatePath('/debtors');
+  revalidatePath(`/debtors/${id}`);
   revalidatePath('/invoices');
   revalidatePath('/dashboard');
 }

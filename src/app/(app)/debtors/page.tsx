@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 
 import { Badge, Card, CardHeader, EmptyState, subtleLinkClass } from '@/components/ui';
 import { displayName } from '@/lib/debtors';
-import { isSnoozed } from '@/lib/dunning/snooze';
+import { isSnoozed, snoozeDaysLeft } from '@/lib/dunning/snooze';
 import { getDictionary } from '@/lib/i18n';
 import { athensDate, formatDate, formatMoney } from '@/lib/money';
 import { createClient } from '@/lib/supabase/server';
@@ -173,7 +173,7 @@ export default async function DebtorsPage({
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Link href="/debtors/import" className={`text-sm ${subtleLinkClass}`}>
-            Import z pliku
+            {t.debtors.importLink}
           </Link>
           <CreateDebtorForm />
         </div>
@@ -193,6 +193,7 @@ export default async function DebtorsPage({
               const open = outstanding.get(debtor.id);
               const reachable = Boolean(debtor.email || debtor.phone);
               const name = displayName(debtor);
+              const paused = isSnoozed(debtor, today);
 
               return (
                 <li key={debtor.id} className="px-5 py-4">
@@ -213,11 +214,9 @@ export default async function DebtorsPage({
                           )}
                         </Link>
                         {debtor.muted ? <Badge tone="neutral">{t.debtors.muted}</Badge> : null}
-                        {isSnoozed(debtor, today) ? (
-                          <Badge tone="info">
-                            {t.snooze.badge(formatDate(debtor.snoozed_until as string))}
-                          </Badge>
-                        ) : null}
+                        {/* The date lives in its own block on the right, so the
+                            badge only has to catch the eye, not repeat it. */}
+                        {paused ? <Badge tone="info">{t.snooze.badge}</Badge> : null}
                         {!reachable ? <Badge tone="danger">{t.debtors.noContact}</Badge> : null}
                       </div>
 
@@ -243,21 +242,50 @@ export default async function DebtorsPage({
                         <p className="text-xs text-ink-500">{t.debtors.openCount(open?.count ?? 0)}</p>
                       </div>
 
+                      {/* Read the way the amount is read: a label, the value,
+                          and how long it still holds. "Paused until 04/09" on
+                          its own leaves the operator counting days in their
+                          head to know whether it is nearly over. */}
+                      {paused ? (
+                        <div className="text-right">
+                          <p className="text-xs uppercase tracking-wide text-ink-400">
+                            {t.snooze.blockLabel}
+                          </p>
+                          <p className="tabular mt-0.5 text-sm font-semibold text-brand-700">
+                            {formatDate(debtor.snoozed_until as string)}
+                          </p>
+                          <p className="text-xs text-ink-500">
+                            {t.snooze.daysLeft(snoozeDaysLeft(debtor, today) ?? 0)}
+                          </p>
+                        </div>
+                      ) : null}
+
                       <EditDebtorForm debtor={debtor} />
 
                       <SnoozeButton
                         debtorId={debtor.id}
-                        snoozedUntil={isSnoozed(debtor, today) ? debtor.snoozed_until : null}
-                        display={
-                          isSnoozed(debtor, today)
-                            ? formatDate(debtor.snoozed_until as string)
-                            : null
-                        }
+                        snoozedUntil={paused ? debtor.snoozed_until : null}
+                        note={paused ? debtor.snooze_note : null}
                       />
 
                       <NotificationSwitch debtorId={debtor.id} muted={debtor.muted} />
                     </div>
                   </div>
+
+                  {/* Why they are paused, in the operator's own words. Two
+                      weeks on, "until 04/09" alone does not say whether the
+                      customer promised a transfer or is disputing the invoice
+                      — and it is rarely the same person reading it. */}
+                  {paused && debtor.snooze_note ? (
+                    <p className="mt-2 flex items-baseline gap-1.5 text-sm text-ink-600">
+                      <span className="shrink-0 text-xs uppercase tracking-wide text-ink-400">
+                        {t.snooze.noteLabel}
+                      </span>
+                      <span className="min-w-0 truncate" title={debtor.snooze_note}>
+                        {debtor.snooze_note}
+                      </span>
+                    </p>
+                  ) : null}
 
                   {debtor.notes ? (
                     <p className="mt-2 text-sm text-ink-500">{debtor.notes}</p>
