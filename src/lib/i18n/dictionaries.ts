@@ -479,6 +479,18 @@ const el = {
       reference: 'Αριθμός παραστατικού',
       external_ref: 'ID στο σύστημά σας',
     } as Record<string, string>,
+    sheetErrors: {
+      empty: 'Δεν επιλέχθηκε αρχείο.',
+      tooBig: 'Το αρχείο ξεπερνά τα 15 MB.',
+      badType: 'Δεκτά αρχεία Excel (.xlsx, .xlsm) ή CSV.',
+      noRows: 'Δεν βρέθηκαν γραμμές με δεδομένα στο βιβλίο εργασίας.',
+      unreadable: 'Δεν μπόρεσα να ανοίξω το αρχείο. Αν είναι προστατευμένο με κωδικό, αποθηκεύστε το ξανά χωρίς κωδικό.',
+    } as Record<string, string>,
+    sheetChosen: (sheet: string, headerRow: number) =>
+      `Φύλλο «${sheet}», επικεφαλίδες στη γραμμή ${headerRow}.`,
+    sheetOthers: (names: string) => `Άλλα φύλλα: ${names}.`,
+    sheetTruncated: 'Το φύλλο είναι πολύ μεγάλο· διαβάστηκαν οι πρώτες 20.000 γραμμές.',
+    reading: 'Ανάγνωση αρχείου…',
     step1: '1. Επιλέξτε αρχείο',
     step1Hint:
       'CSV από Excel, Google Sheets ή εξαγωγή από το σύστημά σας. Τίποτα δεν αποθηκεύεται μέχρι να εγκρίνετε.',
@@ -1576,6 +1588,18 @@ const en: typeof el = {
       reference: 'Invoice number',
       external_ref: 'ID in your system',
     } as Record<string, string>,
+    sheetErrors: {
+      empty: 'No file chosen.',
+      tooBig: 'That file is over 15 MB.',
+      badType: 'Excel (.xlsx, .xlsm) or CSV files only.',
+      noRows: 'No data rows were found in the workbook.',
+      unreadable: 'I could not open that file. If it is password protected, save it again without a password.',
+    } as Record<string, string>,
+    sheetChosen: (sheet: string, headerRow: number) =>
+      `Sheet ${sheet}, headers on row ${headerRow}.`,
+    sheetOthers: (names: string) => `Other sheets: ${names}.`,
+    sheetTruncated: 'That sheet is very large — the first 20,000 rows were read.',
+    reading: 'Reading the file…',
     step1: '1. Choose a file',
     step1Hint:
       'CSV from Excel, Google Sheets or an export from your own system. Nothing is saved until you approve it.',

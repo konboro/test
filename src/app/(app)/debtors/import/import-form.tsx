@@ -13,7 +13,7 @@ import {
 import { useT } from '@/lib/i18n/provider';
 import { formatDate, formatMoney } from '@/lib/money';
 
-import { runImport, type ImportState } from './actions';
+import { readSheetFile, runImport, type ImportState } from './actions';
 
 /**
  * The order the mapping controls appear in, and which two are required.
@@ -50,6 +50,8 @@ export function ImportForm({ termDays }: { termDays: number }) {
   const t = useT();
   const [text, setText] = useState('');
   const [mapping, setMapping] = useState<Partial<Record<ImportField, number>>>({});
+  const [sheetNote, setSheetNote] = useState<string[]>([]);
+  const [reading, setReading] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [state, submit, busy] = useActionState<ImportState, FormData>(runImport, {});
 
@@ -67,10 +69,44 @@ export function ImportForm({ termDays }: { termDays: number }) {
     setMapping(guessColumns(parsed.headers));
   }
 
+  const isSpreadsheet = (file: File) => /.xlsx$|.xlsm$/i.test(file.name);
+
   async function onFile(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    load(await file.text(), file.name);
+
+    setSheetNote([]);
+
+    // A CSV is already text; a workbook has to be opened on the server, where
+    // the parser lives and where the file does not have to leave the request.
+    if (!isSpreadsheet(file)) {
+      load(await file.text(), file.name);
+      return;
+    }
+
+    setReading(true);
+    try {
+      const body = new FormData();
+      body.set('file', file);
+      const result = await readSheetFile(body);
+
+      if (result.error || !result.text) {
+        setSheetNote([result.error ?? t.importer.sheetErrors.unreadable ?? '']);
+        return;
+      }
+
+      // Says which sheet was taken and where the header was found, because both
+      // are guesses and a wrong one is easier to spot than to debug.
+      const notes = [t.importer.sheetChosen(result.sheetName ?? '', result.headerRow ?? 1)];
+      const others = (result.sheets ?? []).filter((name) => name !== result.sheetName);
+      if (others.length) notes.push(t.importer.sheetOthers(others.join(', ')));
+      if (result.truncated) notes.push(t.importer.sheetTruncated);
+
+      setSheetNote(notes);
+      load(result.text, file.name);
+    } finally {
+      setReading(false);
+    }
   }
 
   const ready = Boolean(
@@ -84,10 +120,20 @@ export function ImportForm({ termDays }: { termDays: number }) {
         <div className="space-y-4 px-5 py-4">
           <input
             type="file"
-            accept=".csv,.txt,text/csv,text/plain"
+            accept=".csv,.txt,.xlsx,.xlsm,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             onChange={onFile}
             className="block w-full text-sm text-ink-600 file:mr-3 file:rounded-lg file:border-0 file:bg-ink-900 file:px-3.5 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-ink-800"
           />
+
+          {reading ? <p className="text-sm text-ink-500">{t.importer.reading}</p> : null}
+
+          {sheetNote.length ? (
+            <ul className="space-y-1 rounded-lg bg-ink-50 px-3 py-2 text-xs text-ink-600">
+              {sheetNote.map((note) => (
+                <li key={note}>{note}</li>
+              ))}
+            </ul>
+          ) : null}
 
           <details>
             <summary className="cursor-pointer text-sm text-ink-500 transition hover:text-ink-800">
