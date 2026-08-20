@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { parseSlotKey } from '@/lib/dunning/templates';
+import { saveFailed } from '@/lib/errors';
 import { formError, getDictionary } from '@/lib/i18n';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
@@ -55,7 +56,7 @@ export async function updateProfile(
   // Only the columns granted to `authenticated` are touched here; credentials
   // and balances are unreachable from this path by construction.
   const { error } = await supabase.from('users').update(parsed.data).eq('id', user.id);
-  if (error) return { error: error.message };
+  if (error) return { error: saveFailed(t, 'settings', error) };
 
   revalidatePath('/settings');
   revalidatePath('/dashboard');
@@ -94,7 +95,7 @@ export async function setAutomation(
     .update({ automation_enabled: enabled })
     .eq('id', user.id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: saveFailed(t, 'settings', error) };
 
   revalidatePath('/settings');
   revalidatePath('/dashboard');
@@ -210,7 +211,7 @@ export async function saveTemplate(
         body: parsed.data.body,
       });
 
-  if (error) return { error: error.message };
+  if (error) return { error: saveFailed(t, 'settings', error) };
 
   revalidatePath('/settings');
   return { success: t.forms.success.templateSaved };
@@ -240,7 +241,7 @@ export async function resetTemplate(
       )
     : deletion.eq('step', slot.step));
 
-  if (error) return { error: error.message };
+  if (error) return { error: saveFailed(t, 'settings', error) };
 
   revalidatePath('/settings');
   return { success: t.forms.success.templateReset };

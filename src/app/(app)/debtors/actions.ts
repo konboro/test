@@ -8,6 +8,7 @@ import { athensDate } from '@/lib/money';
 import { normalisePhone } from '@/lib/sms/send';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import { saveFailed } from '@/lib/errors';
 import { formError, getDictionary } from '@/lib/i18n';
 
 export interface DebtorFormState {
@@ -101,7 +102,7 @@ export async function createDebtor(
     if (error.code === '23505') {
       return { error: t.forms.errors.vatTaken };
     }
-    return { error: error.message };
+    return { error: saveFailed(t, 'debtors', error) };
   }
 
   revalidatePath('/debtors');
@@ -129,7 +130,7 @@ export async function updateDebtor(
     .update({ ...parsed.data, phone })
     .eq('id', id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: saveFailed(t, 'debtors', error) };
 
   revalidatePath('/debtors');
   revalidatePath('/dashboard');
@@ -178,7 +179,7 @@ export async function deleteDebtor(
   if (!debtor || debtor.user_id !== user.id) return { error: t.forms.errors.unauthorized };
 
   const { error } = await admin.from('debtors').delete().eq('id', id).eq('user_id', user.id);
-  if (error) return { error: error.message };
+  if (error) return { error: saveFailed(t, 'debtors', error) };
 
   revalidatePath('/debtors');
   revalidatePath('/invoices');

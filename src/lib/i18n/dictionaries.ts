@@ -223,6 +223,11 @@ const el = {
       companyNameRequired: 'Συμπληρώστε την επωνυμία της επιχείρησης.',
       reminderNotSent: (reason: string) => `Δεν στάλθηκε μήνυμα (${reason}).`,
       unknownReason: 'άγνωστος λόγος',
+      saveFailed: 'Η αλλαγή δεν αποθηκεύτηκε. Δοκιμάστε ξανά.',
+      loadFailed: 'Δεν ήταν δυνατή η ανάγνωση των δεδομένων. Δοκιμάστε ξανά σε λίγο.',
+      uploadFailed: 'Το αρχείο δεν ανέβηκε. Δοκιμάστε ξανά.',
+      emailTaken: 'Υπάρχει ήδη λογαριασμός με αυτό το email. Συνδεθείτε ή ζητήστε νέο κωδικό.',
+      signUpFailed: 'Η εγγραφή δεν ολοκληρώθηκε. Δοκιμάστε ξανά σε λίγο.',
     },
     success: {
       invoiceCreated: 'Το παραστατικό καταχωρήθηκε.',
@@ -539,6 +544,16 @@ const el = {
       invalid: 'Μη έγκυρα δεδομένα εισαγωγής.',
       noRows:
         'Καμία γραμμή δεν είναι κατάλληλη για εισαγωγή. Ελέγξτε την αντιστοίχιση των στηλών.',
+      loadCustomers:
+        'Δεν ήταν δυνατή η ανάγνωση των υπαρχόντων πελατών σας, οπότε δεν εισήχθη τίποτα. Δοκιμάστε ξανά σε λίγο.',
+      createCustomers:
+        'Δεν ήταν δυνατή η δημιουργία των νέων πελατών, οπότε δεν εισήχθη τίποτα. Δοκιμάστε ξανά σε λίγο.',
+      rowUnmatched: (line: number) =>
+        `Γραμμή ${line}: δεν αντιστοιχίστηκε σε πελάτη και παραλείφθηκε.`,
+      saveInvoices:
+        'Οι πελάτες αποθηκεύτηκαν, αλλά οι απαιτήσεις όχι. Δοκιμάστε ξανά — όσες έχουν ήδη εισαχθεί δεν θα διπλασιαστούν.',
+      alreadyImported:
+        'Αυτές οι γραμμές έχουν ήδη εισαχθεί, οπότε δεν προστέθηκε τίποτα ξανά.',
     },
   },
   common: {
@@ -1332,6 +1347,11 @@ const en: typeof el = {
       companyNameRequired: 'Enter your company name.',
       reminderNotSent: (reason: string) => `Nothing was sent (${reason}).`,
       unknownReason: 'reason unknown',
+      saveFailed: 'The change was not saved. Try again.',
+      loadFailed: 'The data could not be read. Try again in a moment.',
+      uploadFailed: 'The file was not uploaded. Try again.',
+      emailTaken: 'An account with this email already exists. Sign in, or ask for a new password.',
+      signUpFailed: 'The sign-up did not complete. Try again in a moment.',
     },
     success: {
       invoiceCreated: 'Invoice saved.',
@@ -1644,6 +1664,14 @@ const en: typeof el = {
       session: 'Your session has expired. Please sign in again.',
       invalid: 'The import data is not valid.',
       noRows: 'No row is suitable for import. Check how the columns are mapped.',
+      loadCustomers:
+        'Your existing customers could not be read, so nothing was imported. Try again in a moment.',
+      createCustomers:
+        'The new customers could not be created, so nothing was imported. Try again in a moment.',
+      rowUnmatched: (line: number) => `Row ${line}: could not be matched to a customer, and was skipped.`,
+      saveInvoices:
+        'The customers were saved but the receivables were not. Try again — anything already imported will not be duplicated.',
+      alreadyImported: 'These rows had already been imported, so nothing was added again.',
     },
   },
   common: {

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { saveFailed } from '@/lib/errors';
 import { connectClientId, stripe } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
@@ -59,7 +60,15 @@ export async function POST() {
     })
     .eq('id', user.id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    // The store refused, which is ours to fix and nothing the reader can act
+    // on. The provider's own words are still passed on above, where they are
+    // the only true account of why a key was rejected.
+    return NextResponse.json(
+      { error: saveFailed(await getDictionary(), 'stripe:disconnect', error) },
+      { status: 500 },
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }

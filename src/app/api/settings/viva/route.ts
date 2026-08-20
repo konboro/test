@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
+import { saveFailed } from '@/lib/errors';
 import { encryptSecret } from '@/lib/crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
@@ -80,7 +81,15 @@ export async function POST(request: Request) {
     })
     .eq('id', user.id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    // The store refused, which is ours to fix and nothing the reader can act
+    // on. The provider's own words are still passed on above, where they are
+    // the only true account of why a key was rejected.
+    return NextResponse.json(
+      { error: saveFailed(await getDictionary(), 'settings:viva', error) },
+      { status: 500 },
+    );
+  }
 
   // Reflected back so nobody discovers at go-live that the account has been
   // running on demo credentials all along.
@@ -100,6 +109,14 @@ export async function DELETE() {
     })
     .eq('id', user.id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    // The store refused, which is ours to fix and nothing the reader can act
+    // on. The provider's own words are still passed on above, where they are
+    // the only true account of why a key was rejected.
+    return NextResponse.json(
+      { error: saveFailed(await getDictionary(), 'settings:viva', error) },
+      { status: 500 },
+    );
+  }
   return NextResponse.json({ ok: true });
 }

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 
+import type { Dictionary } from '@/lib/i18n';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 import type { Database } from '@/types/database';
@@ -51,7 +52,11 @@ function rowKey(row: ImportRow, occurrence: number): string {
  * so the tenant id comes from the caller's session and is stamped on every row
  * — nothing in the uploaded file can redirect a debt onto another account.
  */
-export async function commitImport(userId: string, rows: ImportRow[]): Promise<ImportOutcome> {
+export async function commitImport(
+  userId: string,
+  rows: ImportRow[],
+  t: Dictionary,
+): Promise<ImportOutcome> {
   const admin = createAdminClient();
   const outcome: ImportOutcome = {
     debtorsCreated: 0,
@@ -69,7 +74,13 @@ export async function commitImport(userId: string, rows: ImportRow[]): Promise<I
     .eq('user_id', userId);
 
   if (loadError) {
-    outcome.errors.push(`Δεν ήταν δυνατή η ανάγνωση των υπαρχόντων πελατών: ${loadError.message}`);
+    // The database's own words go to the log, not to the operator. A Postgres
+    // error describes our defect in our vocabulary; there is nothing the person
+    // holding the spreadsheet can do with it, and pasting it after a Greek
+    // sentence is how "there is no unique or exclusion constraint matching the
+    // ON CONFLICT specification" ended up on screen.
+    console.error('[import] reading existing customers', loadError);
+    outcome.errors.push(t.importer.errors.loadCustomers);
     return outcome;
   }
 
@@ -127,7 +138,8 @@ export async function commitImport(userId: string, rows: ImportRow[]): Promise<I
       .select('id, name, vat_number, email, external_ref');
 
     if (error) {
-      outcome.errors.push(`Δεν ήταν δυνατή η προσθήκη πελατών: ${error.message}`);
+      console.error('[import] creating customers', error);
+      outcome.errors.push(t.importer.errors.createCustomers);
       return outcome;
     }
 
@@ -157,7 +169,7 @@ export async function commitImport(userId: string, rows: ImportRow[]): Promise<I
       resolve(row) ?? byEmail.get(`name:${row.name}`) ?? null;
 
     if (!debtorId) {
-      outcome.errors.push(`Γραμμή ${row.line}: δεν ήταν δυνατή η αντιστοίχιση πελάτη.`);
+      outcome.errors.push(t.importer.errors.rowUnmatched(row.line));
       continue;
     }
 
@@ -179,21 +191,66 @@ export async function commitImport(userId: string, rows: ImportRow[]): Promise<I
 
   if (!payload.length) return outcome;
 
-  // `ignoreDuplicates` against the (user_id, external_ref) index is what makes a
-  // second upload of the same file change nothing at all.
-  const { data: inserted, error } = await admin
-    .from('invoices')
-    .upsert(payload, { onConflict: 'user_id,external_ref', ignoreDuplicates: true })
-    .select('id');
+  // Which of these the tenant already has.
+  //
+  // This was `upsert(payload, { onConflict: 'user_id,external_ref' })`, and it
+  // could never have worked: the unique index behind that pair is partial —
+  // `where external_ref is not null` — and Postgres will only use a partial
+  // index to resolve ON CONFLICT if the statement repeats the index predicate.
+  // PostgREST sends the column list and nothing else, so the database found no
+  // arbiter and refused the entire batch. Every import failed, on every file,
+  // with a message about constraint specifications.
+  //
+  // Asking first is also more truthful about the result: the duplicate count is
+  // now the rows actually recognised rather than a subtraction that blamed
+  // every unexplained gap on a re-upload.
+  const refs = payload
+    .map((row) => row.external_ref)
+    .filter((ref): ref is string => Boolean(ref));
+
+  const known = new Set<string>();
+
+  // Chunked because this becomes a query string: a few hundred references in
+  // one `in` clause is a URL long enough to be refused before it is read.
+  for (let at = 0; at < refs.length; at += 200) {
+    const { data: seenRows, error: seenError } = await admin
+      .from('invoices')
+      .select('external_ref')
+      .eq('user_id', userId)
+      .in('external_ref', refs.slice(at, at + 200));
+
+    if (seenError) {
+      console.error('[import] reading existing references', seenError);
+      outcome.errors.push(t.importer.errors.saveInvoices);
+      return outcome;
+    }
+
+    for (const row of seenRows ?? []) {
+      if (row.external_ref) known.add(row.external_ref);
+    }
+  }
+
+  const fresh = payload.filter((row) => !row.external_ref || !known.has(row.external_ref));
+  outcome.duplicates = payload.length - fresh.length;
+  outcome.debtorsMatched -= outcome.debtorsCreated;
+
+  if (!fresh.length) return outcome;
+
+  const { data: inserted, error } = await admin.from('invoices').insert(fresh).select('id');
 
   if (error) {
-    outcome.errors.push(`Δεν ήταν δυνατή η αποθήκευση των απαιτήσεων: ${error.message}`);
+    console.error('[import] saving receivables', error);
+    // 23505 is the partial index catching a row this batch had not seen — two
+    // uploads of the same file overlapping. Nothing is lost and nothing is
+    // wrong with the file, so it is reported as already imported rather than as
+    // a failure the operator would go looking for a cause for.
+    outcome.errors.push(
+      error.code === '23505' ? t.importer.errors.alreadyImported : t.importer.errors.saveInvoices,
+    );
     return outcome;
   }
 
   outcome.invoicesCreated = inserted?.length ?? 0;
-  outcome.duplicates = payload.length - outcome.invoicesCreated;
-  outcome.debtorsMatched -= outcome.debtorsCreated;
 
   return outcome;
 }
