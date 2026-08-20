@@ -335,11 +335,23 @@ set role anon;
 do $$
 declare n integer;
 begin
-  select count(*) into n from public.invoices;
-  if n <> 0 then raise exception 'FAIL: anon read % invoices', n; end if;
+  -- Stronger than "no rows", and what the schema now actually does: the anon
+  -- grants were revoked outright, so this is refused before any policy is
+  -- consulted. The check used to assert an empty result, which stopped being
+  -- the truth when 20260819160000_revoke_anon_grants.sql landed.
+  begin
+    select count(*) into n from public.invoices;
+    raise exception 'FAIL: anon could select from invoices at all';
+  exception when insufficient_privilege then
+    null;
+  end;
 
-  select count(*) into n from public.debtors;
-  if n <> 0 then raise exception 'FAIL: anon read % debtors', n; end if;
+  begin
+    select count(*) into n from public.debtors;
+    raise exception 'FAIL: anon could select from debtors at all';
+  exception when insufficient_privilege then
+    null;
+  end;
 end $$;
 \echo '  ok  anon reads no invoices and no debtors directly'
 
@@ -402,5 +414,198 @@ end $$;
 \echo '  ok  anon cannot read funnel events at all'
 
 reset role;
+
+-- --------------------------------------------------------------------------
+-- many companies per login, many logins per company
+-- --------------------------------------------------------------------------
+--
+-- The header is the whole scoping mechanism, so these checks are about what it
+-- can and cannot do: select among your own companies, and nothing else.
+
+do $$
+declare n integer;
+begin
+  select count(*) into n from public.organization_members
+   where organization_id = member_id and role = 'owner';
+  if n <> 2 then raise exception 'FAIL: signup did not make each tenant an owner (got %)', n; end if;
+end $$;
+\echo '  ok  the signup trigger makes a new account the owner of its company'
+
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+
+-- A second company, created the only way a browser can create one.
+do $$
+declare second uuid; n integer;
+begin
+  second := public.create_organization('Alpha Deftero AE', '999888777');
+
+  select count(*) into n from public.my_organizations();
+  if n <> 2 then raise exception 'FAIL: expected 2 companies for tenant A, got %', n; end if;
+
+  -- With no header at all, nothing moved: still their original company.
+  select count(*) into n from public.debtors;
+  if n <> 1 then raise exception 'FAIL: default company should still show its 1 debtor, got %', n; end if;
+
+  -- Acting for the new company: its own books, which are empty.
+  perform set_config('request.headers', json_build_object('x-lefta-org', second)::text, true);
+
+  if public.current_org_id() <> second then
+    raise exception 'FAIL: the header did not select the second company';
+  end if;
+
+  select count(*) into n from public.debtors;
+  if n <> 0 then raise exception 'FAIL: the second company sees % debtors of the first', n; end if;
+
+  select count(*) into n from public.users;
+  if n <> 1 then raise exception 'FAIL: expected exactly the active company row, got %', n; end if;
+
+  perform set_config('request.headers', '', true);
+end $$;
+\echo '  ok  a second company is created, switched into, and sees only its own rows'
+
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+
+-- The forgery test: B asks for A's company by id.
+do $$
+declare n integer; a uuid := '11111111-1111-1111-1111-111111111111';
+begin
+  perform set_config('request.headers', json_build_object('x-lefta-org', a)::text, true);
+
+  if public.current_org_id() <> '22222222-2222-2222-2222-222222222222' then
+    raise exception 'FAIL: a forged header selected a company the caller is not a member of';
+  end if;
+
+  select count(*) into n from public.debtors where user_id = a;
+  if n <> 0 then raise exception 'FAIL: forged header exposed % of another tenant''s debtors', n; end if;
+
+  perform set_config('request.headers', '', true);
+end $$;
+\echo '  ok  a forged header grants nothing — it only selects among your own companies'
+
+-- Junk in the header must not raise: it is evaluated inside every policy, and
+-- an exception there would take down every query rather than deny one.
+do $$
+declare n integer;
+begin
+  perform set_config('request.headers', '{"x-lefta-org":"not-a-uuid"}', true);
+  select count(*) into n from public.debtors;
+  perform set_config('request.headers', 'not even json', true);
+  select count(*) into n from public.debtors;
+  perform set_config('request.headers', '', true);
+end $$;
+\echo '  ok  a malformed header falls back instead of raising'
+
+reset role;
+
+-- A viewer reads everything and writes nothing.
+insert into auth.users (id, email) values
+  ('33333333-3333-3333-3333-333333333333', 'viewer@example.gr');
+
+insert into public.organization_members (organization_id, member_id, member_email, role)
+values ('11111111-1111-1111-1111-111111111111', '33333333-3333-3333-3333-333333333333',
+        'viewer@example.gr', 'viewer');
+
+set role authenticated;
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+
+do $$
+declare n integer; a uuid := '11111111-1111-1111-1111-111111111111';
+begin
+  -- Signing up gave this person a company of their own, so acting for the one
+  -- they were invited into is a switch — the same one the cookie makes.
+  perform set_config('request.headers', json_build_object('x-lefta-org', a)::text, true);
+
+  select count(*) into n from public.debtors;
+  if n <> 1 then raise exception 'FAIL: viewer should see the 1 debtor of that company, got %', n; end if;
+
+  if public.current_org_role() <> 'viewer' then
+    raise exception 'FAIL: role resolved as %', coalesce(public.current_org_role(), 'null');
+  end if;
+
+  begin
+    insert into public.debtors (user_id, name)
+    values ('11111111-1111-1111-1111-111111111111', 'Should not exist');
+    raise exception 'FAIL: a viewer inserted a debtor';
+  exception when insufficient_privilege then
+    null;
+  end;
+
+  begin
+    update public.debtors set name = 'Renamed' where user_id = a;
+    -- An update that matches no row is not an error; the policy simply hides
+    -- every row from a viewer's UPDATE, which is the same outcome by a
+    -- different route.
+    if found then raise exception 'FAIL: a viewer updated a debtor'; end if;
+  exception when insufficient_privilege then
+    null;
+  end;
+
+  perform set_config('request.headers', '', true);
+end $$;
+\echo '  ok  a viewer reads the company and cannot write to it'
+
+reset role;
+
+-- Invitations: single use, email-bound, and never readable as a token.
+insert into auth.users (id, email) values
+  ('44444444-4444-4444-4444-444444444444', 'newbie@example.gr');
+
+do $$
+declare token text; joined uuid; n integer; granted text;
+begin
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  token := public.invite_member('newbie@example.gr', 'member');
+
+  select count(*) into n from public.organization_invites where token_hash = token;
+  if n <> 0 then raise exception 'FAIL: the raw token is stored, not its hash'; end if;
+
+  -- Someone else holding the link gets nothing: a forwarded invitation is not
+  -- a way into a company's receivables.
+  perform set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+  begin
+    perform public.accept_invite(token);
+    raise exception 'FAIL: an invitation was accepted by the wrong address';
+  exception when others then
+    if sqlerrm like 'FAIL:%' then raise; end if;
+  end;
+
+  -- The invited address joins, once.
+  perform set_config('request.jwt.claim.sub', '44444444-4444-4444-4444-444444444444', true);
+  joined := public.accept_invite(token);
+  if joined <> '11111111-1111-1111-1111-111111111111' then
+    raise exception 'FAIL: accepted into the wrong company';
+  end if;
+
+  select role into granted from public.organization_members
+   where organization_id = joined and member_id = '44444444-4444-4444-4444-444444444444';
+  if granted <> 'member' then
+    raise exception 'FAIL: the invited role was not applied (got %)', coalesce(granted, 'null');
+  end if;
+
+  begin
+    perform public.accept_invite(token);
+    raise exception 'FAIL: an invitation was used twice';
+  exception when others then
+    if sqlerrm like 'FAIL:%' then raise; end if;
+  end;
+end $$;
+\echo '  ok  an invitation is single use, bound to its address, and stored as a hash'
+
+-- A company must never be left with nobody who can administer it.
+do $$
+begin
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  begin
+    perform public.remove_member('11111111-1111-1111-1111-111111111111');
+    raise exception 'FAIL: the last owner was removed';
+  exception when others then
+    if sqlerrm like 'FAIL:%' then raise; end if;
+  end;
+end $$;
+\echo '  ok  the last owner cannot be removed'
+
 \echo ''
 \echo 'ALL SCHEMA CHECKS PASSED'

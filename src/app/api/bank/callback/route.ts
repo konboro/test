@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createSession } from '@/lib/bank/client';
 import { appUrl } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getSessionUser } from '@/lib/supabase/server';
+import { writableOrganization } from '@/lib/orgs/active';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,8 +42,8 @@ export async function GET(request: NextRequest) {
   // any signed-in account holding another tenant's pending connection id could
   // finish the handshake and attach its own bank feed to them — and a foreign
   // feed does not just leak, it settles their invoices.
-  const user = await getSessionUser();
-  if (!user || connection.user_id !== user.id) {
+  const org = await writableOrganization();
+  if (!org || connection.user_id !== org.id) {
     console.error('[bank:callback] session does not own this connection', connection.id);
     return NextResponse.redirect(`${settings}?bank=error`);
   }

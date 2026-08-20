@@ -39,11 +39,19 @@ export function addDays(isoDate: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * A calendar day, from either a `date` or a `timestamptz`.
+ *
+ * The two are mixed across the schema — due dates are dates, memberships and
+ * invitations are timestamps — and appending a time to a value that already
+ * carried one produced an Invalid Date, which is a crashed page rather than a
+ * wrong-looking one. Taking the leading day makes both work and neither shift.
+ */
 export function formatDate(isoDate: string, locale = 'el-GR'): string {
   return new Intl.DateTimeFormat(locale, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
     timeZone: 'UTC',
-  }).format(new Date(`${isoDate}T00:00:00Z`));
+  }).format(new Date(`${isoDate.slice(0, 10)}T00:00:00Z`));
 }

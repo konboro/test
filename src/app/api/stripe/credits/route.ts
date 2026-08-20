@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { appUrl } from '@/lib/env';
 import { findPack, stripe } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getSessionUser } from '@/lib/supabase/server';
+import { writableOrganization } from '@/lib/orgs/active';
 
 export const runtime = 'nodejs';
 
@@ -12,8 +12,8 @@ const schema = z.object({ pack: z.string() });
 
 /** Creates a Stripe Checkout session for an SMS credit bundle. */
 export async function POST(request: Request) {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const org = await writableOrganization();
+  if (!org) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   const { data: tenant } = await admin
     .from('users')
     .select('id, email, company_name, stripe_customer_id')
-    .eq('id', user.id)
+    .eq('id', org.id)
     .single();
 
   if (!tenant) return NextResponse.json({ error: 'Account not found' }, { status: 404 });

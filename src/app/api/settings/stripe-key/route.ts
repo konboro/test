@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { saveFailed } from '@/lib/errors';
 import { encryptSecret } from '@/lib/crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getSessionUser } from '@/lib/supabase/server';
+import { writableOrganization } from '@/lib/orgs/active';
 import { getDictionary } from '@/lib/i18n';
 
 export const runtime = 'nodejs';
@@ -34,8 +34,8 @@ const schema = z.object({
  */
 export async function POST(request: Request) {
   const t = await getDictionary();
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const org = await writableOrganization();
+  if (!org) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
   const { error } = await createAdminClient()
     .from('users')
     .update({ stripe_secret_key_enc: encryptSecret(key) })
-    .eq('id', user.id);
+    .eq('id', org.id);
 
   if (error) {
     // The store refused, which is ours to fix and nothing the reader can act
@@ -76,13 +76,13 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE() {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const org = await writableOrganization();
+  if (!org) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { error } = await createAdminClient()
     .from('users')
     .update({ stripe_secret_key_enc: null })
-    .eq('id', user.id);
+    .eq('id', org.id);
 
   if (error) {
     // The store refused, which is ours to fix and nothing the reader can act

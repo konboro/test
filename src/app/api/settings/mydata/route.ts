@@ -6,7 +6,7 @@ import { saveFailed } from '@/lib/errors';
 import { encryptSecret } from '@/lib/crypto';
 import { verifyCredentials } from '@/lib/mydata/client';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getSessionUser } from '@/lib/supabase/server';
+import { writableOrganization } from '@/lib/orgs/active';
 import type { UserRow } from '@/types/database';
 
 export const runtime = 'nodejs';
@@ -26,8 +26,8 @@ const schema = z.object({
  * read back to the browser — the settings UI only ever shows a masked hint.
  */
 export async function POST(request: Request) {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const org = await writableOrganization();
+  if (!org) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     const { data: existing } = await admin
       .from('users')
       .select('mydata_subscription_key_enc')
-      .eq('id', user.id)
+      .eq('id', org.id)
       .maybeSingle();
 
     if (!existing?.mydata_subscription_key_enc) {
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
       const { data } = await admin
         .from('users')
         .select('mydata_subscription_key_enc')
-        .eq('id', user.id)
+        .eq('id', org.id)
         .single();
       keyForCheck = decryptSecret(data!.mydata_subscription_key_enc!);
     }
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     ...(plaintextKey ? { mydata_subscription_key_enc: encryptSecret(plaintextKey) } : {}),
   };
 
-  const { error } = await admin.from('users').update(update).eq('id', user.id);
+  const { error } = await admin.from('users').update(update).eq('id', org.id);
   if (error) {
     // The store refused, which is ours to fix and nothing the reader can act
     // on. The provider's own words are still passed on above, where they are
@@ -107,13 +107,13 @@ export async function POST(request: Request) {
 
 /** Disconnects myDATA and wipes the stored key. */
 export async function DELETE() {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const org = await writableOrganization();
+  if (!org) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { error } = await createAdminClient()
     .from('users')
     .update({ mydata_user_id: null, mydata_subscription_key_enc: null })
-    .eq('id', user.id);
+    .eq('id', org.id);
 
   if (error) {
     // The store refused, which is ours to fix and nothing the reader can act

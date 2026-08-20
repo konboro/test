@@ -4,7 +4,7 @@ import { appUrl } from '@/lib/env';
 import { stripe } from '@/lib/stripe';
 import { verifyConnectState } from '@/lib/stripe-connect';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getSessionUser } from '@/lib/supabase/server';
+import { writableOrganization } from '@/lib/orgs/active';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,8 +15,8 @@ function back(status: string) {
 
 /** Completes the Connect handshake and stores the tenant's account id. */
 export async function GET(request: NextRequest) {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.redirect(`${appUrl()}/login`);
+  const org = await writableOrganization();
+  if (!org) return NextResponse.redirect(`${appUrl()}/login`);
 
   const params = request.nextUrl.searchParams;
 
@@ -29,8 +29,8 @@ export async function GET(request: NextRequest) {
   if (!code) return back('failed');
 
   // Binds this callback to the tenant who started it — see lib/stripe-connect.
-  if (!verifyConnectState(state, user.id)) {
-    console.error('[stripe:connect] state rejected for user', user.id);
+  if (!verifyConnectState(state, org.id)) {
+    console.error('[stripe:connect] state rejected for user', org.id);
     return back('failed');
   }
 
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
         stripe_charges_enabled: Boolean(account.charges_enabled),
         stripe_connected_at: new Date().toISOString(),
       })
-      .eq('id', user.id);
+      .eq('id', org.id);
 
     if (error) {
       // The unique index is the likely cause: one Stripe account cannot collect

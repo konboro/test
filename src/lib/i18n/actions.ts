@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 
+import { activeOrganization } from '@/lib/orgs/active';
 import { createClient } from '@/lib/supabase/server';
 
 import { isLocale, LOCALE_COOKIE } from './index';
@@ -41,7 +42,11 @@ export async function switchLocale(formData: FormData): Promise<void> {
   } = await supabase.auth.getUser();
 
   if (user) {
-    await supabase.from('users').update({ locale }).eq('id', user.id);
+    // Stored against the company being worked in, which is where the column
+    // lives. The cookie above is what actually decides the language for this
+    // person; this keeps the preference for the next session.
+    const org = await activeOrganization();
+    if (org) await supabase.from('users').update({ locale }).eq('id', org.id);
   }
 
   revalidatePath('/', 'layout');

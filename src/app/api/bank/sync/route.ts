@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { psuFromRequest } from '@/lib/bank/psu';
 import { syncBankFeeds } from '@/lib/bank/sync';
-import { getSessionUser } from '@/lib/supabase/server';
+import { writableOrganization } from '@/lib/orgs/active';
 
 export const runtime = 'nodejs';
 
@@ -24,13 +24,13 @@ export const runtime = 'nodejs';
  * guess.
  */
 export async function POST() {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const org = await writableOrganization();
+  if (!org) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   // Customer-present, and said so. The nightly sweep passes no PSU context
   // because nobody is there; claiming otherwise would misstate to the bank why
   // their customer's account is being read.
-  const result = await syncBankFeeds({ userId: user.id, psu: await psuFromRequest() });
+  const result = await syncBankFeeds({ userId: org.id, psu: await psuFromRequest() });
 
   if (result.errors.length) {
     console.error('[bank:sync]', result.errors);

@@ -3,21 +3,21 @@ import { NextResponse } from 'next/server';
 import { ElorusError } from '@/lib/elorus/client';
 import { syncElorusForUser } from '@/lib/elorus/sync';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getSessionUser } from '@/lib/supabase/server';
+import { writableOrganization } from '@/lib/orgs/active';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
 
 /** Pulls the signed-in tenant's customers and documents from Elorus. */
 export async function POST() {
-  const sessionUser = await getSessionUser();
-  if (!sessionUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const org = await writableOrganization();
+  if (!org) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const admin = createAdminClient();
   const { data: tenant, error } = await admin
     .from('users')
     .select('*')
-    .eq('id', sessionUser.id)
+    .eq('id', org.id)
     .single();
 
   if (error || !tenant) {

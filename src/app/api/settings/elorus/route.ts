@@ -6,7 +6,7 @@ import { saveFailed } from '@/lib/errors';
 import { encryptSecret } from '@/lib/crypto';
 import { verifyCredentials } from '@/lib/elorus/client';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getSessionUser } from '@/lib/supabase/server';
+import { writableOrganization } from '@/lib/orgs/active';
 
 export const runtime = 'nodejs';
 
@@ -26,8 +26,8 @@ const schema = z.object({
  * that out at save time is far cheaper than at sync time.
  */
 export async function POST(request: Request) {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const org = await writableOrganization();
+  if (!org) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     const { data: existing } = await admin
       .from('users')
       .select('elorus_api_key_enc')
-      .eq('id', user.id)
+      .eq('id', org.id)
       .maybeSingle();
 
     if (!existing?.elorus_api_key_enc) {
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
       elorus_organization_id: organization_id,
       ...(api_key?.trim() ? { elorus_api_key_enc: encryptSecret(api_key.trim()) } : {}),
     })
-    .eq('id', user.id);
+    .eq('id', org.id);
 
   if (error) {
     // The store refused, which is ours to fix and nothing the reader can act
@@ -88,8 +88,8 @@ export async function POST(request: Request) {
 
 /** Disconnects Elorus and wipes the stored key. */
 export async function DELETE() {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const org = await writableOrganization();
+  if (!org) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { error } = await createAdminClient()
     .from('users')
@@ -98,7 +98,7 @@ export async function DELETE() {
       elorus_organization_id: null,
       elorus_last_sync_at: null,
     })
-    .eq('id', user.id);
+    .eq('id', org.id);
 
   if (error) {
     // The store refused, which is ours to fix and nothing the reader can act

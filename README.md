@@ -100,6 +100,12 @@ Anything using the admin client and acting for a specific tenant performs its ow
 ownership check, standing in for the policy it bypassed (see
 `invoices/actions.ts:markInvoicePaid`).
 
+`server.ts` also sends which company the session is acting for, as a header the
+policies read. Server code takes the company from `requireOrganization()` (or
+`writableOrganization()` in a route handler) and never from `user.id`: the auth
+user is who you are, the company is who you are acting for, and one login can
+work on many. See [docs/multi-company.md](docs/multi-company.md).
+
 ---
 
 ## The automation engine
@@ -303,7 +309,12 @@ Then register an account, add a debtor with a real email, create a manual invoic
 
 ## Security notes
 
-- Every table is tenant-scoped by `auth.uid()` through RLS.
+- Every table is scoped by RLS to the company the session is acting for —
+  `user_id = current_org_id()`, where that function resolves the `x-lefta-org`
+  request header against the caller's rows in `organization_members`. A forged
+  header can only ever select among companies the caller already belongs to.
+  Writes carry a second predicate so a `viewer` cannot make them. See
+  [docs/multi-company.md](docs/multi-company.md).
 - The myDATA key column is excluded from the `authenticated` grant entirely, so even a
   compromised anon key cannot read the ciphertext.
 - `pay_token`, `short_code` and all settlement columns are revoked from `authenticated` —
@@ -328,8 +339,9 @@ reachability, the XML parser, phone normalisation, SMS segmentation, and encrypt
 round-trip/tamper detection.
 
 Not built (out of MVP scope): subscription billing for lefta itself, myDATA
-`RequestMyIncome`, partial payments, multi-user tenants, and any UI language other than
-Greek.
+`RequestMyIncome`, partial payments, and per-member audit — the correspondence
+records which company sent a reminder, not which of its people pressed the
+button.
 
 Integration paths that need live credentials to verify end to end — the AADE endpoint
 shape, Resend/Brevo delivery, and the Stripe webhook — are implemented against the

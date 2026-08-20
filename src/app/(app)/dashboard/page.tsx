@@ -33,7 +33,7 @@ export default async function DashboardPage() {
   const ATTRIBUTION_DAYS = 7;
   const funnelSince = new Date(Date.now() - FUNNEL_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
-  // RLS scopes every one of these to the signed-in tenant.
+  // RLS scopes every one of these to the company this session is acting for.
   const [
     { data: profile },
     { data: invoices },
@@ -49,7 +49,9 @@ export default async function DashboardPage() {
         .select(
           'company_name, sms_credits, mydata_user_id, mydata_last_sync_at, automation_enabled, elorus_organization_id, elorus_last_sync_at',
         )
-        .eq('id', user.id)
+        // No filter: the policy already shows exactly the active company, and
+        // the signed-in person's id is not it once they act for more than one.
+        .limit(1)
         .maybeSingle(),
       supabase
         .from('invoices')

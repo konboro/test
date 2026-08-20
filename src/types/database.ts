@@ -18,7 +18,16 @@ export type RevolutEstate = 'sandbox' | 'production';
 export type PaymentProviderName = 'stripe' | 'viva' | 'revolut';
 /** Portal interface language. Reminder copy is unaffected. */
 export type UserLocale = 'el' | 'en';
+/** What a person may do in a company they belong to. */
+export type MemberRole = 'owner' | 'member' | 'viewer';
 
+/**
+ * One company (tenant).
+ *
+ * The table is called `users` for historical reasons — it holds companies, not
+ * people. Who may act for one is `organization_members`, and `user_id` on every
+ * other table is this row's id. See docs/multi-company.md.
+ */
 export type UserRow = {
   id: string;
   email: string;
@@ -305,6 +314,50 @@ export type InvoiceUploadRow = {
   updated_at: string;
 }
 
+/**
+ * Who may act for a company, and how.
+ *
+ * Written only through the security-definer functions — the browser has select
+ * and nothing else, so that "who has access" cannot be edited by the client
+ * that access is being granted to.
+ */
+export type OrganizationMemberRow = {
+  organization_id: string;
+  member_id: string;
+  /** Carried here so the members screen never has to read `auth.users`. */
+  member_email: string;
+  role: MemberRole;
+  invited_by: string | null;
+  created_at: string;
+}
+
+/** A pending invitation. The token itself is never selectable — only its hash is stored. */
+export type OrganizationInviteRow = {
+  id: string;
+  organization_id: string;
+  email: string;
+  role: MemberRole;
+  created_at: string;
+  expires_at: string;
+  accepted_at: string | null;
+}
+
+/** One row of `my_organizations()` — the companies the caller may act for. */
+export type MyOrganizationRow = {
+  organization_id: string;
+  company_name: string | null;
+  vat_number: string | null;
+  role: MemberRole;
+  joined_at: string;
+}
+
+/** `my_organizations()` with the receivables position of each company. */
+export type MyOrganizationSummaryRow = MyOrganizationRow & {
+  open_cents: number;
+  open_count: number;
+  overdue_count: number;
+}
+
 export type PaymentPageInvoice = {
   invoice_id: string;
   invoice_number: string | null;
@@ -339,9 +392,23 @@ export interface Database {
     Tables: {
       users: {
         Row: UserRow;
-        // `id` comes from auth.users; the row is normally created by trigger.
+        // Created by the signup trigger, or by create_organization() for a
+        // second company. Never inserted from a browser: `authenticated` has no
+        // insert grant on this table.
         Insert: InsertOf<UserRow, 'id' | 'email'>;
         Update: Partial<UserRow>;
+        Relationships: NoRelationships;
+      };
+      organization_members: {
+        Row: OrganizationMemberRow;
+        Insert: InsertOf<OrganizationMemberRow, 'organization_id' | 'member_id' | 'member_email'>;
+        Update: Partial<OrganizationMemberRow>;
+        Relationships: NoRelationships;
+      };
+      organization_invites: {
+        Row: OrganizationInviteRow;
+        Insert: InsertOf<OrganizationInviteRow, 'organization_id' | 'email' | 'role' | 'expires_at'>;
+        Update: Partial<OrganizationInviteRow>;
         Relationships: NoRelationships;
       };
       debtors: {
@@ -466,6 +533,47 @@ export interface Database {
           p_session_id: string;
         };
         Returns: boolean;
+      };
+      // Companies and membership. All security definer: they check the caller
+      // against organization_members themselves, because the browser has no
+      // write access to that table at all.
+      my_organizations: {
+        Args: Record<PropertyKey, never>;
+        Returns: MyOrganizationRow[];
+      };
+      my_organizations_summary: {
+        Args: { p_today: string };
+        Returns: MyOrganizationSummaryRow[];
+      };
+      create_organization: {
+        Args: { p_company_name: string; p_vat_number?: string | null };
+        Returns: string;
+      };
+      delete_organization: {
+        Args: { p_org: string };
+        Returns: undefined;
+      };
+      invite_member: {
+        Args: { p_email: string; p_role: MemberRole };
+        /** The token, returned once so it can be emailed. Not recoverable. */
+        Returns: string;
+      };
+      revoke_invite: {
+        Args: { p_invite: string };
+        Returns: undefined;
+      };
+      accept_invite: {
+        Args: { p_token: string };
+        /** The company just joined. */
+        Returns: string;
+      };
+      set_member_role: {
+        Args: { p_member: string; p_role: MemberRole };
+        Returns: undefined;
+      };
+      remove_member: {
+        Args: { p_member: string };
+        Returns: undefined;
       };
     };
     Enums: {

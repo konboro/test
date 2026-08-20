@@ -13,6 +13,7 @@ import { parseReminderSlot } from '@/lib/dunning/templates';
 import { parseLanguageChoice } from '@/lib/i18n/message-locale';
 import { athensDate, toCents } from '@/lib/money';
 import { safeNextPath } from '@/lib/redirects';
+import { activeOrganization, writableOrganization } from '@/lib/orgs/active';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { saveFailed } from '@/lib/errors';
@@ -50,14 +51,11 @@ export async function sendReminder(
   const slot = parseReminderSlot(String(formData.get('choice') ?? 'manual'));
   if (!slot) return { error: t.forms.errors.unknownTemplate };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: t.forms.errors.unauthorized };
+  const org = await writableOrganization();
+  if (!org) return { error: t.forms.errors.unauthorized };
 
   const result = await sendManualReminder({
-    userId: user.id,
+    userId: org.id,
     invoiceId: id,
     step: slot.step,
     variant: slot.variant,
@@ -101,14 +99,13 @@ export async function previewReminder(
   const slot = parseReminderSlot(choice);
   if (!slot) return { ok: false, error: t.forms.errors.unknownTemplate };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: t.forms.errors.unauthorized };
+  // Reading, not sending: a viewer may look at what would go out. The send
+  // itself is a different action and asks for a role that can write.
+  const org = await activeOrganization();
+  if (!org) return { ok: false, error: t.forms.errors.unauthorized };
 
   return previewManualReminder({
-    userId: user.id,
+    userId: org.id,
     invoiceId,
     step: slot.step,
     variant: slot.variant,
@@ -145,10 +142,8 @@ export async function toggleInvoiceAutomation(formData: FormData) {
   const enabled = String(formData.get('enabled') ?? '') === 'true';
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return;
+  const org = await writableOrganization();
+  if (!org) return;
 
   await supabase.from('invoices').update({ automation_enabled: !enabled }).eq('id', id);
 
@@ -160,11 +155,8 @@ export async function markInvoicePaid(formData: FormData) {
   const id = String(formData.get('id') ?? '');
   if (!id) return;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return;
+  const org = await writableOrganization();
+  if (!org) return;
 
   const admin = createAdminClient();
 
@@ -175,7 +167,7 @@ export async function markInvoicePaid(formData: FormData) {
     .maybeSingle();
 
   // Ownership check stands in for the RLS policy bypassed by the service role.
-  if (!invoice || invoice.user_id !== user.id || invoice.status !== 'pending') return;
+  if (!invoice || invoice.user_id !== org.id || invoice.status !== 'pending') return;
 
   await admin
     .from('invoices')
@@ -215,11 +207,8 @@ export async function deleteInvoice(
   if (!id) return { error: t.forms.errors.missingInvoice };
   if (formData.get('confirm') !== 'yes') return { error: t.forms.errors.missingInvoice };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: t.forms.errors.unauthorized };
+  const org = await writableOrganization();
+  if (!org) return { error: t.forms.errors.unauthorized };
 
   const admin = createAdminClient();
 
@@ -229,9 +218,9 @@ export async function deleteInvoice(
     .eq('id', id)
     .maybeSingle();
 
-  if (!invoice || invoice.user_id !== user.id) return { error: t.forms.errors.missingInvoice };
+  if (!invoice || invoice.user_id !== org.id) return { error: t.forms.errors.missingInvoice };
 
-  const { error } = await admin.from('invoices').delete().eq('id', id).eq('user_id', user.id);
+  const { error } = await admin.from('invoices').delete().eq('id', id).eq('user_id', org.id);
   if (error) return { error: saveFailed(t, 'invoices', error) };
 
   revalidatePath('/invoices');
@@ -328,10 +317,8 @@ export async function createInvoice(
   }
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: t.forms.errors.unauthorized };
+  const org = await writableOrganization();
+  if (!org) return { error: t.forms.errors.unauthorized };
 
   // RLS confirms the debtor belongs to this tenant: a foreign id simply returns
   // no rows here.
@@ -344,7 +331,7 @@ export async function createInvoice(
   if (!debtor) return { error: t.forms.errors.debtorNotFound };
 
   const { error } = await supabase.from('invoices').insert({
-    user_id: user.id,
+    user_id: org.id,
     debtor_id: parsed.data.debtor_id,
     invoice_number: parsed.data.invoice_number,
     series: parsed.data.series,
@@ -402,11 +389,8 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
   if (!ids.length) redirect(to({ bulk: 'none' }));
   if (!slot) redirect(to({ bulk: 'unknown_template' }));
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  const org = await writableOrganization();
+  if (!org) redirect('/login');
 
   const only = channelChoice(formData.get('only'));
   const language = parseLanguageChoice(formData.get('lang'));
@@ -421,7 +405,7 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
   // outcome would depend on who lost.
   for (const id of batch) {
     const result = await sendManualReminder({
-      userId: user.id,
+      userId: org.id,
       invoiceId: id,
       step: slot.step,
       variant: slot.variant,
@@ -482,13 +466,11 @@ export async function runScenarioForSelected(formData: FormData): Promise<void> 
   if (!ids.length) redirect(to({ bulk: 'none' }));
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  const org = await writableOrganization();
+  if (!org) redirect('/login');
 
   const batch = ids.slice(0, BULK_LIMIT);
-  const scenario = await loadScenario(user.id);
+  const scenario = await loadScenario(org.id);
   const today = athensDate();
 
   // Retried without the per-invoice switch when that column has not been pushed
@@ -498,7 +480,7 @@ export async function runScenarioForSelected(formData: FormData): Promise<void> 
   const selected = await supabase
     .from('invoices')
     .select('id, due_date, automation_enabled')
-    .eq('user_id', user.id)
+    .eq('user_id', org.id)
     .in('id', batch);
 
   let rows = selected.data;
@@ -510,7 +492,7 @@ export async function runScenarioForSelected(formData: FormData): Promise<void> 
     const fallback = await supabase
       .from('invoices')
       .select('id, due_date')
-      .eq('user_id', user.id)
+      .eq('user_id', org.id)
       .in('id', batch);
 
     // Absent means the switch does not exist yet, and an invoice that cannot be
@@ -552,7 +534,7 @@ export async function runScenarioForSelected(formData: FormData): Promise<void> 
     }
 
     const result = await sendManualReminder({
-      userId: user.id,
+      userId: org.id,
       invoiceId: id,
       step: rung.step,
       language,
