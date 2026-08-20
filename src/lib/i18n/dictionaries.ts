@@ -130,11 +130,28 @@ const el = {
     redirecting: 'Ανακατεύθυνση…',
     buy: 'Αγορά',
   },
+  snooze: {
+    action: 'Παύση υπενθυμίσεων',
+    activeUntil: (until: string) => `Σε παύση έως ${until}`,
+    badge: (until: string) => `Παύση έως ${until}`,
+    hint: 'Ο πελάτης υποσχέθηκε πληρωμή — καμία υπενθύμιση μέχρι την ημερομηνία.',
+    title: 'Παύση υπενθυμίσεων',
+    subtitle:
+      'Καμία υπενθύμιση σε αυτόν τον πελάτη — ούτε αυτόματη ούτε χειροκίνητη — μέχρι να περάσει η ημερομηνία. Αίρεται μόνη της.',
+    days: (n: number) => `${n} ημέρες`,
+    untilLabel: 'Ή συγκεκριμένη ημερομηνία',
+    untilHint: 'Η υπενθύμιση ξεκινά ξανά την επόμενη ημέρα.',
+    save: 'Αποθήκευση',
+    resume: 'Άρση παύσης',
+  },
+
   manual: {
     invoiceNotFound: 'Το παραστατικό δεν βρέθηκε.',
     invoiceNotOpen: 'Το παραστατικό δεν είναι ανεξόφλητο.',
     debtorMissing: 'Δεν βρέθηκαν τα στοιχεία του πελάτη.',
     debtorMuted: 'Ο πελάτης είναι σε σίγαση. Καταργήστε τη σίγαση για να στείλετε υπενθύμιση.',
+    debtorSnoozed: (until: string) =>
+      `Οι υπενθυμίσεις είναι σε παύση έως ${until}. Άρετε την παύση για να στείλετε τώρα.`,
     noEmail: 'Ο πελάτης δεν έχει email.',
     noEmailProvider: 'Δεν έχει ρυθμιστεί πάροχος email (Resend).',
     noPhone: 'Ο πελάτης δεν έχει έγκυρο κινητό.',
@@ -1210,11 +1227,28 @@ const en: typeof el = {
     redirecting: 'Redirecting…',
     buy: 'Buy',
   },
+  snooze: {
+    action: 'Pause reminders',
+    activeUntil: (until: string) => `Paused until ${until}`,
+    badge: (until: string) => `Paused until ${until}`,
+    hint: 'The customer promised to pay — no reminders until the date.',
+    title: 'Pause reminders',
+    subtitle:
+      'No reminders to this customer — automatic or manual — until the date has passed. It lifts by itself.',
+    days: (n: number) => `${n} days`,
+    untilLabel: 'Or a specific date',
+    untilHint: 'Chasing resumes the day after.',
+    save: 'Save',
+    resume: 'Resume now',
+  },
+
   manual: {
     invoiceNotFound: 'Invoice not found.',
     invoiceNotOpen: 'That invoice is not outstanding.',
     debtorMissing: 'The customer details could not be found.',
     debtorMuted: 'This customer is muted. Unmute them to send a reminder.',
+    debtorSnoozed: (until: string) =>
+      `Reminders are paused until ${until}. Lift the pause to send one now.`,
     noEmail: 'The customer has no email address.',
     noEmailProvider: 'No email provider is configured (Resend).',
     noPhone: 'The customer has no valid mobile number.',
