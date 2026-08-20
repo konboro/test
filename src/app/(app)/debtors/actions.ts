@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { normalisePhone } from '@/lib/sms/send';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { formError, getDictionary } from '@/lib/i18n';
 
@@ -134,6 +135,57 @@ export async function updateDebtor(
 }
 
 /** Pauses or resumes automated reminders for one debtor. */
+/**
+ * Deletes one customer, and everything the schema hangs off them.
+ *
+ * The cascade is wide and mostly invisible from the page the button sits on:
+ * their invoices go, and with each invoice its payment attempts and link
+ * activity; their entire message history goes too, because
+ * `communications_log.debtor_id` cascades. That last one is the record of what
+ * was said to a real person on the tenant's behalf, so the dialog states the
+ * count before anyone presses it.
+ *
+ * Ownership is checked here rather than left to RLS, because the delete runs
+ * under the service role. `confirm` is required so that a delete is never one
+ * stray request away.
+ */
+export async function deleteDebtor(
+  _prev: { error?: string },
+  formData: FormData,
+): Promise<{ error?: string }> {
+  const t = await getDictionary();
+
+  const id = String(formData.get('id') ?? '');
+  if (!id) return { error: t.forms.errors.unauthorized };
+  if (formData.get('confirm') !== 'yes') return { error: t.forms.errors.unauthorized };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: t.forms.errors.unauthorized };
+
+  const admin = createAdminClient();
+
+  const { data: debtor } = await admin
+    .from('debtors')
+    .select('id, user_id')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (!debtor || debtor.user_id !== user.id) return { error: t.forms.errors.unauthorized };
+
+  const { error } = await admin.from('debtors').delete().eq('id', id).eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath('/debtors');
+  revalidatePath('/invoices');
+  revalidatePath('/dashboard');
+  revalidatePath('/logs');
+
+  return {};
+}
+
 export async function toggleMute(formData: FormData) {
   const id = String(formData.get('id') ?? '');
   const muted = String(formData.get('muted') ?? '') === 'true';

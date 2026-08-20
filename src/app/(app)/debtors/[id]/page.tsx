@@ -11,6 +11,9 @@ import { athensDate, formatDate, formatMoney } from '@/lib/money';
 import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
 
+import { DeleteButton } from '@/components/delete-button';
+
+import { deleteDebtor } from '../actions';
 import { NotificationSwitch } from '../notification-switch';
 import { DueDateButton } from '../../invoices/invoice-forms';
 import { EditDebtorForm } from '../debtor-forms';
@@ -61,8 +64,13 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
 
   // RLS scopes both of these to the tenant, so a foreign id simply returns
   // nothing rather than another tenant's customer.
-  const [{ data: debtor }, { data: invoices }, { data: contacts }, { data: messages }] =
-    await Promise.all([
+  const [
+    { data: debtor },
+    { data: invoices },
+    { data: contacts },
+    { data: messages },
+    { count: messageCount },
+  ] = await Promise.all([
     supabase.from('debtors').select('*').eq('id', id).maybeSingle(),
     supabase
       .from('invoices')
@@ -78,6 +86,13 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
       .eq('debtor_id', id)
       .order('sent_at', { ascending: false })
       .limit(50),
+    // Counted rather than measured off the list above, which is capped at 50.
+    // The delete dialog quotes this number, and a confirmation that understates
+    // what it is about to destroy is worse than no confirmation at all.
+    supabase
+      .from('communications_log')
+      .select('id', { count: 'exact', head: true })
+      .eq('debtor_id', id),
   ]);
 
   if (!debtor) notFound();
@@ -128,6 +143,15 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
         <div className="flex items-center gap-4">
           <EditDebtorForm debtor={debtor} />
           <NotificationSwitch debtorId={debtor.id} muted={debtor.muted} withLabel />
+          <DeleteButton
+            action={deleteDebtor}
+            id={debtor.id}
+            trigger={t.common.delete}
+            title={t.debtors.deleteTitle}
+            body={t.debtors.deleteBody(name ?? t.debtors.nameMissing, rows.length, messageCount ?? 0)}
+            warning={(messageCount ?? 0) > 0 ? t.debtors.deleteHistoryWarning : undefined}
+            confirmLabel={t.common.delete}
+          />
         </div>
       </div>
 

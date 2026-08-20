@@ -518,6 +518,9 @@ const el = {
     close: 'Κλείσιμο',
     edit: 'Επεξεργασία',
     signOut: 'Έξοδος',
+    delete: 'Διαγραφή',
+    deleting: 'Διαγραφή…',
+    deleteIrreversible: 'Η ενέργεια δεν αναιρείται.',
     unknownCustomer: 'Άγνωστος πελάτης',
     email: 'Email',
     sms: 'SMS',
@@ -760,6 +763,11 @@ const el = {
     payLinkCopied: 'Αντιγράφηκε',
     remind: 'Υπενθύμιση',
     remindHint: 'Προεπισκόπηση και αποστολή υπενθύμισης',
+    deleteTitle: 'Διαγραφή παραστατικού;',
+    deleteBody: (label: string) =>
+      `Το ${label} θα διαγραφεί, μαζί με τις απόπειρες πληρωμής και τη δραστηριότητα του συνδέσμου. Τα μηνύματα που έχουν ήδη σταλεί παραμένουν.`,
+    deletePaidWarning:
+      'Αυτό το παραστατικό είναι εξοφλημένο. Διαγράφοντάς το χάνετε την καταγραφή ότι πληρώθηκε.',
     newManual: 'Χειροκίνητο παραστατικό',
     limitsOffTitle: 'Δοκιμαστική λειτουργία — το ημερήσιο όριο είναι ανενεργό.',
     limitsOffBody:
@@ -830,6 +838,11 @@ const el = {
     unmute: 'Ενεργοποίηση',
     backToList: '← Όλοι οι πελάτες',
     notificationsLabel: 'Αυτόματες υπενθυμίσεις για αυτόν τον πελάτη',
+    deleteTitle: 'Διαγραφή πελάτη;',
+    deleteBody: (name: string, invoices: number, messages: number) =>
+      `Ο πελάτης ${name} θα διαγραφεί μαζί με ${invoices} ${invoices === 1 ? 'παραστατικό' : 'παραστατικά'} και ${messages} ${messages === 1 ? 'μήνυμα' : 'μηνύματα'}.`,
+    deleteHistoryWarning:
+      'Το ιστορικό επικοινωνίας διαγράφεται μαζί του — είναι η καταγραφή του τι στάλθηκε σε αυτό το πρόσωπο εκ μέρους σας.',
     notificationsOn: 'Ενεργές',
     notificationsOff: 'Σε παύση',
     messagesTitle: 'Ιστορικό μηνυμάτων',
@@ -1574,6 +1587,9 @@ const en: typeof el = {
     close: 'Close',
     edit: 'Edit',
     signOut: 'Sign out',
+    delete: 'Delete',
+    deleting: 'Deleting…',
+    deleteIrreversible: 'This cannot be undone.',
     unknownCustomer: 'Unknown customer',
     email: 'Email',
     sms: 'SMS',
@@ -1814,6 +1830,11 @@ const en: typeof el = {
     payLinkCopied: 'Copied',
     remind: 'Remind',
     remindHint: 'Preview and send a reminder',
+    deleteTitle: 'Delete this invoice?',
+    deleteBody: (label: string) =>
+      `${label} will be deleted, along with its payment attempts and link activity. Messages already sent stay.`,
+    deletePaidWarning:
+      'This invoice is settled. Deleting it loses the record that it was paid.',
     newManual: 'Manual invoice',
     limitsOffTitle: 'Testing mode — the daily contact limit is off.',
     limitsOffBody:
@@ -1878,6 +1899,11 @@ const en: typeof el = {
     unmute: 'Unmute',
     backToList: '← All customers',
     notificationsLabel: 'Automatic reminders for this customer',
+    deleteTitle: 'Delete this customer?',
+    deleteBody: (name: string, invoices: number, messages: number) =>
+      `${name} will be deleted, along with ${invoices} ${invoices === 1 ? 'invoice' : 'invoices'} and ${messages} ${messages === 1 ? 'message' : 'messages'}.`,
+    deleteHistoryWarning:
+      'The correspondence goes with them — that is the record of what was sent to a real person on your behalf.',
     notificationsOn: 'On',
     notificationsOff: 'Paused',
     messagesTitle: 'Message history',
