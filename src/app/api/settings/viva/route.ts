@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { encryptSecret } from '@/lib/crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getSessionUser } from '@/lib/supabase/server';
+import { writableOrganization } from '@/lib/orgs/active';
 import { accessToken, type VivaEnvironment } from '@/lib/viva/client';
 import { getDictionary } from '@/lib/i18n';
 
@@ -37,8 +37,8 @@ const schema = z.object({
  */
 export async function POST(request: Request) {
   const t = await getDictionary();
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const org = await writableOrganization();
+  if (!org) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
       viva_source_code: sourceCode,
       viva_environment: environment,
     })
-    .eq('id', user.id);
+    .eq('id', org.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -88,8 +88,8 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE() {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const org = await writableOrganization();
+  if (!org) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { error } = await createAdminClient()
     .from('users')
@@ -98,7 +98,7 @@ export async function DELETE() {
       viva_client_secret_enc: null,
       viva_source_code: null,
     })
-    .eq('id', user.id);
+    .eq('id', org.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

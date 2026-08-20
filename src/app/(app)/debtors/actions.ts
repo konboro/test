@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { normaliseSnoozeNote, resolveSnooze } from '@/lib/dunning/snooze';
 import { athensDate } from '@/lib/money';
 import { normalisePhone } from '@/lib/sms/send';
+import { writableOrganization } from '@/lib/orgs/active';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { formError, getDictionary } from '@/lib/i18n';
@@ -82,17 +83,15 @@ export async function createDebtor(
   if (!parsed.success) return { error: formError(t, parsed.error.issues[0]?.message) };
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: t.forms.errors.unauthorized };
+  const org = await writableOrganization();
+  if (!org) return { error: t.forms.errors.unauthorized };
 
   const phone = parsed.data.phone ? normalisePhone(parsed.data.phone) : null;
 
   // RLS still enforces ownership; user_id is set explicitly because the policy
   // checks it rather than defaulting it.
   const { error } = await supabase.from('debtors').insert({
-    user_id: user.id,
+    user_id: org.id,
     ...parsed.data,
     phone,
   });
@@ -161,11 +160,8 @@ export async function deleteDebtor(
   if (!id) return { error: t.forms.errors.unauthorized };
   if (formData.get('confirm') !== 'yes') return { error: t.forms.errors.unauthorized };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: t.forms.errors.unauthorized };
+  const org = await writableOrganization();
+  if (!org) return { error: t.forms.errors.unauthorized };
 
   const admin = createAdminClient();
 
@@ -175,9 +171,9 @@ export async function deleteDebtor(
     .eq('id', id)
     .maybeSingle();
 
-  if (!debtor || debtor.user_id !== user.id) return { error: t.forms.errors.unauthorized };
+  if (!debtor || debtor.user_id !== org.id) return { error: t.forms.errors.unauthorized };
 
-  const { error } = await admin.from('debtors').delete().eq('id', id).eq('user_id', user.id);
+  const { error } = await admin.from('debtors').delete().eq('id', id).eq('user_id', org.id);
   if (error) return { error: error.message };
 
   revalidatePath('/debtors');

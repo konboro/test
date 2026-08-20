@@ -32,8 +32,13 @@ export async function getLocale(): Promise<Locale> {
 
   if (!user) return 'el';
 
-  const { data } = await supabase.from('users').select('locale').eq('id', user.id).maybeSingle();
-  return isLocale(data?.locale) ? data.locale : 'el';
+  // No `id` filter: the policy shows exactly one company — the one this session
+  // is acting for — and the signed-in person is no longer that company's id.
+  // Filtering by their auth id would return nothing the moment an accountant is
+  // working inside a client's books, and the interface would silently fall back
+  // to Greek for them.
+  const { data } = await supabase.from('users').select('locale').limit(1);
+  return isLocale(data?.[0]?.locale) ? data[0].locale : 'el';
 }
 
 export async function getDictionary(): Promise<Dictionary> {

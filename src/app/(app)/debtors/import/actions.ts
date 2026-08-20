@@ -7,7 +7,7 @@ import { commitImport, type ImportOutcome } from '@/lib/import/commit';
 import { buildPreview, parseCsv, type ImportField } from '@/lib/import/parse';
 import { athensDate } from '@/lib/money';
 import { getDictionary } from '@/lib/i18n';
-import { createClient } from '@/lib/supabase/server';
+import { writableOrganization } from '@/lib/orgs/active';
 
 export interface ImportState {
   error?: string;
@@ -47,11 +47,8 @@ const schema = z.object({
  */
 export async function runImport(_prev: ImportState, formData: FormData): Promise<ImportState> {
   const t = await getDictionary();
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: t.importer.errors.session };
+  const org = await writableOrganization();
+  if (!org) return { error: t.importer.errors.session };
 
   let parsedInput;
   try {
@@ -76,7 +73,7 @@ export async function runImport(_prev: ImportState, formData: FormData): Promise
     return { error: t.importer.errors.noRows };
   }
 
-  const outcome = await commitImport(user.id, preview.rows);
+  const outcome = await commitImport(org.id, preview.rows);
 
   revalidatePath('/debtors');
   revalidatePath('/invoices');

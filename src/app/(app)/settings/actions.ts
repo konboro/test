@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { parseSlotKey } from '@/lib/dunning/templates';
 import { formError, getDictionary } from '@/lib/i18n';
+import { activeOrganization } from '@/lib/orgs/active';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
@@ -47,14 +48,14 @@ export async function updateProfile(
   if (!parsed.success) return { error: formError(t, parsed.error.issues[0]?.message) };
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: t.forms.errors.unauthorized };
+  // The company being worked in. Null covers both "not signed in" and "member
+  // of nothing", which are the same answer here.
+  const org = await activeOrganization();
+  if (!org) return { error: t.forms.errors.unauthorized };
 
   // Only the columns granted to `authenticated` are touched here; credentials
   // and balances are unreachable from this path by construction.
-  const { error } = await supabase.from('users').update(parsed.data).eq('id', user.id);
+  const { error } = await supabase.from('users').update(parsed.data).eq('id', org.id);
   if (error) return { error: error.message };
 
   revalidatePath('/settings');
@@ -84,15 +85,13 @@ export async function setAutomation(
   const enabled = formData.get('enabled') === 'on';
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: t.forms.errors.unauthorized };
+  const org = await activeOrganization();
+  if (!org) return { error: t.forms.errors.unauthorized };
 
   const { error } = await supabase
     .from('users')
     .update({ automation_enabled: enabled })
-    .eq('id', user.id);
+    .eq('id', org.id);
 
   if (error) return { error: error.message };
 
@@ -121,16 +120,15 @@ export async function updatePaymentProvider(formData: FormData): Promise<void> {
   const raw = String(formData.get('payment_provider') ?? '');
   const provider = raw === 'stripe' || raw === 'viva' ? raw : null;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return;
+  // Verified against the membership list rather than taken from the cookie:
+  // this writes with the service role, which has no policy behind it.
+  const org = await activeOrganization();
+  if (!org) return;
 
   const { error } = await createAdminClient()
     .from('users')
     .update({ payment_provider: provider })
-    .eq('id', user.id);
+    .eq('id', org.id);
   if (error) return;
 
   revalidatePath('/settings');
@@ -177,10 +175,8 @@ export async function saveTemplate(
   if (!slot) return { error: t.forms.errors.unknownTemplate };
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: t.forms.errors.unauthorized };
+  const org = await activeOrganization();
+  if (!org) return { error: t.forms.errors.unauthorized };
 
   // The variant has to narrow the lookup as well as the step: two manual slots
   // now share `step is null`, and matching on the step alone would overwrite
@@ -202,7 +198,7 @@ export async function saveTemplate(
         .update({ subject, body: parsed.data.body })
         .eq('id', existing.id)
     : await supabase.from('message_templates').insert({
-        user_id: user.id,
+        user_id: org.id,
         step: slot.step,
         variant: slot.variant,
         channel: slot.channel,

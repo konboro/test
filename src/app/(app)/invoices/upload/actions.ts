@@ -9,6 +9,7 @@ import { parseAmountCents, type ImportRow } from '@/lib/import/parse';
 import { readInvoiceDocument } from '@/lib/invoice-scan/read';
 import { visionReader } from '@/lib/invoice-scan/vision';
 import { athensDate } from '@/lib/money';
+import { writableOrganization } from '@/lib/orgs/active';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
@@ -45,10 +46,8 @@ export async function uploadInvoiceDocuments(
   formData: FormData,
 ): Promise<UploadState> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: 'unauthorized' };
+  const org = await writableOrganization();
+  if (!org) return { error: 'unauthorized' };
 
   const files = formData.getAll('files').filter((f): f is File => f instanceof File && f.size > 0);
   if (files.length === 0) return { error: 'no_files' };
@@ -59,7 +58,7 @@ export async function uploadInvoiceDocuments(
   const { data: profile } = await supabase
     .from('users')
     .select('vat_number')
-    .eq('id', user.id)
+    .eq('id', org.id)
     .maybeSingle();
 
   let read = 0;
@@ -76,7 +75,7 @@ export async function uploadInvoiceDocuments(
     // access is brokered by the server role — but a layout where one tenant's
     // objects are namespaced under their own id is the one that stays safe if
     // that ever changes.
-    const path = `${user.id}/${randomUUID()}.${extension}`;
+    const path = `${org.id}/${randomUUID()}.${extension}`;
 
     const { error: uploadError } = await admin.storage
       .from(BUCKET)
@@ -90,7 +89,7 @@ export async function uploadInvoiceDocuments(
     );
 
     await admin.from('invoice_uploads').insert({
-      user_id: user.id,
+      user_id: org.id,
       storage_path: path,
       filename: file.name,
       mime_type: file.type,
@@ -121,11 +120,8 @@ export async function uploadInvoiceDocuments(
  * operator corrected is the field that counts.
  */
 export async function commitUpload(_prev: UploadState, formData: FormData): Promise<UploadState> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: 'unauthorized' };
+  const org = await writableOrganization();
+  if (!org) return { error: 'unauthorized' };
 
   const id = String(formData.get('id') ?? '');
   if (!id) return { error: 'missing' };
@@ -157,7 +153,7 @@ export async function commitUpload(_prev: UploadState, formData: FormData): Prom
     .eq('id', id)
     .maybeSingle();
 
-  if (!upload || upload.user_id !== user.id) return { error: 'missing' };
+  if (!upload || upload.user_id !== org.id) return { error: 'missing' };
   if (upload.status !== 'pending') return { error: 'already_done' };
 
   const row: ImportRow = {
@@ -176,7 +172,7 @@ export async function commitUpload(_prev: UploadState, formData: FormData): Prom
     externalRef: null,
   };
 
-  const outcome = await commitImport(user.id, [row]);
+  const outcome = await commitImport(org.id, [row]);
   if (outcome.errors.length > 0) return { error: outcome.errors[0] };
 
   // Link the document to what it became, so a disputed reminder can be answered
@@ -188,7 +184,7 @@ export async function commitUpload(_prev: UploadState, formData: FormData): Prom
         await admin
           .from('invoices')
           .select('id')
-          .eq('user_id', user.id)
+          .eq('user_id', org.id)
           .eq('invoice_number', row.reference)
           .eq('amount_cents', row.amountCents)
           .order('created_at', { ascending: false })
@@ -215,11 +211,8 @@ export async function commitUpload(_prev: UploadState, formData: FormData): Prom
 
 /** Drops a proposal. The stored file stays: it is evidence, not scratch. */
 export async function discardUpload(formData: FormData): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return;
+  const org = await writableOrganization();
+  if (!org) return;
 
   const id = String(formData.get('id') ?? '');
   if (!id) return;
@@ -228,7 +221,7 @@ export async function discardUpload(formData: FormData): Promise<void> {
     .from('invoice_uploads')
     .update({ status: 'discarded', updated_at: new Date().toISOString() })
     .eq('id', id)
-    .eq('user_id', user.id);
+    .eq('user_id', org.id);
 
   revalidatePath('/invoices/upload');
 }

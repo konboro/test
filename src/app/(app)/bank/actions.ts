@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { activeOrganization } from '@/lib/orgs/active';
+import { canWrite } from '@/lib/orgs/roles';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
@@ -25,14 +27,19 @@ async function ownedTransaction(transactionId: string) {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
+  // The credit belongs to a company; the confirmation belongs to a person.
+  // Both are needed here, and they stopped being the same value.
+  const org = await activeOrganization();
+  if (!org || !canWrite(org.role)) return null;
+
   const { data } = await createAdminClient()
     .from('bank_transactions')
     .select('id, user_id, amount_cents, matched_invoice_id, rejected_invoice_ids')
     .eq('id', transactionId)
     .maybeSingle();
 
-  if (!data || data.user_id !== user.id) return null;
-  return { user, transaction: data };
+  if (!data || data.user_id !== org.id) return null;
+  return { user, org, transaction: data };
 }
 
 /** Accepts the proposal: the invoice is settled and the credit is what did it. */
@@ -56,7 +63,7 @@ export async function confirmMatch(formData: FormData): Promise<void> {
       paid_amount_cents: owned.transaction.amount_cents,
     })
     .eq('id', invoiceId)
-    .eq('user_id', owned.user.id)
+    .eq('user_id', owned.org.id)
     .eq('status', 'pending')
     .select('id');
 

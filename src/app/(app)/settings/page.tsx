@@ -7,6 +7,7 @@ import { loadScenario } from '@/lib/dunning/engine';
 import { DEFAULT_TEMPLATES, EDITABLE_SLOTS, slotKey } from '@/lib/dunning/templates';
 import { getDictionary, type Dictionary } from '@/lib/i18n';
 import { smsCreditsEnforced } from '@/lib/limits';
+import { requireOrganization } from '@/lib/orgs/active';
 import { paymentsAvailable } from '@/lib/providers';
 import { connectConfigured, SMS_PACKS } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -174,12 +175,17 @@ export default async function SettingsPage({
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
+  // These settings belong to the company being worked in, not to the person
+  // signed in — an accountant editing a client's reply-to address is editing
+  // the client's, and the policy is what makes that true.
+  const org = await requireOrganization();
+
   const { data: profile } = await supabase
     .from('users')
     .select(
       'company_name, email, vat_number, reply_to_email, automation_enabled, mydata_user_id, mydata_environment, sms_credits, stripe_account_id, stripe_charges_enabled, locale, elorus_organization_id',
     )
-    .eq('id', user.id)
+    .eq('id', org.id)
     .maybeSingle();
 
   if (!profile) redirect('/login');
@@ -192,7 +198,7 @@ export default async function SettingsPage({
     .select('id', { count: 'exact', head: true })
     .eq('status', 'pending');
   const stripeMessage = stripeNotice(t, stripe);
-  const scenario = await loadScenario(user.id);
+  const scenario = await loadScenario(org.id);
   const bankOutcome = bankNotice(t, bank, { seen, settled, queued, reason, fetched, accounts });
 
   const { data: bankConnections } = await supabase
@@ -217,7 +223,9 @@ export default async function SettingsPage({
     .select(
       'stripe_secret_key_enc, viva_client_id_enc, viva_client_secret_enc, viva_source_code, viva_environment, revolut_secret_key_enc, revolut_environment, payment_provider',
     )
-    .eq('id', user.id)
+    // The service role has no policy to fall back on, so the company id here is
+    // the verified one from the membership list, never the cookie.
+    .eq('id', org.id)
     .maybeSingle();
   const hasOwnStripeKey = Boolean(keyRow?.stripe_secret_key_enc);
   const vivaConfigured = Boolean(keyRow?.viva_client_id_enc && keyRow?.viva_client_secret_enc);

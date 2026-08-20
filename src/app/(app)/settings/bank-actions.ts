@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 
 import { psuFromRequest } from '@/lib/bank/psu';
 import { syncBankFeeds } from '@/lib/bank/sync';
-import { getSessionUser } from '@/lib/supabase/server';
+import { writableOrganization } from '@/lib/orgs/active';
 
 
 /**
@@ -29,13 +29,13 @@ import { getSessionUser } from '@/lib/supabase/server';
  * sends the operator off to fix something that was never broken.
  */
 export async function syncBankNow(): Promise<void> {
-  const user = await getSessionUser();
-  if (!user) redirect('/login');
+  const org = await writableOrganization();
+  if (!org) redirect('/login');
 
   // Customer-present, and said so. The nightly sweep passes no PSU context
   // because nobody is there — claiming otherwise would misstate to the bank why
   // their customer's account is being read.
-  const result = await syncBankFeeds({ userId: user.id, psu: await psuFromRequest() });
+  const result = await syncBankFeeds({ userId: org.id, psu: await psuFromRequest() });
 
   if (result.errors.length) {
     // Say what actually went wrong. The first version of this mapped every

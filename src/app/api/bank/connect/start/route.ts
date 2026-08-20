@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { bankingConfigured, startAuth } from '@/lib/bank/client';
 import { appUrl } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getSessionUser } from '@/lib/supabase/server';
+import { writableOrganization } from '@/lib/orgs/active';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,8 +21,8 @@ export const dynamic = 'force-dynamic';
  * rather than invisible.
  */
 export async function GET(request: NextRequest) {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.redirect(`${appUrl()}/login`);
+  const org = await writableOrganization();
+  if (!org) return NextResponse.redirect(`${appUrl()}/login`);
 
   const settings = `${appUrl()}/settings`;
   if (!bankingConfigured()) return NextResponse.redirect(`${settings}?bank=unavailable`);
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
   const { data: connection, error } = await admin
     .from('bank_connections')
     .insert({
-      user_id: user.id,
+      user_id: org.id,
       institution_id: aspsp,
       institution_name: aspsp,
       status: 'pending',

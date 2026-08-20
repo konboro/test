@@ -21,11 +21,12 @@ export default async function ImportPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  // Only used when a row carries no due date of its own.
+  // Only used when a row carries no due date of its own. Unfiltered: the policy
+  // shows exactly the company being imported into.
   const { data: profile } = await supabase
     .from('users')
     .select('default_payment_terms_days')
-    .eq('id', user.id)
+    .limit(1)
     .maybeSingle();
 
   return (

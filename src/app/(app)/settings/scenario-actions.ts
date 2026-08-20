@@ -4,8 +4,8 @@ import { revalidatePath } from 'next/cache';
 
 import { DEFAULT_SCENARIO } from '@/lib/dunning/scenario';
 import { getDictionary } from '@/lib/i18n';
+import { activeOrganization } from '@/lib/orgs/active';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getSessionUser } from '@/lib/supabase/server';
 import type { CommChannel, DunningStep } from '@/types/database';
 
 export interface ScenarioState {
@@ -39,8 +39,11 @@ export async function saveScenario(
 ): Promise<ScenarioState> {
   const t = await getDictionary();
 
-  const user = await getSessionUser();
-  if (!user) return { error: t.forms.errors.unauthorized };
+  // Verified membership, not the cookie: the ladder is written with the service
+  // role, and a company id taken on trust would let a hand-edited cookie
+  // rewrite someone else's reminder schedule.
+  const org = await activeOrganization();
+  if (!org) return { error: t.forms.errors.unauthorized };
 
   const rows = STEPS.map((step) => {
     const channels = formData
@@ -52,7 +55,7 @@ export async function saveScenario(
     const raw = Number(formData.get(`${step}_offset`));
 
     return {
-      user_id: user.id,
+      user_id: org.id,
       step,
       // A step with no channel is off, not broken. Saying so here keeps the
       // engine from having to guess what an empty channel list meant.
@@ -85,7 +88,7 @@ export async function saveScenario(
     admin.from('dunning_steps').upsert(rows, { onConflict: 'user_id,step' }),
     admin.from('dunning_settings').upsert(
       {
-        user_id: user.id,
+        user_id: org.id,
         repeat_enabled: formData.get('repeat_enabled') === 'on',
         repeat_every_days: repeatEvery,
         repeat_max: repeatMax,

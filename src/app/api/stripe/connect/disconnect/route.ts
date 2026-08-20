@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { connectClientId, stripe } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getSessionUser } from '@/lib/supabase/server';
+import { writableOrganization } from '@/lib/orgs/active';
 import { getDictionary } from '@/lib/i18n';
 
 export const runtime = 'nodejs';
@@ -20,15 +20,15 @@ export const runtime = 'nodejs';
  */
 export async function POST() {
   const t = await getDictionary();
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const org = await writableOrganization();
+  if (!org) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const admin = createAdminClient();
 
   const { data: profile } = await admin
     .from('users')
     .select('stripe_account_id')
-    .eq('id', user.id)
+    .eq('id', org.id)
     .maybeSingle();
 
   if (!profile?.stripe_account_id) {
@@ -57,7 +57,7 @@ export async function POST() {
       stripe_charges_enabled: false,
       stripe_connected_at: null,
     })
-    .eq('id', user.id);
+    .eq('id', org.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
