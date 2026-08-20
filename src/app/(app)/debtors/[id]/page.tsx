@@ -5,6 +5,7 @@ import { Badge, Card, CardHeader, EmptyState, linkClass, Stat, subtleLinkClass }
 import { aging } from '@/lib/aging';
 import { displayName } from '@/lib/debtors';
 import { workflowStatus } from '@/lib/dunning/status';
+import { MessageLog } from '@/components/message-log';
 import { getDictionary } from '@/lib/i18n';
 import { athensDate, formatDate, formatMoney } from '@/lib/money';
 import { createClient } from '@/lib/supabase/server';
@@ -60,7 +61,8 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
 
   // RLS scopes both of these to the tenant, so a foreign id simply returns
   // nothing rather than another tenant's customer.
-  const [{ data: debtor }, { data: invoices }, { data: contacts }] = await Promise.all([
+  const [{ data: debtor }, { data: invoices }, { data: contacts }, { data: messages }] =
+    await Promise.all([
     supabase.from('debtors').select('*').eq('id', id).maybeSingle(),
     supabase
       .from('invoices')
@@ -68,11 +70,20 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
       .eq('debtor_id', id)
       .order('due_date', { ascending: false }),
     supabase.from('dunning_contacts').select('invoice_id, step').eq('debtor_id', id),
+    // Newest first, and capped: this is the recent history of a conversation,
+    // not an export. The full record stays on /logs, which the card links to.
+    supabase
+      .from('communications_log')
+      .select('*')
+      .eq('debtor_id', id)
+      .order('sent_at', { ascending: false })
+      .limit(50),
   ]);
 
   if (!debtor) notFound();
 
   const rows = invoices ?? [];
+  const sentMessages = messages ?? [];
   const pending = rows.filter((i) => i.status === 'pending');
   const outstanding = pending.reduce((sum, i) => sum + i.amount_cents, 0);
   const paid = rows
@@ -290,6 +301,29 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
             </table>
             </div>
           </>
+        )}
+      </Card>
+
+      {/*
+        Under the invoices, not above them: what is owed is why anyone opens a
+        customer, and the correspondence is what they read next — usually to
+        answer "have we actually chased this person, and did it arrive?".
+      */}
+      <Card>
+        <CardHeader
+          title={t.debtors.messagesTitle}
+          subtitle={t.debtors.messagesCount(sentMessages.length)}
+          action={
+            <Link href="/logs" className={`text-sm ${linkClass}`}>
+              {t.debtors.messagesAll}
+            </Link>
+          }
+        />
+
+        {sentMessages.length === 0 ? (
+          <EmptyState title={t.debtors.noMessagesTitle} body={t.debtors.noMessagesBody} />
+        ) : (
+          <MessageLog entries={sentMessages} />
         )}
       </Card>
     </div>
