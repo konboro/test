@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
+import { normaliseSnoozeDate, snoozeUntil } from '@/lib/dunning/snooze';
+import { athensDate } from '@/lib/money';
 import { normalisePhone } from '@/lib/sms/send';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
@@ -196,5 +198,41 @@ export async function toggleMute(formData: FormData) {
   await supabase.from('debtors').update({ muted: !muted }).eq('id', id);
 
   revalidatePath('/debtors');
+  revalidatePath('/dashboard');
+}
+
+/**
+ * Holds every reminder for this customer until a date — the "I'll pay on the
+ * 15th" case.
+ *
+ * Written through the session client rather than the service role: the
+ * migration grants exactly this column to `authenticated`, and RLS decides
+ * whose customer it is, which is the check that matters.
+ *
+ * The form sends either a preset number of days or a date typed by hand, and
+ * both are validated here rather than trusted — an unbounded pause is a mute
+ * wearing a date, and this action is reachable with any payload.
+ */
+export async function snoozeDebtor(formData: FormData) {
+  const id = String(formData.get('id') ?? '');
+  if (!id) return;
+
+  const today = athensDate();
+  const days = Number(formData.get('days') ?? '');
+  const until = String(formData.get('until') ?? '').trim();
+
+  // "Resume now" is the same action with nothing to set, so lifting a snooze
+  // needs no second code path that could disagree with this one.
+  const resolved = until
+    ? normaliseSnoozeDate(until, today)
+    : Number.isFinite(days) && days > 0
+      ? snoozeUntil(today, days)
+      : null;
+
+  const supabase = await createClient();
+  await supabase.from('debtors').update({ snoozed_until: resolved }).eq('id', id);
+
+  revalidatePath('/debtors');
+  revalidatePath('/invoices');
   revalidatePath('/dashboard');
 }

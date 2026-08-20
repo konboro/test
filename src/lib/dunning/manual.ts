@@ -26,13 +26,14 @@ import {
   type LanguageChoice,
 } from '@/lib/i18n/message-locale';
 import { contactLimitsDisabled } from '@/lib/limits';
-import { athensDate } from '@/lib/money';
+import { athensDate, formatDate } from '@/lib/money';
 import { channelAvailable, providerStatus, type Channel } from '@/lib/providers';
 import { normalisePhone, segmentCount } from '@/lib/sms/send';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { DebtorRow, InvoiceRow, TemplateStep, UserRow } from '@/types/database';
 
 import { dispatchContact, templateContext } from './dispatch';
+import { isSnoozed } from './snooze';
 import { loadTemplateOverrides } from './template-store';
 import { renderEmail, renderSms, type TemplateVariant } from './templates';
 import { getDictionary, type Dictionary } from '@/lib/i18n';
@@ -124,6 +125,17 @@ async function loadTarget(
     return {
       ok: false,
       error: t.manual.debtorMuted,
+    };
+  }
+
+  // Nor is the button a way around a promise. A snooze exists because someone
+  // said "I'll pay on the 15th", and a reminder sent by hand on the 12th breaks
+  // that just as surely as the sweep would. Lifting it is one click away and
+  // says what it is doing, which is the honest way to change your mind.
+  if (isSnoozed(debtor, athensDate())) {
+    return {
+      ok: false,
+      error: t.manual.debtorSnoozed(formatDate(debtor.snoozed_until as string)),
     };
   }
 

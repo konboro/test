@@ -6,6 +6,7 @@ import type { DebtorRow, DunningStep, InvoiceRow, UserRow } from '@/types/databa
 
 import { dispatchContact } from './dispatch';
 import { DEFAULT_SCENARIO, rungFor, type Scenario } from './scenario';
+import { isSnoozed } from './snooze';
 import { loadTemplateOverrides } from './template-store';
 import type { TemplateOverrides } from './templates';
 
@@ -225,6 +226,16 @@ async function processTenant(
     }
     if (debtor.muted) {
       result.skipped.push({ invoiceId: invoice.id, reason: 'debtor muted' });
+      continue;
+    }
+    // A promise to pay by a date. Held for the person rather than the document,
+    // because chasing them tomorrow about a different invoice breaks the same
+    // promise. It lifts by itself — nothing clears the column.
+    if (isSnoozed(debtor, today)) {
+      result.skipped.push({
+        invoiceId: invoice.id,
+        reason: `debtor snoozed until ${debtor.snoozed_until}`,
+      });
       continue;
     }
     // The narrowest of the three switches. The tenant's own flag gates the

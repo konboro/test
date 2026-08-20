@@ -17,11 +17,20 @@ export interface ReadResult {
   fields: ExtractedInvoice;
   missing: RequiredField[];
   /** Set when nothing could be read at all, for the review screen to explain. */
-  problem?: 'no_text_layer' | 'vision_unavailable' | 'unreadable';
+  problem?: 'no_text_layer' | 'vision_unavailable' | 'unreadable' | 'too_many_pages';
 }
 
 /** Enough characters that this is a document rather than a stray label. */
 const MEANINGFUL_TEXT = 40;
+
+/**
+ * How many pages of a text-free PDF we will pay a model to read.
+ *
+ * An invoice is one to three pages. Beyond this the upload is a batch of
+ * documents scanned into one file, and the bill is per page — so it stops here
+ * and says so rather than quietly costing twenty times what an invoice should.
+ */
+const MAX_VISION_PAGES = 5;
 
 export function isPdf(mimeType: string): boolean {
   return mimeType === 'application/pdf';
@@ -34,19 +43,25 @@ export function isPdf(mimeType: string): boolean {
  * the request that actually uploads a PDF, rather than on every cold start of
  * every route in the app.
  */
-export async function pdfText(bytes: Uint8Array): Promise<string | null> {
+export async function pdfText(
+  bytes: Uint8Array,
+): Promise<{ text: string | null; pages: number }> {
   try {
     const { extractText, getDocumentProxy } = await import('unpdf');
     const pdf = await getDocumentProxy(bytes);
     const { text } = await extractText(pdf, { mergePages: true });
 
     const merged = Array.isArray(text) ? text.join('\n') : text;
-    return merged.trim().length >= MEANINGFUL_TEXT ? merged : null;
+
+    return {
+      text: merged.trim().length >= MEANINGFUL_TEXT ? merged : null,
+      pages: pdf.numPages,
+    };
   } catch (cause) {
     // A malformed or encrypted PDF is a normal thing for a person to upload;
     // it becomes a review row asking them to type the fields, not a 500.
     console.error('[invoice-scan] pdf text layer', String(cause));
-    return null;
+    return { text: null, pages: 0 };
   }
 }
 
@@ -65,12 +80,19 @@ export async function readInvoiceDocument(
 ): Promise<ReadResult> {
   const empty = extractInvoiceFields('', options);
 
-  if (isPdf(file.mimeType)) {
-    const text = await pdfText(file.bytes);
+  let pages = 0;
 
-    if (text) {
-      const { fields, missing } = extractInvoiceFields(text, options);
+  if (isPdf(file.mimeType)) {
+    const read = await pdfText(file.bytes);
+    pages = read.pages;
+
+    if (read.text) {
+      const { fields, missing } = extractInvoiceFields(read.text, options);
       return { source: 'pdf_text', fields, missing };
+    }
+
+    if (pages > MAX_VISION_PAGES) {
+      return { source: 'manual', ...empty, problem: 'too_many_pages' };
     }
   }
 

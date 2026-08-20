@@ -75,6 +75,8 @@ export type DebtorRow = {
   phone: string | null;
   notes: string | null;
   muted: boolean;
+  /** No reminders until this date has passed. Null means not snoozed. */
+  snoozed_until: string | null;
   /** Reminder language. Null derives it from the phone number. */
   locale: string | null;
   created_at: string;

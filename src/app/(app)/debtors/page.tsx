@@ -3,12 +3,14 @@ import { redirect } from 'next/navigation';
 
 import { Badge, Card, CardHeader, EmptyState, subtleLinkClass } from '@/components/ui';
 import { displayName } from '@/lib/debtors';
+import { isSnoozed } from '@/lib/dunning/snooze';
 import { getDictionary } from '@/lib/i18n';
-import { formatMoney } from '@/lib/money';
+import { athensDate, formatDate, formatMoney } from '@/lib/money';
 import { createClient } from '@/lib/supabase/server';
 
 import { NotificationSwitch } from './notification-switch';
 import { CreateDebtorForm, EditDebtorForm } from './debtor-forms';
+import { SnoozeButton } from './snooze-button';
 
 export async function generateMetadata() {
   return { title: (await getDictionary()).debtors.title };
@@ -63,6 +65,10 @@ export default async function DebtorsPage({
     supabase.from('debtors').select('*').order('name'),
     supabase.from('invoices').select('debtor_id, amount_cents, status').eq('status', 'pending'),
   ]);
+
+  // A snooze expires by comparison rather than by a job, so every screen that
+  // shows one needs today's date in the tenant's timezone.
+  const today = athensDate();
 
   const outstanding = new Map<string, { count: number; total: number }>();
   for (const invoice of invoices ?? []) {
@@ -207,6 +213,11 @@ export default async function DebtorsPage({
                           )}
                         </Link>
                         {debtor.muted ? <Badge tone="neutral">{t.debtors.muted}</Badge> : null}
+                        {isSnoozed(debtor, today) ? (
+                          <Badge tone="info">
+                            {t.snooze.badge(formatDate(debtor.snoozed_until as string))}
+                          </Badge>
+                        ) : null}
                         {!reachable ? <Badge tone="danger">{t.debtors.noContact}</Badge> : null}
                       </div>
 
@@ -233,6 +244,16 @@ export default async function DebtorsPage({
                       </div>
 
                       <EditDebtorForm debtor={debtor} />
+
+                      <SnoozeButton
+                        debtorId={debtor.id}
+                        snoozedUntil={isSnoozed(debtor, today) ? debtor.snoozed_until : null}
+                        display={
+                          isSnoozed(debtor, today)
+                            ? formatDate(debtor.snoozed_until as string)
+                            : null
+                        }
+                      />
 
                       <NotificationSwitch debtorId={debtor.id} muted={debtor.muted} />
                     </div>
