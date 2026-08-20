@@ -76,7 +76,7 @@ export async function runImport(_prev: ImportState, formData: FormData): Promise
     return { error: t.importer.errors.noRows };
   }
 
-  const outcome = await commitImport(user.id, preview.rows);
+  const outcome = await commitImport(user.id, preview.rows, t);
 
   revalidatePath('/debtors');
   revalidatePath('/invoices');

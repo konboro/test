@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 
 import { revalidatePath } from 'next/cache';
 
+import { getDictionary } from '@/lib/i18n';
 import { commitImport } from '@/lib/import/commit';
 import { parseAmountCents, type ImportRow } from '@/lib/import/parse';
 import { readInvoiceDocument } from '@/lib/invoice-scan/read';
@@ -82,7 +83,10 @@ export async function uploadInvoiceDocuments(
       .from(BUCKET)
       .upload(path, bytes, { contentType: file.type, upsert: false });
 
-    if (uploadError) return { error: uploadError.message };
+    if (uploadError) {
+      console.error('[invoice-scan] upload', uploadError);
+      return { error: (await getDictionary()).forms.errors.uploadFailed };
+    }
 
     const result = await readInvoiceDocument(
       { bytes, mimeType: file.type },
@@ -176,7 +180,9 @@ export async function commitUpload(_prev: UploadState, formData: FormData): Prom
     externalRef: null,
   };
 
-  const outcome = await commitImport(user.id, [row]);
+  // `commitImport` reports in the reader's language now rather than pasting the
+  // database's own words into the page, so it needs the dictionary.
+  const outcome = await commitImport(user.id, [row], await getDictionary());
   if (outcome.errors.length > 0) return { error: outcome.errors[0] };
 
   // Link the document to what it became, so a disputed reminder can be answered

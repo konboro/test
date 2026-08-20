@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { z } from 'zod';
 
+import { saveFailed } from '@/lib/errors';
 import { encryptSecret } from '@/lib/crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
@@ -59,7 +60,15 @@ export async function POST(request: Request) {
     .update({ stripe_secret_key_enc: encryptSecret(key) })
     .eq('id', user.id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    // The store refused, which is ours to fix and nothing the reader can act
+    // on. The provider's own words are still passed on above, where they are
+    // the only true account of why a key was rejected.
+    return NextResponse.json(
+      { error: saveFailed(await getDictionary(), 'settings:stripe', error) },
+      { status: 500 },
+    );
+  }
 
   // Test keys are obvious from their prefix and worth reflecting back, so
   // nobody discovers at go-live that the account has been running on one.
@@ -75,6 +84,14 @@ export async function DELETE() {
     .update({ stripe_secret_key_enc: null })
     .eq('id', user.id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    // The store refused, which is ours to fix and nothing the reader can act
+    // on. The provider's own words are still passed on above, where they are
+    // the only true account of why a key was rejected.
+    return NextResponse.json(
+      { error: saveFailed(await getDictionary(), 'settings:stripe', error) },
+      { status: 500 },
+    );
+  }
   return NextResponse.json({ ok: true });
 }

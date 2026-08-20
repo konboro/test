@@ -442,7 +442,7 @@ export function DueDateButton({
 
           {state.error ? (
             <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-              {state.error === 'invalid' ? t.invoices.dueDateInvalid : state.error}
+              {state.error}
             </p>
           ) : null}
         </Modal>

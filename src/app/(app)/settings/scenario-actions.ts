@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { DEFAULT_SCENARIO } from '@/lib/dunning/scenario';
+import { saveFailed } from '@/lib/errors';
 import { getDictionary } from '@/lib/i18n';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
@@ -96,7 +97,7 @@ export async function saveScenario(
   ]);
 
   const failure = stepError ?? settingsError;
-  if (failure) return { error: failure.message };
+  if (failure) return { error: saveFailed(t, 'settings:scenario', failure) };
 
   revalidatePath('/settings');
   revalidatePath('/invoices');

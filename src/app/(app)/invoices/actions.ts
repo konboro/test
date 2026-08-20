@@ -15,6 +15,7 @@ import { athensDate, toCents } from '@/lib/money';
 import { safeNextPath } from '@/lib/redirects';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import { saveFailed } from '@/lib/errors';
 import { formError, getDictionary } from '@/lib/i18n';
 import { redirect } from 'next/navigation';
 import { automationPaused, loadScenario, missingColumn, stepForInvoice } from '@/lib/dunning/engine';
@@ -231,7 +232,7 @@ export async function deleteInvoice(
   if (!invoice || invoice.user_id !== user.id) return { error: t.forms.errors.missingInvoice };
 
   const { error } = await admin.from('invoices').delete().eq('id', id).eq('user_id', user.id);
-  if (error) return { error: error.message };
+  if (error) return { error: saveFailed(t, 'invoices', error) };
 
   revalidatePath('/invoices');
   revalidatePath('/debtors');
@@ -262,12 +263,18 @@ export async function updateDueDate(
   _prev: ReminderState,
   formData: FormData,
 ): Promise<ReminderState> {
+  const t = await getDictionary();
+
   const parsed = dueDateSchema.safeParse({
     id: formData.get('id'),
     due_date: formData.get('due_date'),
   });
 
-  if (!parsed.success) return { error: 'invalid' };
+  // A sentence, not the token `invalid`. The component used to translate that
+  // token itself, which meant one action reported failure in a private
+  // vocabulary only one caller understood — and any other caller would have
+  // shown the word `invalid` to a Greek reader.
+  if (!parsed.success) return { error: t.invoices.dueDateInvalid };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -275,7 +282,7 @@ export async function updateDueDate(
     .update({ due_date: parsed.data.due_date })
     .eq('id', parsed.data.id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: saveFailed(t, 'invoices', error) };
 
   revalidatePath('/invoices');
   revalidatePath('/debtors');
@@ -349,7 +356,7 @@ export async function createInvoice(
     source: 'manual',
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: saveFailed(t, 'invoices', error) };
 
   revalidatePath('/invoices');
   revalidatePath('/dashboard');

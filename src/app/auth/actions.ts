@@ -71,7 +71,17 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
   });
 
   if (error) {
-    return { error: error.message };
+    // Supabase answers in English whatever language the page is in, and its
+    // wording is written for a developer reading a stack trace. Only one of
+    // these is worth passing on at all — that the address is taken, because it
+    // tells the reader to sign in instead — and it is worth saying properly.
+    console.error('[auth:signUp]', error);
+
+    const taken =
+      error.code === 'user_already_exists' ||
+      /already registered|already exists/i.test(error.message);
+
+    return { error: taken ? t.forms.errors.emailTaken : t.forms.errors.signUpFailed };
   }
 
   // With email confirmation enabled the user has no session yet.

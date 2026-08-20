@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
+import { getDictionary } from '@/lib/i18n';
+import { saveFailed } from '@/lib/errors';
 import { encryptSecret } from '@/lib/crypto';
 import { verifyCredentials } from '@/lib/mydata/client';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -90,7 +92,15 @@ export async function POST(request: Request) {
   };
 
   const { error } = await admin.from('users').update(update).eq('id', user.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    // The store refused, which is ours to fix and nothing the reader can act
+    // on. The provider's own words are still passed on above, where they are
+    // the only true account of why a key was rejected.
+    return NextResponse.json(
+      { error: saveFailed(await getDictionary(), 'settings:mydata', error) },
+      { status: 500 },
+    );
+  }
 
   return NextResponse.json({ ok: true, verified: verify === true });
 }
@@ -105,6 +115,14 @@ export async function DELETE() {
     .update({ mydata_user_id: null, mydata_subscription_key_enc: null })
     .eq('id', user.id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    // The store refused, which is ours to fix and nothing the reader can act
+    // on. The provider's own words are still passed on above, where they are
+    // the only true account of why a key was rejected.
+    return NextResponse.json(
+      { error: saveFailed(await getDictionary(), 'settings:mydata', error) },
+      { status: 500 },
+    );
+  }
   return NextResponse.json({ ok: true });
 }
