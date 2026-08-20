@@ -119,7 +119,18 @@ export function PublicFooter({ t }: { t: Dictionary }) {
 
         <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-ink-100 pt-6">
           <p className="text-xs text-ink-400">© {new Date().getFullYear()} lefta.app</p>
-          <p className="text-xs text-ink-400">{t.landing.market}</p>
+          {/* Quiet by design, and in the bottom row rather than in a column of
+              its own: nobody comes to the site for these, but the person who
+              wants them should not have to hunt. */}
+          <nav aria-label={t.legal.footerHeading} className="flex flex-wrap items-center gap-4">
+            <Link href="/aporrito" className={footerLinkClass}>
+              {t.legal.privacy}
+            </Link>
+            <Link href="/oroi" className={footerLinkClass}>
+              {t.legal.terms}
+            </Link>
+            <span className="text-xs text-ink-400">{t.landing.market}</span>
+          </nav>
         </div>
       </div>
     </footer>

@@ -384,6 +384,11 @@ const el = {
     ctaBody: 'Η σύνδεση των βιβλίων σας παίρνει λίγα λεπτά και δεν φεύγει καμία υπενθύμιση πριν την εγκρίνετε.',
     faqLink: 'Έχετε ερώτηση; Δείτε τις συχνές ερωτήσεις.',
   },
+  legal: {
+    footerHeading: 'Νομικά',
+    privacy: 'Απόρρητο',
+    terms: 'Όροι χρήσης',
+  },
   faq: {
     metaTitle: 'Συχνές ερωτήσεις',
     metaDescription:
@@ -1456,6 +1461,11 @@ const en: typeof el = {
     ctaTitle: 'See what you are owed today',
     ctaBody: 'Connecting your books takes a few minutes, and no reminder goes out until you have approved it.',
     faqLink: 'Got a question? Read the FAQ.',
+  },
+  legal: {
+    footerHeading: 'Legal',
+    privacy: 'Privacy',
+    terms: 'Terms',
   },
   faq: {
     metaTitle: 'Frequently asked questions',
