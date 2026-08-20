@@ -46,7 +46,11 @@ function fold(value: string): string {
     // exactly one careless save.
     .replace(/[̀-ͯ]/g, '')
     .replace(/ς/g, 'σ')
-    .toUpperCase();
+    .toUpperCase()
+    // Ł is a letter in its own right, not L with a mark, so NFD leaves it alone
+    // and every Polish label containing it would miss. PŁATNOŚCI folds to
+    // PLATNOSCI only because of this line.
+    .replace(/Ł/g, 'L');
 }
 
 /** Everything after the first match of `label` on that line. */
@@ -80,63 +84,69 @@ function valueFor(lines: string[], label: RegExp): string | null {
 }
 
 // --- labels ---------------------------------------------------------------
-// Greek first, because that is what the documents are. English too, because a
-// Greek company invoicing abroad issues in English and the same reader has to
-// cope with both.
+// Greek and English because that is what the product sells into. Polish,
+// German, French, Italian, Spanish and Romanian because an invoice book does
+// not respect the market a tool was built for — the first real document that
+// arrived here was Polish, and it read as a blank form.
 //
-// Every one of these is written with explicit Unicode lookarounds instead of
-// \b. JavaScript's \b is defined against [A-Za-z0-9_], so a Greek letter is not
-// a word character and /\bΑΦΜ\b/ matches nothing, ever — silently, because a
-// regex that never fires is indistinguishable from a document that never
-// mentioned the label.
+// Written as regex literals with explicit Unicode lookarounds, never as strings
+// passed to `new RegExp`. Two reasons, both learned the hard way. JavaScript's
+// \b is ASCII-only, so /\bΑΦΜ\b/ and /\bNIP\b/ can never match. And in a string
+// literal '\s' is simply 's', so a pattern built that way turns
+// DATA\s+WYSTAWIENIA into DATAs+WYSTAWIENIA — a regex that compiles, never
+// fires, and looks exactly like a document that did not mention the label.
 
 const VAT_LABEL =
-  /(?<![\p{L}\p{N}])(?:Α\.Φ\.Μ\.?|ΑΦΜ|VAT(?:\s*(?:NO|NUMBER|ID|REG))?|TAX\s*ID)(?![\p{L}\p{N}])/u;
+  /(?<![\p{L}\p{N}])(?:Α\.Φ\.Μ\.?|ΑΦΜ|VAT(?:\s*(?:NO|NUMBER|ID|REG))?|TAX\s*ID|NIP|UST-?IDNR\.?|STEUERNUMMER|TVA|P\.?\s*IVA|PARTITA\s*IVA|CIF|NIF|CUI)(?![\p{L}\p{N}])/u;
 
 const CUSTOMER_MARKER =
-  /(ΣΤΟΙΧΕΙΑ\s+ΠΕΛΑΤΗ|ΠΕΛΑΤΗ|ΕΠΩΝΥΜΙΑ|ΠΡΟΣ|BILL\s*TO|INVOICE\s*TO|CUSTOMER|CLIENT)/u;
-const ISSUER_MARKER = /(ΣΤΟΙΧΕΙΑ\s+ΕΚΔΟΤΗ|ΕΚΔΟΤΗ|ΠΩΛΗΤΗ|SUPPLIER|SELLER|ISSUER)/u;
+  /(?<![\p{L}\p{N}])(?:ΣΤΟΙΧΕΙΑ\s+ΠΕΛΑΤΗ|ΠΕΛΑΤΗ|ΕΠΩΝΥΜΙΑ|ΠΡΟΣ|BILL\s*TO|INVOICE\s*TO|CUSTOMER|CLIENT|NABYWCA|ODBIORCA|KUPUJACY|KUNDE|EMPFANGER|CLIENTE|DESTINATARIO|CUMPARATOR)(?![\p{L}\p{N}])/u;
+
+const ISSUER_MARKER =
+  /(?<![\p{L}\p{N}])(?:ΣΤΟΙΧΕΙΑ\s+ΕΚΔΟΤΗ|ΕΚΔΟΤΗ|ΠΩΛΗΤΗ|SUPPLIER|SELLER|ISSUER|SPRZEDAWCA|WYSTAWCA|VERKAUFER|LIEFERANT|FOURNISSEUR|VENDEUR|FORNITORE|PROVEEDOR|FURNIZOR)(?![\p{L}\p{N}])/u;
 
 const NUMBER_LABEL =
-  /(?<![\p{L}\p{N}])(?:ΑΡΙΘΜΟΣ\s+ΤΙΜΟΛΟΓΙΟΥ|ΑΡ\.?\s*ΤΙΜΟΛΟΓΙΟΥ|ΑΡ\.?\s*ΠΑΡΑΣΤΑΤΙΚΟΥ|ΑΡΙΘΜΟΣ|INVOICE\s*(?:NO|NUMBER|#)|DOCUMENT\s*(?:NO|NUMBER))(?![\p{L}\p{N}])/u;
+  /(?<![\p{L}\p{N}])(?:ΑΡΙΘΜΟΣ\s+ΤΙΜΟΛΟΓΙΟΥ|ΑΡ\.?\s*ΤΙΜΟΛΟΓΙΟΥ|ΑΡ\.?\s*ΠΑΡΑΣΤΑΤΙΚΟΥ|ΑΡΙΘΜΟΣ|INVOICE\s*(?:NO|NUMBER|#)|DOCUMENT\s*(?:NO|NUMBER)|FAKTURA\s*VAT|NR\s*FAKTURY|FAKTURA|RACHUNEK|RECHNUNGSNUMMER|RECHNUNG\s*NR\.?|RECHNUNG|FACTURE\s*N|FATTURA\s*N|FATTURA|FACTURA\s*N|FACTURA)(?![\p{L}\p{N}])/u;
 
-const SERIES_LABEL = /(?<![\p{L}\p{N}])(?:ΣΕΙΡΑ|SERIES)(?![\p{L}\p{N}])/u;
+const SERIES_LABEL = /(?<![\p{L}\p{N}])(?:ΣΕΙΡΑ|SERIES|SERIA|SERIE)(?![\p{L}\p{N}])/u;
 
+// Specific before generic: a bare DATA would otherwise swallow "Data sprzedaży"
+// on a document whose issue date sits two lines lower.
 const ISSUE_DATE_LABEL =
-  /(?<![\p{L}\p{N}])(?:ΗΜΕΡΟΜΗΝΙΑ\s+ΕΚΔΟΣΗΣ|ΗΜ\/ΝΙΑ\s+ΕΚΔΟΣΗΣ|ΗΜΕΡΟΜΗΝΙΑ|ΗΜ\/ΝΙΑ|ISSUE\s*DATE|INVOICE\s*DATE|DATE)(?![\p{L}\p{N}])/u;
+  /(?<![\p{L}\p{N}])(?:ΗΜΕΡΟΜΗΝΙΑ\s+ΕΚΔΟΣΗΣ|ΗΜ\/ΝΙΑ\s+ΕΚΔΟΣΗΣ|ΗΜΕΡΟΜΗΝΙΑ|ΗΜ\/ΝΙΑ|DATA\s+WYSTAWIENIA|RECHNUNGSDATUM|AUSSTELLUNGSDATUM|DATE\s+DE\s+FACTURATION|FECHA\s+DE\s+EMISION|ISSUE\s*DATE|INVOICE\s*DATE|DATA\s+SPRZEDAZY|DATA\s+FATTURA|DATE|DATA|DATUM|FECHA)(?![\p{L}\p{N}])/u;
 
 const DUE_DATE_LABEL =
-  /(?<![\p{L}\p{N}])(?:ΗΜΕΡΟΜΗΝΙΑ\s+ΛΗΞΗΣ|ΛΗΞΗ|ΠΡΟΘΕΣΜΙΑ(?:\s+ΠΛΗΡΩΜΗΣ)?|DUE\s*DATE|PAYMENT\s*DUE|DUE)(?![\p{L}\p{N}])/u;
+  /(?<![\p{L}\p{N}])(?:ΗΜΕΡΟΜΗΝΙΑ\s+ΛΗΞΗΣ|ΛΗΞΗ|ΠΡΟΘΕΣΜΙΑ(?:\s+ΠΛΗΡΩΜΗΣ)?|TERMIN\s+PLATNOSCI|TERMIN\s+ZAPLATY|FALLIGKEITSDATUM|ZAHLBAR\s+BIS|DATE\s+ECHEANCE|DUE\s*DATE|PAYMENT\s*DUE|DUE|SCADENZA|VENCIMIENTO|SCADENT)(?![\p{L}\p{N}])/u;
 
 const MARK_LABEL = /(?<![\p{L}\p{N}])(?:Μ\.ΑΡ\.Κ\.?|ΜΑΡΚ|MARK)(?![\p{L}\p{N}])/u;
 
 /**
  * Total labels, most specific first.
  *
- * The order is the whole design. A Greek invoice shows net, VAT and total,
- * frequently with the VAT line between them; matching ΣΥΝΟΛΟ first would
- * cheerfully return the net subtotal of a document whose payable amount is 24%
- * higher, and every imported invoice would under-collect by exactly the VAT.
- * What we want is what the customer owes, so a label naming itself payable
- * beats one merely naming itself a sum.
+ * The order is the whole design. An invoice shows net, tax and total, often with
+ * the tax line between them; matching a bare "total" first would cheerfully
+ * return the net subtotal of a document whose payable amount is 23% higher, and
+ * every import would under-collect by exactly the tax. What we want is what the
+ * customer owes, so a label naming itself payable beats one merely naming a sum.
  *
- * `vetoComponents` is off for the specific tiers on purpose. "ΣΥΝΟΛΟ ΜΕ ΦΠΑ"
- * contains ΦΠΑ and *is* the payable amount; a blanket veto on the word would
- * throw away the exact line we came for. The veto exists for the last tier,
- * where a bare ΣΥΝΟΛΟ or TOTAL really might be labelling a subtotal.
+ * `vetoComponents` is off for the specific tiers on purpose. "ΣΥΝΟΛΟ ΜΕ ΦΠΑ" and
+ * "Do zapłaty (PLN)" both sit beside the word for tax, and a blanket veto would
+ * throw away the exact line we came for.
  */
 const TOTAL_LABELS: ReadonlyArray<{ pattern: RegExp; vetoComponents: boolean }> = [
   {
     pattern:
-      /(?<![\p{L}\p{N}])(?:ΠΛΗΡΩΤΕΟ(?:\s+ΠΟΣΟ)?|ΤΕΛΙΚΟ\s+ΣΥΝΟΛΟ|ΓΕΝΙΚΟ\s+ΣΥΝΟΛΟ|AMOUNT\s*DUE|BALANCE\s*DUE|TOTAL\s*DUE|GRAND\s*TOTAL)(?![\p{L}\p{N}])/u,
+      /(?<![\p{L}\p{N}])(?:ΠΛΗΡΩΤΕΟ(?:\s+ΠΟΣΟ)?|ΤΕΛΙΚΟ\s+ΣΥΝΟΛΟ|ΓΕΝΙΚΟ\s+ΣΥΝΟΛΟ|AMOUNT\s*DUE|BALANCE\s*DUE|TOTAL\s*DUE|GRAND\s*TOTAL|DO\s+ZAPLATY|RAZEM\s+DO\s+ZAPLATY|KWOTA\s+DO\s+ZAPLATY|ZAHLBETRAG|GESAMTBETRAG|RECHNUNGSBETRAG|NET\s*A\s*PAYER|TOTALE\s+DA\s+PAGARE|TOTAL\s+A\s+PAGAR|TOTAL\s+DE\s+PLATA)(?![\p{L}\p{N}])/u,
     vetoComponents: false,
   },
   {
-    pattern: /(?<![\p{L}\p{N}])(?:ΣΥΝΟΛΟ\s+ΜΕ\s+ΦΠΑ|ΑΞΙΑ\s+ΜΕ\s+ΦΠΑ)(?![\p{L}\p{N}])/u,
+    pattern:
+      /(?<![\p{L}\p{N}])(?:ΣΥΝΟΛΟ\s+ΜΕ\s+ΦΠΑ|ΑΞΙΑ\s+ΜΕ\s+ΦΠΑ|WARTOSC\s+BRUTTO|SUMA\s+BRUTTO|BRUTTO|GESAMT\s+BRUTTO|TOTALE\s+IVA\s+INCLUSA)(?![\p{L}\p{N}])/u,
     vetoComponents: false,
   },
   {
-    pattern: /(?<![\p{L}\p{N}])(?:ΣΥΝΟΛΙΚΟ\s+ΠΟΣΟ|ΣΥΝΟΛΟ|TOTAL)(?![\p{L}\p{N}])/u,
+    pattern:
+      /(?<![\p{L}\p{N}])(?:ΣΥΝΟΛΙΚΟ\s+ΠΟΣΟ|ΣΥΝΟΛΟ|TOTAL|RAZEM|SUMA|GESAMT|TOTALE|IMPORTE)(?![\p{L}\p{N}])/u,
     vetoComponents: true,
   },
 ];
@@ -144,29 +154,55 @@ const TOTAL_LABELS: ReadonlyArray<{ pattern: RegExp; vetoComponents: boolean }> 
 /**
  * Lines naming a component of the price rather than the price.
  *
- * Checked before a total label is accepted, and deliberately not applied to the
- * "ΣΥΝΟΛΟ ΜΕ ΦΠΑ" family — that phrase contains ΦΠΑ and names the payable
- * amount, so a blanket veto on the word would reject the very line we want.
+ * Consulted only for the generic tier above, where a bare "total" really might
+ * be labelling a subtotal.
  */
 const NOT_A_TOTAL =
-  /(?<![\p{L}\p{N}])(?:ΚΑΘΑΡΗ\s+ΑΞΙΑ|ΑΞΙΑ\s+ΧΩΡΙΣ|ΜΕΡΙΚΟ\s+ΣΥΝΟΛΟ|ΦΠΑ|ΕΚΠΤΩΣΗ|SUBTOTAL|NET(?:\s+AMOUNT)?|VAT|TAX|DISCOUNT)(?![\p{L}\p{N}])/u;
+  /(?<![\p{L}\p{N}])(?:ΚΑΘΑΡΗ\s+ΑΞΙΑ|ΑΞΙΑ\s+ΧΩΡΙΣ|ΜΕΡΙΚΟ\s+ΣΥΝΟΛΟ|ΦΠΑ|ΕΚΠΤΩΣΗ|SUBTOTAL|NET(?:\s+AMOUNT)?|VAT|TAX|DISCOUNT|NETTO|WARTOSC\s+NETTO|PODSTAWA|RABAT|ZWISCHENSUMME|MWST|IMPONIBILE|IVA|TVA)(?![\p{L}\p{N}])/u;
 
-/** A number that could be money, taken from the end of a line. */
-const TRAILING_AMOUNT = /(-?[\d.,]{1,20})\s*(?:€|EUR|ΕΥΡΩ)?\s*$/u;
+/**
+ * A money amount at the end of a line.
+ *
+ * The inner class admits spaces, because half of Europe groups thousands with
+ * one: "1 230,00" is a single number, and a pattern that stops at the space
+ * reads it as 230,00 — the same invoice, off by a factor of a thousand, with
+ * nothing on screen to suggest anything went wrong. Must end in a digit, so a
+ * trailing separator cannot be swallowed.
+ */
+const TRAILING_AMOUNT = /(-?[\d.,   ]{0,24}\d)\s*(?:€|EUR|ΕΥΡΩ|PLN|ZL|RON|LEI|CZK|HUF|BGN)?\s*$/u;
+
+/** Currency codes we can name, checked against the whole document. */
+const CURRENCIES: ReadonlyArray<{ code: string; pattern: RegExp }> = [
+  { code: 'PLN', pattern: /(?<![\p{L}\p{N}])(?:PLN|ZL|ZLOTY|ZLOTYCH)(?![\p{L}\p{N}])/u },
+  { code: 'RON', pattern: /(?<![\p{L}\p{N}])(?:RON|LEI)(?![\p{L}\p{N}])/u },
+  { code: 'CZK', pattern: /(?<![\p{L}\p{N}])CZK(?![\p{L}\p{N}])/u },
+  { code: 'HUF', pattern: /(?<![\p{L}\p{N}])HUF(?![\p{L}\p{N}])/u },
+  { code: 'BGN', pattern: /(?<![\p{L}\p{N}])BGN(?![\p{L}\p{N}])/u },
+  { code: 'USD', pattern: /(?<![\p{L}\p{N}])USD(?![\p{L}\p{N}])/u },
+  { code: 'GBP', pattern: /(?<![\p{L}\p{N}])GBP(?![\p{L}\p{N}])/u },
+];
 
 function currencyIn(text: string): string {
   const folded = fold(text);
-  if (/\bUSD\b|\$/.test(folded)) return 'USD';
-  if (/\bGBP\b|£/.test(folded)) return 'GBP';
+  if (/\$/.test(text)) return 'USD';
+  if (/£/.test(text)) return 'GBP';
+
+  for (const { code, pattern } of CURRENCIES) {
+    if (pattern.test(folded)) return code;
+  }
+
   return 'EUR';
 }
 
 /**
- * Every 9-digit number a VAT label points at, in reading order.
+ * Every tax number a VAT label points at, in reading order.
  *
- * A Greek VAT number is exactly nine digits, which is also the shape of plenty
- * of other things on an invoice — so nine bare digits are never enough. It has
- * to be nine digits a label introduced.
+ * Length varies by country — Greek nine digits, Polish ten, others between — so
+ * the range is wide and the label does the real filtering. That matters more
+ * than it sounds: a Polish invoice carries a REGON right next to the NIP and it
+ * is nine digits, exactly the shape the old pattern insisted on. Matching a
+ * bare run of digits would have picked the wrong identifier off the correct
+ * document.
  */
 function vatCandidates(lines: string[]): Array<{ value: string; index: number }> {
   const found: Array<{ value: string; index: number }> = [];
@@ -175,7 +211,9 @@ function vatCandidates(lines: string[]): Array<{ value: string; index: number }>
     if (!VAT_LABEL.test(fold(line))) return;
 
     const after = tail(line, VAT_LABEL) || lines[index + 1] || '';
-    const digits = /(?:EL)?(\d{9})(?!\d)/.exec(after.replace(/[\s.]/g, ''));
+    const digits = /(?:EL|PL|DE|FR|IT|ES|RO|BG|CZ|HU)?(\d{8,12})(?!\d)/.exec(
+      after.replace(/[\s.-]/g, ''),
+    );
     if (digits?.[1]) found.push({ value: digits[1], index });
   });
 
