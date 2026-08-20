@@ -11,6 +11,7 @@
  * before this is called.
  */
 
+import { replyToFor } from '@/lib/email/reply-to';
 import { sendEmail } from '@/lib/email/send';
 import { appUrl } from '@/lib/env';
 import { channelTaggedUrl } from '@/lib/funnel/events';
@@ -135,6 +136,7 @@ export async function dispatchContact(params: {
   };
 
   if (channels.includes('email') && debtor.email) {
+    const replyTo = replyToFor(tenant);
     const email = renderEmail(copyStep, channelCtx('email'), overrides, copyVariant, locale);
 
     if (!emailAvailable()) {
@@ -159,7 +161,9 @@ export async function dispatchContact(params: {
         // The debtor owes the creditor, not the platform: the reminder should
         // read as coming from them.
         ...(tenant.company_name ? { fromName: tenant.company_name } : {}),
-        ...(tenant.reply_to_email ? { replyTo: tenant.reply_to_email } : {}),
+        // Never omitted while the tenant has any address at all: a reminder
+        // with no Reply-To routes the debtor answer to noreply@ and loses it.
+        ...(replyTo ? { replyTo } : {}),
       });
 
       await supabase.from('communications_log').insert({

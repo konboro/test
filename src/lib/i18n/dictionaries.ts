@@ -105,7 +105,8 @@ const el = {
     mobileHint: 'Μορφή +30 69XXXXXXXX. Απαραίτητο για SMS.',
     notes: 'Σημειώσεις',
     replyTo: 'Email απάντησης',
-    replyToHint: 'Εκεί θα απαντούν οι πελάτες στις υπενθυμίσεις.',
+    replyToHint:
+      'Εκεί θα απαντούν οι πελάτες στις υπενθυμίσεις. Αν το αφήσετε κενό, χρησιμοποιείται το email του λογαριασμού σας.',
     automationOn: 'Ενεργή αυτοματοποίηση υπενθυμίσεων',
     automationHint: 'Όταν είναι απενεργοποιημένη, δεν στέλνεται κανένα μήνυμα σε κανέναν πελάτη.',
     localeAuto: 'Αυτόματα',
@@ -1184,7 +1185,8 @@ const en: typeof el = {
     mobileHint: 'Format +30 69XXXXXXXX. Required for SMS.',
     notes: 'Notes',
     replyTo: 'Reply-to email',
-    replyToHint: 'Where customers reply to reminders.',
+    replyToHint:
+      'Where customers reply to reminders. Left empty, your account email is used.',
     automationOn: 'Reminder automation on',
     automationHint: 'While it is off, no message goes to any customer.',
     localeAuto: 'Automatic',
