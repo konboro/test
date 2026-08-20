@@ -35,6 +35,7 @@ const PUBLIC_PREFIXES = [
   // "Unauthorized" in the debtor's browser.
   '/api/stripe/confirm',
   '/api/viva/return',
+  '/api/revolut/return',
   // Authenticated by Stripe's signature, not by a session cookie.
   '/api/stripe/webhook',
   // Authenticated by the CRON_SECRET bearer token.

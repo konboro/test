@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { providerFor, stripeConfigured, vivaConfigured } from './provider';
+import { providerFor, revolutConfigured, stripeConfigured, vivaConfigured } from './provider';
 import { belongsToOrder, checkoutUrl, hostsFor, isSettled } from '../viva/client';
 
 const NONE = {
@@ -11,9 +11,12 @@ const NONE = {
   viva_client_secret_enc: null,
   viva_source_code: null,
   viva_environment: 'demo',
+  revolut_secret_key_enc: null,
+  revolut_environment: 'sandbox',
   payment_provider: null,
 };
 
+const REVOLUT = { ...NONE, revolut_secret_key_enc: 'enc' };
 const STRIPE_KEY = { ...NONE, stripe_secret_key_enc: 'enc' };
 const STRIPE_CONNECT = { ...NONE, stripe_account_id: 'acct_1', stripe_charges_enabled: true };
 const VIVA = { ...NONE, viva_client_id_enc: 'enc', viva_client_secret_enc: 'enc' };
@@ -67,6 +70,58 @@ describe('vivaConfigured', () => {
     vi.stubEnv('VIVA_ALLOW_DEMO', '1');
 
     expect(vivaConfigured(VIVA)).toBe(true);
+  });
+});
+
+describe('revolutConfigured', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('needs a key', () => {
+    expect(revolutConfigured({ ...REVOLUT, revolut_secret_key_enc: null })).toBe(false);
+    expect(revolutConfigured({ ...REVOLUT, revolut_environment: 'production' })).toBe(true);
+  });
+
+  it('refuses the sandbox estate in production — a test card must not settle a real invoice', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+
+    expect(revolutConfigured(REVOLUT)).toBe(false);
+    expect(providerFor(REVOLUT)).toBeNull();
+    expect(revolutConfigured({ ...REVOLUT, revolut_environment: 'production' })).toBe(true);
+  });
+
+  it('lets a production deployment opt in to the sandbox explicitly', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('REVOLUT_ALLOW_SANDBOX', '1');
+
+    expect(revolutConfigured(REVOLUT)).toBe(true);
+  });
+});
+
+describe('providerFor with Revolut', () => {
+  it('serves Revolut when it is the only one configured', () => {
+    expect(providerFor(REVOLUT)).toBe('revolut');
+  });
+
+  it('keeps Stripe first when both are set up and nothing was chosen', () => {
+    expect(providerFor({ ...REVOLUT, stripe_secret_key_enc: 'enc' })).toBe('stripe');
+  });
+
+  it('honours a stated Revolut preference', () => {
+    expect(
+      providerFor({ ...REVOLUT, stripe_secret_key_enc: 'enc', payment_provider: 'revolut' }),
+    ).toBe('revolut');
+  });
+
+  it('ignores a Revolut preference once the key is gone', () => {
+    expect(
+      providerFor({
+        ...NONE,
+        stripe_secret_key_enc: 'enc',
+        payment_provider: 'revolut',
+      }),
+    ).toBe('stripe');
   });
 });
 

@@ -7,6 +7,7 @@ const base = {
   stripe_checkout_session_id: null,
   stripe_payment_intent_id: null,
   viva_transaction_id: null,
+  revolut_order_id: null,
   paid_at: null,
   source: 'mydata' as const,
 };
@@ -30,6 +31,12 @@ describe('settlementMethod', () => {
     expect(
       settlementMethod({ ...base, viva_transaction_id: 'vt_1', paid_at: '2026-08-14' }),
     ).toBe('card_viva');
+  });
+
+  it('reads a Revolut order id as a card payment through the link', () => {
+    expect(
+      settlementMethod({ ...base, revolut_order_id: 'ord_1', paid_at: '2026-08-20' }),
+    ).toBe('card_revolut');
   });
 
   it('labels a bank-matched settlement as a transfer', () => {

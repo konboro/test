@@ -185,6 +185,7 @@ export default async function InvoicesPage({
   const methodLabel = {
     card_stripe: t.bank.channels.stripe,
     card_viva: t.bank.channels.viva,
+    card_revolut: t.bank.channels.revolut,
     transfer: t.bank.channels.transfer,
     external: t.invoices.paidMethodExternal,
     billing_system: t.invoices.paidMethodBilling,
