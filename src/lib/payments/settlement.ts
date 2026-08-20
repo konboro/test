@@ -25,6 +25,7 @@ import type { InvoiceRow } from '@/types/database';
 export type SettlementMethod =
   | 'card_stripe'
   | 'card_viva'
+  | 'card_revolut'
   | 'transfer'
   | 'external'
   | 'billing_system';
@@ -36,6 +37,7 @@ export function settlementMethod(
     | 'stripe_checkout_session_id'
     | 'stripe_payment_intent_id'
     | 'viva_transaction_id'
+    | 'revolut_order_id'
     | 'paid_at'
     | 'source'
   >,
@@ -45,6 +47,9 @@ export function settlementMethod(
 
   if (invoice.stripe_checkout_session_id || invoice.stripe_payment_intent_id) return 'card_stripe';
   if (invoice.viva_transaction_id) return 'card_viva';
+  // Written only after the order was read back from Revolut, never from a
+  // redirect parameter — so its presence is evidence the money moved.
+  if (invoice.revolut_order_id) return 'card_revolut';
   if (options.settledByBank) return 'transfer';
   if (invoice.source === 'elorus' && !invoice.paid_at) return 'billing_system';
   return 'external';

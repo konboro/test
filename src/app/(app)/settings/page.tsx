@@ -18,6 +18,7 @@ import { ScenarioForm } from './scenario-forms';
 import { AutomationSwitch } from './automation-switch';
 import { CreditPacks, MyDataForm, ProfileForm } from './settings-forms';
 import { ProviderChooser } from './provider-chooser';
+import { RevolutForm } from './revolut-forms';
 import { StripeConnect } from './stripe-forms';
 import { VivaForm } from './viva-forms';
 import { TemplateEditor, type TemplateSlotView } from './template-forms';
@@ -213,11 +214,15 @@ export default async function SettingsPage({
   // this function.
   const { data: keyRow } = await createAdminClient()
     .from('users')
-    .select('stripe_secret_key_enc, viva_client_id_enc, viva_client_secret_enc, viva_source_code, viva_environment, payment_provider')
+    .select(
+      'stripe_secret_key_enc, viva_client_id_enc, viva_client_secret_enc, viva_source_code, viva_environment, revolut_secret_key_enc, revolut_environment, payment_provider',
+    )
     .eq('id', user.id)
     .maybeSingle();
   const hasOwnStripeKey = Boolean(keyRow?.stripe_secret_key_enc);
   const vivaConfigured = Boolean(keyRow?.viva_client_id_enc && keyRow?.viva_client_secret_enc);
+  const revolutConfigured = Boolean(keyRow?.revolut_secret_key_enc);
+  const stripeConfigured = Boolean(hasOwnStripeKey || profile.stripe_account_id);
 
   // RLS scopes this to the tenant. A slot with no row keeps the built-in copy.
   const { data: templates } = await supabase
@@ -358,13 +363,44 @@ export default async function SettingsPage({
         </div>
       </Card>
 
+      <Card>
+        <div id="revolut" className="scroll-mt-20">
+          <CardHeader
+            title={t.settings.revolut}
+            subtitle={t.settings.revolutHint}
+            action={
+              revolutConfigured ? (
+                <Badge tone={keyRow?.revolut_environment === 'production' ? 'positive' : 'warning'}>
+                  {keyRow?.revolut_environment === 'production'
+                    ? t.settings.revolutProduction
+                    : t.settings.revolutSandbox}
+                </Badge>
+              ) : (
+                <Badge tone="warning">{t.settings.notConnected}</Badge>
+              )
+            }
+          />
+          <RevolutForm
+            configured={revolutConfigured}
+            environment={keyRow?.revolut_environment ?? 'sandbox'}
+          />
+        </div>
+      </Card>
+
       {/* Only worth asking once there is something to choose between. With one
           provider set up the answer is forced, and a dropdown with a single
           real option is a decision the operator does not have to make. */}
-      {vivaConfigured && (hasOwnStripeKey || profile.stripe_account_id) ? (
+      {[stripeConfigured, vivaConfigured, revolutConfigured].filter(Boolean).length > 1 ? (
         <Card>
           <CardHeader title={t.settings.providerTitle} subtitle={t.settings.providerHint} />
-          <ProviderChooser current={keyRow?.payment_provider ?? null} />
+          <ProviderChooser
+            current={keyRow?.payment_provider ?? null}
+            available={{
+              stripe: stripeConfigured,
+              viva: vivaConfigured,
+              revolut: revolutConfigured,
+            }}
+          />
         </Card>
       ) : null}
 

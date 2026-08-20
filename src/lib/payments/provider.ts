@@ -14,9 +14,10 @@
 
 import { decryptSecret } from '@/lib/crypto';
 import { optionalEnv } from '@/lib/env';
+import type { RevolutCredentials, RevolutEnvironment } from '@/lib/revolut/client';
 import type { VivaCredentials, VivaEnvironment } from '@/lib/viva/client';
 
-export type PaymentProvider = 'stripe' | 'viva';
+export type PaymentProvider = 'stripe' | 'viva' | 'revolut';
 
 /** Exactly the columns this decision needs, so callers select no more than that. */
 export interface TenantPaymentRow {
@@ -27,6 +28,8 @@ export interface TenantPaymentRow {
   viva_client_secret_enc?: string | null;
   viva_source_code?: string | null;
   viva_environment?: string | null;
+  revolut_secret_key_enc?: string | null;
+  revolut_environment?: string | null;
   payment_provider?: string | null;
 }
 
@@ -34,7 +37,7 @@ export interface TenantPaymentRow {
 // infer the row shape, and a concatenation defeats that — every caller would
 // receive `GenericStringError` instead of a typed row.
 export const PAYMENT_COLUMNS =
-  'stripe_account_id, stripe_charges_enabled, stripe_secret_key_enc, viva_client_id_enc, viva_client_secret_enc, viva_source_code, viva_environment, payment_provider' as const;
+  'stripe_account_id, stripe_charges_enabled, stripe_secret_key_enc, viva_client_id_enc, viva_client_secret_enc, viva_source_code, viva_environment, revolut_secret_key_enc, revolut_environment, payment_provider' as const;
 
 export function stripeConfigured(tenant: TenantPaymentRow): boolean {
   return Boolean(
@@ -64,6 +67,22 @@ export function vivaConfigured(tenant: TenantPaymentRow): boolean {
 }
 
 /**
+ * Revolut's sandbox is gated for the same reason Viva's demo estate is: it
+ * takes test cards and moves no money, so in production it would hand real
+ * debtors a button that either declines their card or "settles" a real invoice
+ * for nothing. `REVOLUT_ALLOW_SANDBOX=1` opts a production deployment in.
+ */
+function sandboxEstateAllowed(): boolean {
+  return process.env.NODE_ENV !== 'production' || optionalEnv('REVOLUT_ALLOW_SANDBOX') === '1';
+}
+
+export function revolutConfigured(tenant: TenantPaymentRow): boolean {
+  if (!tenant.revolut_secret_key_enc) return false;
+  if (revolutEnvironmentOf(tenant.revolut_environment) === 'sandbox') return sandboxEstateAllowed();
+  return true;
+}
+
+/**
  * The provider a payment link should use, or null when the creditor cannot take
  * a card at all.
  *
@@ -78,18 +97,25 @@ export function vivaConfigured(tenant: TenantPaymentRow): boolean {
 export function providerFor(tenant: TenantPaymentRow): PaymentProvider | null {
   const stripe = stripeConfigured(tenant);
   const viva = vivaConfigured(tenant);
+  const revolut = revolutConfigured(tenant);
 
   const preferred = tenant.payment_provider;
   if (preferred === 'viva' && viva) return 'viva';
+  if (preferred === 'revolut' && revolut) return 'revolut';
   if (preferred === 'stripe' && stripe) return 'stripe';
 
   if (stripe) return 'stripe';
   if (viva) return 'viva';
+  if (revolut) return 'revolut';
   return null;
 }
 
 function environmentOf(value: string | null | undefined): VivaEnvironment {
   return value === 'production' ? 'production' : 'demo';
+}
+
+function revolutEnvironmentOf(value: string | null | undefined): RevolutEnvironment {
+  return value === 'production' ? 'production' : 'sandbox';
 }
 
 /**
@@ -110,5 +136,15 @@ export function vivaCredentialsFor(tenant: TenantPaymentRow): VivaCredentials | 
     clientSecret: decryptSecret(tenant.viva_client_secret_enc as string),
     environment: environmentOf(tenant.viva_environment),
     sourceCode: tenant.viva_source_code ?? null,
+  };
+}
+
+/** The tenant's Revolut key, decrypted. Same contract as the Viva one above. */
+export function revolutCredentialsFor(tenant: TenantPaymentRow): RevolutCredentials | null {
+  if (!revolutConfigured(tenant)) return null;
+
+  return {
+    secretKey: decryptSecret(tenant.revolut_secret_key_enc as string),
+    environment: revolutEnvironmentOf(tenant.revolut_environment),
   };
 }
