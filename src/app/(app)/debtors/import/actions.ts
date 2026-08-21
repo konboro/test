@@ -53,11 +53,10 @@ const MAX_SHEET_BYTES = 15 * 1024 * 1024;
 export async function readSheetFile(formData: FormData): Promise<SheetReadResult> {
   const t = await getDictionary();
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: t.forms.errors.unauthorized };
+  // Reading a workbook writes nothing, but it is only offered to somebody who
+  // could go on to import it — the same gate the commit below uses.
+  const org = await writableOrganization();
+  if (!org) return { error: t.forms.errors.unauthorized };
 
   const file = formData.get('file');
   if (!(file instanceof File) || file.size === 0) return { error: t.importer.sheetErrors.empty };
@@ -122,11 +121,8 @@ export async function assistMapping(
   headers: string[],
   rows: string[][],
 ): Promise<{ mapping: Partial<Record<ImportField, number>>; mappedBy: 'headers' | 'ai' }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { mapping: {}, mappedBy: 'headers' };
+  const org = await writableOrganization();
+  if (!org) return { mapping: {}, mappedBy: 'headers' };
 
   return mapColumns(headers, rows);
 }
