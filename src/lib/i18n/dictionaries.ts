@@ -1073,6 +1073,24 @@ const el = {
     creditsSuccess:
       'Η πληρωμή ολοκληρώθηκε. Τα SMS πιστώνονται μόλις επιβεβαιωθεί από το Stripe — συνήθως σε λίγα δευτερόλεπτα.',
     creditsCancelled: 'Η αγορά ακυρώθηκε. Δεν χρεωθήκατε.',
+    groups: {
+      company: {
+        title: 'Η επιχείρησή σας',
+        body: 'Πώς εμφανίζεστε στους πελάτες σας και πού σας απαντούν.',
+      },
+      reminders: {
+        title: 'Υπενθυμίσεις',
+        body: 'Τι φεύγει, πότε και με ποια λόγια — και πόσα SMS σας απομένουν.',
+      },
+      payments: {
+        title: 'Πληρωμές',
+        body: 'Πώς πληρώνουν οι πελάτες σας με κάρτα. Τα χρήματα πηγαίνουν απευθείας στον δικό σας λογαριασμό.',
+      },
+      books: {
+        title: 'Λογιστική και τράπεζα',
+        body: 'Από πού έρχονται τα παραστατικά και πώς αναγνωρίζεται μια εξόφληση.',
+      },
+    },
     automation: {
       title: 'Αυτόματες υπενθυμίσεις',
       subtitle: 'Ο κεντρικός διακόπτης. Όσο είναι κλειστός, δεν φεύγει κανένα μήνυμα σε κανέναν πελάτη.',
@@ -2287,6 +2305,24 @@ const en: typeof el = {
     creditsSuccess:
       'Payment complete. The SMS credits appear as soon as Stripe confirms — usually within seconds.',
     creditsCancelled: 'The purchase was cancelled. You have not been charged.',
+    groups: {
+      company: {
+        title: 'Your business',
+        body: 'How you appear to your customers, and where they reply.',
+      },
+      reminders: {
+        title: 'Reminders',
+        body: 'What goes out, when, and in whose words — and how much SMS you have left.',
+      },
+      payments: {
+        title: 'Payments',
+        body: 'How your customers pay by card. The money goes straight to your own account.',
+      },
+      books: {
+        title: 'Accounting and bank',
+        body: 'Where the invoices come from, and how a settlement is noticed.',
+      },
+    },
     automation: {
       title: 'Automatic reminders',
       subtitle: 'The master switch. While it is off, nothing goes out to any customer.',

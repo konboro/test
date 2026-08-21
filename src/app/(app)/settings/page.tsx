@@ -17,6 +17,7 @@ import { ElorusForm } from './elorus-forms';
 import { BankConnect } from './bank-forms';
 import { ScenarioForm } from './scenario-forms';
 import { AutomationSwitch } from './automation-switch';
+import { SettingsSection } from './section';
 import { CreditPacks, MyDataForm, ProfileForm } from './settings-forms';
 import { ProviderChooser } from './provider-chooser';
 import { RevolutForm } from './revolut-forms';
@@ -298,6 +299,21 @@ export default async function SettingsPage({
         </div>
       ) : null}
 
+      <SettingsSection
+        title={t.settings.groups.company.title}
+        body={t.settings.groups.company.body}
+      />
+
+      <Card>
+        <CardHeader title={t.settings.business} />
+        <ProfileForm profile={profile} />
+      </Card>
+
+      <SettingsSection
+        title={t.settings.groups.reminders.title}
+        body={t.settings.groups.reminders.body}
+      />
+
       <Card>
         <div id="automation" className="scroll-mt-20">
           <CardHeader
@@ -310,10 +326,62 @@ export default async function SettingsPage({
           />
         </div>
       </Card>
+
       <Card>
-        <CardHeader title={t.settings.business} />
-        <ProfileForm profile={profile} />
+        <div id="scenario" className="scroll-mt-20">
+          <CardHeader title={t.scenario.title} subtitle={t.scenario.hint} />
+          <ScenarioForm scenario={scenario} />
+        </div>
       </Card>
+
+      <Card>
+        <CardHeader
+          title={t.settings.templatesTitle}
+          subtitle={t.settings.templatesHint}
+        />
+        <TemplateEditor slots={slots} />
+      </Card>
+
+      {/* A purchase card, so it needs both halves of a purchase: a meter that
+          governs something, and a platform account that can take the money. */}
+      {smsCreditsEnforced() && paymentsAvailable() ? (
+        <Card>
+        <div id="credits" className="scroll-mt-20">
+          <CardHeader
+            title={t.settings.smsTitle}
+            subtitle={t.settings.smsHint}
+            action={
+              <span className="tabular text-sm font-semibold text-ink-900">
+                {t.settings.smsAvailable(profile.sms_credits)}
+              </span>
+            }
+          />
+          <CreditPacks packs={SMS_PACKS} />
+        </div>
+        </Card>
+      ) : null}
+
+      <SettingsSection
+        title={t.settings.groups.payments.title}
+        body={t.settings.groups.payments.body}
+      />
+
+      {/* Only worth asking once there is something to choose between. With one
+          provider set up the answer is forced, and a dropdown with a single
+          real option is a decision the operator does not have to make. */}
+      {[stripeConfigured, vivaConfigured, revolutConfigured].filter(Boolean).length > 1 ? (
+        <Card>
+          <CardHeader title={t.settings.providerTitle} subtitle={t.settings.providerHint} />
+          <ProviderChooser
+            current={keyRow?.payment_provider ?? null}
+            available={{
+              stripe: stripeConfigured,
+              viva: vivaConfigured,
+              revolut: revolutConfigured,
+            }}
+          />
+        </Card>
+      ) : null}
 
       <Card>
         <div id="stripe" className="scroll-mt-20">
@@ -395,49 +463,31 @@ export default async function SettingsPage({
         </div>
       </Card>
 
-      {/* Only worth asking once there is something to choose between. With one
-          provider set up the answer is forced, and a dropdown with a single
-          real option is a decision the operator does not have to make. */}
-      {[stripeConfigured, vivaConfigured, revolutConfigured].filter(Boolean).length > 1 ? (
+      <SettingsSection
+        title={t.settings.groups.books.title}
+        body={t.settings.groups.books.body}
+      />
+
+      {profile.mydata_user_id || !profile.elorus_organization_id ? (
         <Card>
-          <CardHeader title={t.settings.providerTitle} subtitle={t.settings.providerHint} />
-          <ProviderChooser
-            current={keyRow?.payment_provider ?? null}
-            available={{
-              stripe: stripeConfigured,
-              viva: vivaConfigured,
-              revolut: revolutConfigured,
-            }}
-          />
+        <CardHeader
+          title={t.settings.mydata}
+          subtitle={t.settings.mydataHint}
+          action={
+            profile.mydata_user_id ? (
+              <Badge tone="positive">{t.settings.connected}</Badge>
+            ) : (
+              <Badge tone="warning">{t.settings.notConnected}</Badge>
+            )
+          }
+        />
+        <MyDataForm
+          connected={Boolean(profile.mydata_user_id)}
+          userId={profile.mydata_user_id}
+          environment={profile.mydata_environment}
+        />
         </Card>
       ) : null}
-
-      {/* Collecting the money and noticing it arrived are separate problems:
-          the cards above take card payments, this one reads the bank so a
-          transfer settles the invoice on its own. */}
-      <Card>
-        <div id="scenario" className="scroll-mt-20">
-          <CardHeader title={t.scenario.title} subtitle={t.scenario.hint} />
-          <ScenarioForm scenario={scenario} />
-        </div>
-      </Card>
-
-      <Card>
-        <div id="bank" className="scroll-mt-20">
-          <CardHeader
-            title={t.settings.bankAccount}
-            subtitle={t.settings.bankAccountHint}
-            action={
-              (bankConnections ?? []).some((c) => c.status === 'active') ? (
-                <Badge tone="positive">{t.settings.connected}</Badge>
-              ) : (
-                <Badge tone="warning">{t.settings.notConnected}</Badge>
-              )
-            }
-          />
-          <BankConnect banks={banks} connections={bankConnections ?? []} t={t} />
-        </div>
-      </Card>
 
       <Card>
         <CardHeader
@@ -457,52 +507,24 @@ export default async function SettingsPage({
         />
       </Card>
 
-      {profile.mydata_user_id || !profile.elorus_organization_id ? (
+      {/* Collecting the money and noticing it arrived are separate problems.
+          The payment cards above take card payments; this reads the bank, so a
+          transfer settles the invoice without anyone ticking it off. */}
       <Card>
-        <CardHeader
-          title={t.settings.mydata}
-          subtitle={t.settings.mydataHint}
-          action={
-            profile.mydata_user_id ? (
-              <Badge tone="positive">{t.settings.connected}</Badge>
-            ) : (
-              <Badge tone="warning">{t.settings.notConnected}</Badge>
-            )
-          }
-        />
-        <MyDataForm
-          connected={Boolean(profile.mydata_user_id)}
-          userId={profile.mydata_user_id}
-          environment={profile.mydata_environment}
-        />
-      </Card>
-      ) : null}
-
-      {/* A purchase card, so it needs both halves of a purchase: a meter that
-          governs something, and a platform account that can take the money. */}
-      {smsCreditsEnforced() && paymentsAvailable() ? (
-      <Card>
-        <div id="credits" className="scroll-mt-20">
+        <div id="bank" className="scroll-mt-20">
           <CardHeader
-            title={t.settings.smsTitle}
-            subtitle={t.settings.smsHint}
+            title={t.settings.bankAccount}
+            subtitle={t.settings.bankAccountHint}
             action={
-              <span className="tabular text-sm font-semibold text-ink-900">
-                {t.settings.smsAvailable(profile.sms_credits)}
-              </span>
+              (bankConnections ?? []).some((c) => c.status === 'active') ? (
+                <Badge tone="positive">{t.settings.connected}</Badge>
+              ) : (
+                <Badge tone="warning">{t.settings.notConnected}</Badge>
+              )
             }
           />
-          <CreditPacks packs={SMS_PACKS} />
+          <BankConnect banks={banks} connections={bankConnections ?? []} t={t} />
         </div>
-      </Card>
-      ) : null}
-
-      <Card>
-        <CardHeader
-          title={t.settings.templatesTitle}
-          subtitle={t.settings.templatesHint}
-        />
-        <TemplateEditor slots={slots} />
       </Card>
 
   </div>
