@@ -23,6 +23,7 @@ const profileSchema = z.object({
     .max(20)
     .optional()
     .transform((v) => (v ? v : null)),
+  business_mode: z.enum(['general', 'landlord']).default('general'),
   reply_to_email: z
     .string()
     .trim()
@@ -44,6 +45,7 @@ export async function updateProfile(
     company_name: formData.get('company_name'),
     vat_number: formData.get('vat_number'),
     reply_to_email: formData.get('reply_to_email'),
+    business_mode: formData.get('business_mode') ?? 'general',
   });
 
   if (!parsed.success) return { error: formError(t, parsed.error.issues[0]?.message) };

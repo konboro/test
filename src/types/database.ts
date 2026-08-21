@@ -66,6 +66,8 @@ export type UserRow = {
   automation_enabled: boolean;
   reply_to_email: string | null;
   locale: UserLocale;
+  /** general | landlord. Chooses the vocabulary and whether leases are offered. */
+  business_mode: 'general' | 'landlord';
   default_payment_terms_days: number;
   created_at: string;
   updated_at: string;
@@ -121,7 +123,7 @@ export type InvoiceRow = {
   pay_token: string;
   /** The short public credential the reminder link carries. */
   short_code: string;
-  source: 'mydata' | 'manual' | 'elorus' | 'import';
+  source: 'mydata' | 'manual' | 'elorus' | 'import' | 'lease';
   /** Stable id in the billing system; its own numbers repeat across sequences. */
   elorus_invoice_id: string | null;
   /** Identifier from wherever an imported debt came from. Keeps re-imports idempotent. */
@@ -169,6 +171,25 @@ export type DunningContactRow = {
  * nullable `step` column on both dunning_contacts and message_templates.
  */
 export type TemplateStep = DunningStep | null;
+
+export type LeaseRow = {
+  id: string;
+  user_id: string;
+  debtor_id: string;
+  /** What the landlord calls the place, in their own words. */
+  property: string;
+  amount_cents: number;
+  currency: string;
+  /** 1–31, clamped to the month when a charge is generated. */
+  due_day: number;
+  starts_on: string;
+  ends_on: string | null;
+  /** The earliest month this lease may bill for. */
+  generate_from: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
 
 export type MessageTemplateRow = {
   id: string;
@@ -436,6 +457,15 @@ export interface Database {
         Row: DunningSettingsRow;
         Insert: InsertOf<DunningSettingsRow, 'user_id'>;
         Update: Partial<DunningSettingsRow>;
+        Relationships: NoRelationships;
+      };
+      leases: {
+        Row: LeaseRow;
+        Insert: InsertOf<
+          LeaseRow,
+          'user_id' | 'debtor_id' | 'property' | 'amount_cents' | 'due_day' | 'starts_on' | 'generate_from'
+        >;
+        Update: Partial<LeaseRow>;
         Relationships: NoRelationships;
       };
       message_templates: {

@@ -27,6 +27,7 @@ export function ProfileForm({
     company_name: string | null;
     vat_number: string | null;
     reply_to_email: string | null;
+    business_mode: 'general' | 'landlord';
     email: string | null;
   };
 }) {
@@ -64,6 +65,19 @@ export function ProfileForm({
             defaultValue={profile.reply_to_email ?? ''}
             className={inputClass}
           />
+        </Field>
+
+        {/* Not a preference but a description of the business, which is why
+            it sits with the company details rather than in a feature list. */}
+        <Field label={t.fields.businessMode} hint={t.fields.businessModeHint}>
+          <select
+            name="business_mode"
+            defaultValue={profile.business_mode}
+            className={inputClass}
+          >
+            <option value="general">{t.fields.modeGeneral}</option>
+            <option value="landlord">{t.fields.modeLandlord}</option>
+          </select>
         </Field>
 
       </div>

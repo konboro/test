@@ -62,13 +62,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const { data: profile } = await supabase
     .from('users')
-    .select('company_name, email, sms_credits')
+    .select('company_name, email, sms_credits, business_mode')
     .eq('id', active.id)
     .maybeSingle();
 
   const NAV = [
     { href: '/dashboard', label: t.nav.dashboard },
     { href: '/invoices', label: t.nav.invoices },
+    // Only for a company that says it lets property. To everyone else a
+    // leases screen is a menu item that opens an empty page.
+    ...(profile?.business_mode === 'landlord'
+      ? [{ href: '/leases', label: t.nav.leases }]
+      : []),
     { href: '/debtors', label: t.nav.debtors },
     { href: '/bank', label: t.nav.bank },
     { href: '/logs', label: t.nav.logs },
