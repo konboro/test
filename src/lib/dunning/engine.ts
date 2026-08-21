@@ -210,8 +210,19 @@ async function processTenant(
   if (!invoices?.length) return;
 
   const debtorIds = [...new Set(invoices.map((i) => i.debtor_id))];
-  const { data: debtors } = await supabase.from('debtors').select('*').in('id', debtorIds);
+  const [{ data: debtors }, { data: openReports }] = await Promise.all([
+    supabase.from('debtors').select('*').in('id', debtorIds),
+    // "I already paid" / "this document is wrong", said on the payment page.
+    // While one is open the invoice is contested, and chasing a contested
+    // debt is the exact mistake the report feature exists to prevent.
+    supabase
+      .from('invoice_reports')
+      .select('invoice_id, kind')
+      .eq('user_id', tenant.id)
+      .eq('status', 'open'),
+  ]);
   const debtorsById = new Map((debtors ?? []).map((d) => [d.id, d]));
+  const reportedInvoices = new Map((openReports ?? []).map((r) => [r.invoice_id, r.kind]));
 
   // Build today's candidate list.
   const candidates: Candidate[] = [];
@@ -244,6 +255,15 @@ async function processTenant(
     // arranged while the rest of that customer's are chased as usual.
     if (automationPaused(invoice)) {
       result.skipped.push({ invoiceId: invoice.id, reason: 'automation paused for invoice' });
+      continue;
+    }
+    // The debtor said "already paid" or "this is wrong" on the payment page,
+    // and nobody has reviewed it yet. Until someone does, this debt is
+    // contested — resolution is one click on the invoices screen, and either
+    // outcome (settled, or dismissed) puts the invoice back where it belongs.
+    const reportKind = reportedInvoices.get(invoice.id);
+    if (reportKind) {
+      result.skipped.push({ invoiceId: invoice.id, reason: `open ${reportKind} report` });
       continue;
     }
 

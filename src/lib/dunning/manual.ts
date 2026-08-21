@@ -139,6 +139,26 @@ async function loadTarget(
     };
   }
 
+  // The debtor contested this document from the payment page — claimed it is
+  // paid, or disputed it — and the claim is still unreviewed. A reminder sent
+  // by hand over the top of "I already paid" is the exact failure the report
+  // exists to prevent; reviewing it is one click on the same screen.
+  const { data: report } = await supabase
+    .from('invoice_reports')
+    .select('kind')
+    .eq('invoice_id', invoice.id)
+    .eq('status', 'open')
+    .limit(1)
+    .maybeSingle();
+
+  if (report) {
+    return {
+      ok: false,
+      error:
+        report.kind === 'paid_claim' ? t.manual.invoicePaidClaim : t.manual.invoiceDisputed,
+    };
+  }
+
   return { ok: true, target: { tenant, debtor, invoice } };
 }
 
