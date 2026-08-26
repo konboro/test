@@ -151,6 +151,8 @@ export type DunningSettingsRow = {
   repeat_enabled: boolean;
   repeat_every_days: number;
   repeat_max: number;
+  /** Local Europe/Athens hour the sweep may contact this tenant at. */
+  send_hour: number;
   updated_at: string;
 }
 

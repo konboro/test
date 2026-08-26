@@ -32,6 +32,8 @@ export interface ScenarioRepeat {
 export interface Scenario {
   steps: ScenarioStep[];
   repeat: ScenarioRepeat;
+  /** Local Europe/Athens hour, 0-23, at which the sweep may act for this tenant. */
+  sendHour: number;
 }
 
 /** What a tenant gets before they have touched anything. */
@@ -42,6 +44,9 @@ export const DEFAULT_SCENARIO: Scenario = {
     { step: 'overdue_10', enabled: true, offsetDays: 10, channels: ['email', 'sms'] },
   ],
   repeat: { enabled: false, everyDays: 14, max: 3 },
+  // The start of the working day. A reminder landing at 07:00 is buried by the
+  // time anybody opens their inbox.
+  sendHour: 9,
 };
 
 /** Stop chasing entirely once an invoice is this far past due. */

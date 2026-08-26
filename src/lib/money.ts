@@ -55,3 +55,21 @@ export function formatDate(isoDate: string, locale = 'el-GR'): string {
     timeZone: 'UTC',
   }).format(new Date(`${isoDate.slice(0, 10)}T00:00:00Z`));
 }
+
+/**
+ * The hour, 0–23, for the given instant in Europe/Athens.
+ *
+ * The scenario's send hour is a local hour, and it has to stay local: a cron
+ * firing at a fixed UTC time lands at 09:00 Athens in winter and 10:00 in
+ * summer, so a tenant who chose "morning" would silently be moved an hour twice
+ * a year. Reading the local hour is what makes the choice mean what it says.
+ */
+export function athensHour(at: Date = new Date()): number {
+  const hour = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Athens',
+    hour: '2-digit',
+    hour12: false,
+  }).format(at);
+
+  return Number(hour);
+}

@@ -95,6 +95,20 @@ export function ScenarioForm({ scenario }: { scenario: Scenario }) {
         ))}
       </div>
 
+      {/* When, rather than whether. The steps above decide which day a reminder
+          falls on; this decides what time of day it leaves. */}
+      <div className="rounded-xl border border-ink-200 p-4">
+        <Field label={t.scenario.sendHour} hint={t.scenario.sendHourHint}>
+          <select name="send_hour" defaultValue={String(scenario.sendHour)} className={inputClass}>
+            {Array.from({ length: 24 }, (_, hour) => (
+              <option key={hour} value={hour}>
+                {`${String(hour).padStart(2, '0')}:00`}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
       <div className="rounded-xl border border-ink-200 p-4">
         <label className="flex items-center gap-2 text-sm font-medium text-ink-900">
           <input

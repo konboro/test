@@ -1,4 +1,4 @@
-import { athensDate, daysBetween } from '@/lib/money';
+import { athensDate, athensHour, daysBetween } from '@/lib/money';
 import { channelAvailable, providerStatus, type Channel, type ProviderStatus } from '@/lib/providers';
 import { normalisePhone } from '@/lib/sms/send';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -140,6 +140,7 @@ export async function loadScenario(userId: string): Promise<Scenario> {
           max: settings.repeat_max,
         }
       : { ...DEFAULT_SCENARIO.repeat },
+    sendHour: settings?.send_hour ?? DEFAULT_SCENARIO.sendHour,
   };
 }
 
@@ -192,6 +193,12 @@ async function processTenant(
 
   // The cadence this tenant configured, or the built-in one if they never did.
   const scenario = await loadScenario(tenant.id);
+
+  // The sweep runs every hour; a tenant is swept only in the hour they chose.
+  // Read in Europe/Athens rather than UTC, because the choice is a local one: a
+  // fixed UTC schedule lands an hour later in summer than in winter, and a
+  // tenant who picked nine would be moved to ten without touching anything.
+  if (athensHour() !== scenario.sendHour) return;
 
   // AUTO-STOP is expressed here: only `pending` invoices are ever loaded. The
   // moment the Stripe webhook flips an invoice to `paid`, it leaves this set and

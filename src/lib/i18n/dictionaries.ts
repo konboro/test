@@ -301,6 +301,8 @@ const el = {
     offsetsMustDiffer: 'Δύο ενεργά βήματα δεν μπορούν να πέφτουν την ίδια ημέρα.',
     repeatTitle: 'Επανάληψη τελευταίου βήματος',
     repeatEnabled: 'Επανάληψη μέχρι να εξοφληθεί',
+    sendHour: 'Ώρα αποστολής',
+    sendHourHint: 'Τοπική ώρα Ελλάδας. Οι αυτόματες υπενθυμίσεις φεύγουν σε αυτήν την ώρα.',
     repeatEvery: 'Κάθε (ημέρες)',
     repeatMax: 'Μέγιστες επαναλήψεις',
     repeatHint:
@@ -1635,6 +1637,8 @@ const en: typeof el = {
     offsetsMustDiffer: 'Two active steps cannot fall on the same day.',
     repeatTitle: 'Repeat the final step',
     repeatEnabled: 'Repeat until it is paid',
+    sendHour: 'Sending hour',
+    sendHourHint: 'Greek local time. Automatic reminders go out at this hour.',
     repeatEvery: 'Every (days)',
     repeatMax: 'Most repeats',
     repeatHint:

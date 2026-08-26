@@ -83,6 +83,18 @@ export async function saveScenario(
   const repeatEvery = clamp(Number(formData.get('repeat_every_days')) || 14, LIMITS.repeatEvery);
   const repeatMax = clamp(Number(formData.get('repeat_max')) || 3, LIMITS.repeatMax);
 
+  // Clamped rather than validated away: a stale form or a hand-made request
+  // should land on a sane hour, not refuse the whole save of a cadence the
+  // operator did mean to change.
+  // A missing field parses to NaN, and clamp carries NaN straight through to a
+  // column with a 0-23 check constraint — which would fail the whole save. The
+  // fallback is the default hour, not zero: midnight is a choice nobody makes.
+  const requestedHour = Number(formData.get('send_hour'));
+  const sendHour = clamp(
+    Number.isFinite(requestedHour) ? requestedHour : DEFAULT_SCENARIO.sendHour,
+    { min: 0, max: 23 },
+  );
+
   const admin = createAdminClient();
 
   const [{ error: stepError }, { error: settingsError }] = await Promise.all([
@@ -93,6 +105,7 @@ export async function saveScenario(
         repeat_enabled: formData.get('repeat_enabled') === 'on',
         repeat_every_days: repeatEvery,
         repeat_max: repeatMax,
+        send_hour: sendHour,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'user_id' },
