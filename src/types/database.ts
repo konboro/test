@@ -68,6 +68,8 @@ export type UserRow = {
   locale: UserLocale;
   /** general | landlord. Chooses the vocabulary and whether leases are offered. */
   business_mode: 'general' | 'landlord';
+  /** Email the creditor when an invoice settles. */
+  notify_on_payment: boolean;
   default_payment_terms_days: number;
   created_at: string;
   updated_at: string;

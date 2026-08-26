@@ -355,6 +355,8 @@ const el = {
       debtorAdded: 'Ο πελάτης προστέθηκε.',
       debtorUpdated: 'Τα στοιχεία ενημερώθηκαν.',
       settingsSaved: 'Οι ρυθμίσεις αποθηκεύτηκαν.',
+      paymentNoticeOn: 'Θα λαμβάνετε email σε κάθε εξόφληση.',
+      paymentNoticeOff: 'Δεν θα λαμβάνετε email για εξοφλήσεις.',
       automationOn: 'Οι αυτόματες υπενθυμίσεις ενεργοποιήθηκαν.',
       automationOff: 'Οι αυτόματες υπενθυμίσεις απενεργοποιήθηκαν. Δεν φεύγει κανένα μήνυμα.',
       templateSaved: 'Το πρότυπο αποθηκεύτηκε.',
@@ -1147,6 +1149,13 @@ const el = {
     creditsSuccess:
       'Η πληρωμή ολοκληρώθηκε. Τα SMS πιστώνονται μόλις επιβεβαιωθεί από το Stripe — συνήθως σε λίγα δευτερόλεπτα.',
     creditsCancelled: 'Η αγορά ακυρώθηκε. Δεν χρεωθήκατε.',
+    paymentNotice: {
+      title: 'Ειδοποίηση πληρωμής',
+      label: 'Email σε κάθε εξόφληση',
+      hint: 'Στέλνεται σε εσάς, όχι στον πελάτη. Με πολλές ημερήσιες εισπράξεις είναι πολλά email.',
+      on: 'Ενεργή',
+      off: 'Ανενεργή',
+    },
     groups: {
       company: {
         title: 'Η επιχείρησή σας',
@@ -1675,6 +1684,8 @@ const en: typeof el = {
       debtorAdded: 'Customer added.',
       debtorUpdated: 'Details updated.',
       settingsSaved: 'Settings saved.',
+      paymentNoticeOn: 'You will be emailed on every settlement.',
+      paymentNoticeOff: 'You will not be emailed about settlements.',
       automationOn: 'Automatic reminders are on.',
       automationOff: 'Automatic reminders are off. Nothing goes out.',
       templateSaved: 'Template saved.',
@@ -2452,6 +2463,13 @@ const en: typeof el = {
     creditsSuccess:
       'Payment complete. The SMS credits appear as soon as Stripe confirms — usually within seconds.',
     creditsCancelled: 'The purchase was cancelled. You have not been charged.',
+    paymentNotice: {
+      title: 'Payment notice',
+      label: 'Email me on every settlement',
+      hint: 'Sent to you, not to the customer. With many collections a day, that is many emails.',
+      on: 'On',
+      off: 'Off',
+    },
     groups: {
       company: {
         title: 'Your business',

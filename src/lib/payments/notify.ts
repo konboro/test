@@ -75,6 +75,12 @@ export async function notifyPaymentReceived(invoiceId: string): Promise<void> {
 
     if (!tenant) return;
 
+    // Switched off in settings. Checked here rather than at each of the four
+    // call sites — Stripe return, Stripe webhook, Viva return and the bank
+    // sweep all end here, and a preference honoured in three of them is worse
+    // than none at all.
+    if (tenant.notify_on_payment === false) return;
+
     // Replies still go to the money desk; the notice itself goes to everyone
     // who should know, the account holder included.
     const recipients = notificationRecipients(tenant);

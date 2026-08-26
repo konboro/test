@@ -17,6 +17,7 @@ import { ElorusForm } from './elorus-forms';
 import { BankConnect } from './bank-forms';
 import { ScenarioForm } from './scenario-forms';
 import { AutomationSwitch } from './automation-switch';
+import { PaymentNoticeSwitch } from './payment-notice-switch';
 import { SettingsSection } from './section';
 import { CreditPacks, MyDataForm, ProfileForm } from './settings-forms';
 import { ProviderChooser } from './provider-chooser';
@@ -181,15 +182,22 @@ export default async function SettingsPage({
   // the client's, and the policy is what makes that true.
   const org = await requireOrganization();
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('users')
     .select(
-      'company_name, email, vat_number, business_mode, reply_to_email, automation_enabled, mydata_user_id, mydata_environment, sms_credits, stripe_account_id, stripe_charges_enabled, locale, elorus_organization_id',
+      'company_name, email, vat_number, business_mode, notify_on_payment, reply_to_email, automation_enabled, mydata_user_id, mydata_environment, sms_credits, stripe_account_id, stripe_charges_enabled, locale, elorus_organization_id',
     )
     .eq('id', org.id)
     .maybeSingle();
 
-  if (!profile) redirect('/login');
+  if (!profile) {
+    // A refused query and a missing row are indistinguishable here, and the
+    // handler for both is a redirect that looks exactly like being signed out.
+    // One column absent from the SELECT grant fails all thirteen — that is how
+    // this page once logged everyone out — so say which it was.
+    if (profileError) console.error('[settings] profile query refused', profileError.message);
+    redirect('/login');
+  }
 
   // What the confirmation is actually asking about. A switch that warns
   // "reminders will start going out" is abstract; the same warning naming a
@@ -460,6 +468,16 @@ export default async function SettingsPage({
             configured={revolutConfigured}
             environment={keyRow?.revolut_environment ?? 'sandbox'}
           />
+        </div>
+      </Card>
+
+      <Card>
+        <div id="payment-notice" className="scroll-mt-20">
+          <CardHeader
+            title={t.settings.paymentNotice.title}
+            subtitle={t.settings.paymentNotice.hint}
+          />
+          <PaymentNoticeSwitch enabled={profile.notify_on_payment !== false} />
         </div>
       </Card>
 

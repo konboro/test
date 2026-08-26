@@ -244,3 +244,37 @@ export async function resetTemplate(
   revalidatePath('/settings');
   return { success: t.forms.success.templateReset };
 }
+
+/**
+ * Turns the payment notice on or off.
+ *
+ * Its own action rather than a field on the profile form, for the reason the
+ * automation switch is: a two-state preference with a Save button beside it
+ * invites the reading that nothing happened until you press Save.
+ */
+export async function setPaymentNotice(
+  _prev: SettingsState,
+  formData: FormData,
+): Promise<SettingsState> {
+  const t = await getDictionary();
+
+  // Anything that is not an explicit "on" means off — the safe reading of a
+  // malformed request is fewer emails, not more.
+  const enabled = formData.get('enabled') === 'on';
+
+  const supabase = await createClient();
+  const org = await activeOrganization();
+  if (!org) return { error: t.forms.errors.unauthorized };
+  const { error } = await supabase
+    .from('users')
+    .update({ notify_on_payment: enabled })
+    .eq('id', org.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath('/settings');
+
+  return {
+    success: enabled ? t.forms.success.paymentNoticeOn : t.forms.success.paymentNoticeOff,
+  };
+}
