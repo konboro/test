@@ -83,6 +83,7 @@ export default async function InvoicesPage({
     { data: contacts },
     { data: bankMatches },
     { data: openReports },
+    { data: sentMessages },
   ] = await Promise.all([
     query.limit(500),
     supabase.from('debtors').select('id, name, vat_number').order('name'),
@@ -103,10 +104,21 @@ export default async function InvoicesPage({
       .select('id, invoice_id, kind, details, bank_match, created_at')
       .eq('status', 'open')
       .order('created_at', { ascending: false }),
+    // What actually left the building for each invoice. Counted from the send
+    // log rather than from dunning_contacts: a contact is a rung claimed on the
+    // ladder, while this answers the question an operator asks before pressing
+    // Remind again — how many times has this person already been told.
+    supabase.from('communications_log').select('invoice_id').eq('status', 'sent'),
   ]);
 
   const bankSettled = new Set((bankMatches ?? []).map((row) => row.matched_invoice_id));
   const reportByInvoice = new Map((openReports ?? []).map((r) => [r.invoice_id, r.kind]));
+
+  const sentByInvoice = new Map<string, number>();
+  for (const row of sentMessages ?? []) {
+    if (!row.invoice_id) continue;
+    sentByInvoice.set(row.invoice_id, (sentByInvoice.get(row.invoice_id) ?? 0) + 1);
+  }
 
   const debtorsById = new Map((debtors ?? []).map((d) => [d.id, d]));
 

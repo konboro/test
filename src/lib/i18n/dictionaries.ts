@@ -993,6 +993,8 @@ const el = {
     payLinkCopied: 'Αντιγράφηκε',
     remind: 'Υπενθύμιση',
     remindHint: 'Προεπισκόπηση και αποστολή υπενθύμισης',
+    remindersSent: (n: number) =>
+      n === 1 ? '1 υπενθύμιση' : `${n} υπενθυμίσεις`,
     deleteTitle: 'Διαγραφή παραστατικού;',
     deleteBody: (label: string) =>
       `Το ${label} θα διαγραφεί, μαζί με τις απόπειρες πληρωμής και τη δραστηριότητα του συνδέσμου. Τα μηνύματα που έχουν ήδη σταλεί παραμένουν.`,
@@ -2314,6 +2316,8 @@ const en: typeof el = {
     payLinkCopied: 'Copied',
     remind: 'Remind',
     remindHint: 'Preview and send a reminder',
+    remindersSent: (n: number) =>
+      n === 1 ? '1 reminder sent' : `${n} reminders sent`,
     deleteTitle: 'Delete this invoice?',
     deleteBody: (label: string) =>
       `${label} will be deleted, along with its payment attempts and link activity. Messages already sent stay.`,
