@@ -994,6 +994,7 @@ const el = {
     payLink: 'Σύνδεσμος πληρωμής',
     payLinkCopied: 'Αντιγράφηκε',
     remind: 'Υπενθύμιση',
+    sortBy: 'Ταξινόμηση',
     remindHint: 'Προεπισκόπηση και αποστολή υπενθύμισης',
     remindersSent: (n: number) =>
       n === 1 ? '1 υπενθύμιση' : `${n} υπενθυμίσεις`,
@@ -2319,6 +2320,7 @@ const en: typeof el = {
     payLink: 'Payment link',
     payLinkCopied: 'Copied',
     remind: 'Remind',
+    sortBy: 'Sort by',
     remindHint: 'Preview and send a reminder',
     remindersSent: (n: number) =>
       n === 1 ? '1 reminder sent' : `${n} reminders sent`,

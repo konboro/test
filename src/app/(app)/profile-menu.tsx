@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { signOut } from '@/app/auth/actions';
 import { useT } from '@/lib/i18n/provider';
@@ -25,15 +25,12 @@ export function ProfileMenu({
   email,
   smsCredits,
   showCredits,
-  localeSwitch,
 }: {
   companyName: string | null;
   email: string | null;
   smsCredits: number;
   /** Credits are only worth showing where they are actually metered. */
   showCredits: boolean;
-  /** Rendered on the server and handed in, since the switch reads the locale itself. */
-  localeSwitch: ReactNode;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -122,9 +119,7 @@ export function ProfileMenu({
             </Link>
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t border-ink-100 px-4 py-3">
-            {localeSwitch}
-
+          <div className="flex items-center justify-end border-t border-ink-100 px-4 py-3">
             <form action={signOut}>
               <button
                 type="submit"

@@ -421,6 +421,39 @@ export default async function InvoicesPage({
               they are actually wanted — who, how much, how late — with the
               controls underneath. From `md` up the table returns, because
               comparing invoices side by side is what it is good at. */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-ink-200 px-5 py-2.5 md:hidden">
+            {showBulk ? (
+              <label className="flex items-center gap-2 text-sm text-ink-700">
+                <SelectAll form="bulk" />
+                {t.invoices.bulk.selectAll}
+              </label>
+            ) : null}
+
+            <div className="flex items-center gap-3 text-xs">
+              <span className="text-ink-400">{t.invoices.sortBy}</span>
+              {(
+                [
+                  ['customer', t.invoices.colCustomer],
+                  ['amount', t.invoices.colAmount],
+                  ['due', t.invoices.colDue],
+                ] as const
+              ).map(([key, label]) => (
+                <Link
+                  key={key}
+                  href={sortHref(key)}
+                  className={
+                    sort === key
+                      ? 'font-semibold text-ink-900 underline underline-offset-2'
+                      : 'text-ink-500 underline-offset-2 hover:underline'
+                  }
+                >
+                  {label}
+                  {sort === key ? (descending ? ' ↓' : ' ↑') : ''}
+                </Link>
+              ))}
+            </div>
+          </div>
+
           <ul className="divide-y divide-ink-100 md:hidden">
             {visible.map((invoice) => {
               const { status, number, label, debtor, customer, age } = view(invoice);

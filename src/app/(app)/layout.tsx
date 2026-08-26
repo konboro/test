@@ -113,12 +113,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               }))}
               activeId={active.id}
             />
+            <LocaleSwitch />
             <ProfileMenu
               companyName={profile?.company_name ?? null}
               email={profile?.email ?? user.email ?? null}
               smsCredits={profile?.sms_credits ?? 0}
               showCredits={smsCreditsEnforced()}
-              localeSwitch={<LocaleSwitch />}
             />
           </div>
         </div>
