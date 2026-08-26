@@ -29,6 +29,7 @@ import {
   RemindButton,
 } from './invoice-forms';
 import { BulkActions } from './bulk-actions';
+import { ReportReview } from './report-review';
 import { SelectAll } from './select-all';
 
 export async function generateMetadata() {
@@ -76,22 +77,36 @@ export default async function InvoicesPage({
   if (filter === 'pending') query = query.eq('status', 'pending');
   else if (filter === 'paid') query = query.eq('status', 'paid');
 
-  const [{ data: invoices }, { data: debtors }, { data: contacts }, { data: bankMatches }] =
-    await Promise.all([
-      query.limit(500),
-      supabase.from('debtors').select('id, name, vat_number').order('name'),
-      supabase.from('dunning_contacts').select('invoice_id, step'),
-      // Which invoices a bank credit settled — that link lives on the
-      // transaction, and it is what tells a detected transfer apart from a
-      // settlement someone typed in by hand.
-      supabase
-        .from('bank_transactions')
-        .select('matched_invoice_id')
-        .eq('state', 'settled')
-        .not('matched_invoice_id', 'is', null),
-    ]);
+  const [
+    { data: invoices },
+    { data: debtors },
+    { data: contacts },
+    { data: bankMatches },
+    { data: openReports },
+  ] = await Promise.all([
+    query.limit(500),
+    supabase.from('debtors').select('id, name, vat_number').order('name'),
+    supabase.from('dunning_contacts').select('invoice_id, step'),
+    // Which invoices a bank credit settled — that link lives on the
+    // transaction, and it is what tells a detected transfer apart from a
+    // settlement someone typed in by hand.
+    supabase
+      .from('bank_transactions')
+      .select('matched_invoice_id')
+      .eq('state', 'settled')
+      .not('matched_invoice_id', 'is', null),
+    // What debtors said on the payment page and nobody has reviewed yet.
+    // Chasing is already held for these; this screen is where it gets
+    // un-held, so the queue sits above the list it is blocking.
+    supabase
+      .from('invoice_reports')
+      .select('id, invoice_id, kind, details, bank_match, created_at')
+      .eq('status', 'open')
+      .order('created_at', { ascending: false }),
+  ]);
 
   const bankSettled = new Set((bankMatches ?? []).map((row) => row.matched_invoice_id));
+  const reportByInvoice = new Map((openReports ?? []).map((r) => [r.invoice_id, r.kind]));
 
   const debtorsById = new Map((debtors ?? []).map((d) => [d.id, d]));
 
@@ -129,6 +144,40 @@ export default async function InvoicesPage({
       (a, b) => nameOf(a.debtor_id).localeCompare(nameOf(b.debtor_id)) * (descending ? -1 : 1),
     );
   }
+
+  // The review queue, enriched with the document each report is about. Its
+  // invoices are fetched by id rather than taken from `invoices` above: that
+  // list obeys the page's filter, and a payment claim must not vanish from the
+  // queue because the operator happens to be looking at the paid view.
+  const reportInvoiceIds = [...new Set((openReports ?? []).map((r) => r.invoice_id))];
+  const { data: reportInvoices } = reportInvoiceIds.length
+    ? await supabase
+        .from('invoices')
+        .select('id, debtor_id, amount_cents, invoice_number, series, mark')
+        .in('id', reportInvoiceIds)
+    : { data: [] };
+  const reportInvoiceById = new Map((reportInvoices ?? []).map((row) => [row.id, row]));
+
+  const reviewable = (openReports ?? []).flatMap((report) => {
+    const invoice = reportInvoiceById.get(report.invoice_id);
+    if (!invoice) return [];
+
+    return [
+      {
+        id: report.id,
+        kind: report.kind,
+        createdAt: report.created_at,
+        details: report.details,
+        bankMatch: report.bank_match,
+        invoiceLabel:
+          [invoice.series, invoice.invoice_number].filter(Boolean).join(' ') ||
+          invoice.mark ||
+          '—',
+        invoiceAmountCents: invoice.amount_cents,
+        debtorName: nameOf(invoice.debtor_id) || t.debtors.nameMissing,
+      },
+    ];
+  });
 
   // Where the bulk action sends the operator back to, filters and all.
   const back = `/invoices?${new URLSearchParams({ filter, sort, dir, ...(q ? { q } : {}) })}`;
@@ -279,6 +328,8 @@ export default async function InvoicesPage({
         </div>
       ) : null}
 
+      <ReportReview t={t} reports={reviewable} />
+
       <Card>
         <CardHeader title={t.invoices.count(visible.length)} />
 
@@ -405,6 +456,17 @@ export default async function InvoicesPage({
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         <Badge tone={status.tone}>{status.label}</Badge>
                         {age ? <Badge tone={age.tone}>{age.label}</Badge> : null}
+                        {reportByInvoice.has(invoice.id) ? (
+                          <Badge
+                            tone={
+                              reportByInvoice.get(invoice.id) === 'paid_claim' ? 'info' : 'warning'
+                            }
+                          >
+                            {reportByInvoice.get(invoice.id) === 'paid_claim'
+                              ? t.reports.kindPaid
+                              : t.reports.kindDispute}
+                          </Badge>
+                        ) : null}
                       </div>
 
                       <p className="tabular mt-2 text-xs text-ink-500">
@@ -578,7 +640,22 @@ export default async function InvoicesPage({
                         )}
                       </td>
                       <td className="px-5 py-3">
-                        <Badge tone={status.tone}>{status.label}</Badge>
+                        <span className="inline-flex flex-wrap items-center gap-1.5">
+                          <Badge tone={status.tone}>{status.label}</Badge>
+                          {reportByInvoice.has(invoice.id) ? (
+                            <Badge
+                              tone={
+                                reportByInvoice.get(invoice.id) === 'paid_claim'
+                                  ? 'info'
+                                  : 'warning'
+                              }
+                            >
+                              {reportByInvoice.get(invoice.id) === 'paid_claim'
+                                ? t.reports.kindPaid
+                                : t.reports.kindDispute}
+                            </Badge>
+                          ) : null}
+                        </span>
                       </td>
                       <td className="px-5 py-3 text-center">
                         {/* Only where it means something. A settled invoice is

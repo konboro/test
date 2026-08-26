@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 
 import { FunnelBeacon } from './beacon';
 import { PayButton } from './pay-button';
+import { ReportLinks } from './report-links';
 
 /**
  * Public payment page for the debtor.
@@ -91,15 +92,24 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
                   <LockIcon />
                   Ασφαλής πληρωμή με κάρτα. Το lefta.app δεν αποθηκεύει στοιχεία κάρτας.
                 </p>
+                {/* The exits for whoever is NOT paying right now: already paid
+                    by transfer, or the document is wrong. Both used to be dead
+                    ends that earned the visitor another reminder. */}
+                <ReportLinks token={credential} />
               </>
             ) : payable ? (
               // The creditor has neither a connected account nor their own key.
               // The document details above still stand — a reminder link must
-              // never dead-end on a button that breaks when pressed.
-              <div className="rounded-xl bg-ink-100 px-4 py-3 text-center text-sm text-ink-600">
-                Η ηλεκτρονική πληρωμή δεν είναι προς το παρόν διαθέσιμη. Επικοινωνήστε με τον εκδότη
-                για την εξόφληση.
-              </div>
+              // never dead-end on a button that breaks when pressed. The report
+              // links matter even more here: with no button at all, "I paid by
+              // transfer" is the page's most likely true story.
+              <>
+                <div className="rounded-xl bg-ink-100 px-4 py-3 text-center text-sm text-ink-600">
+                  Η ηλεκτρονική πληρωμή δεν είναι προς το παρόν διαθέσιμη. Επικοινωνήστε με τον
+                  εκδότη για την εξόφληση.
+                </div>
+                <ReportLinks token={credential} />
+              </>
             ) : (
               <div className="rounded-xl bg-ink-100 px-4 py-3 text-center text-sm text-ink-600">
                 Το παραστατικό δεν είναι διαθέσιμο για ηλεκτρονική πληρωμή. Επικοινωνήστε με τον

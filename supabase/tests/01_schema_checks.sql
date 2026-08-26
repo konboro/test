@@ -607,5 +607,91 @@ begin
 end $$;
 \echo '  ok  the last owner cannot be removed'
 
+-- --------------------------------------------------------------------------
+-- invoice reports: filed by the server, read by the tenant, decided by nobody's browser
+-- --------------------------------------------------------------------------
+
+-- Filed the way the payment endpoint files them: service role, values from the
+-- invoice row the credential resolved to.
+insert into public.invoice_reports (user_id, invoice_id, debtor_id, kind, details)
+values ('11111111-1111-1111-1111-111111111111', 'bbbbbbbb-0000-0000-0000-000000000001',
+        'aaaaaaaa-0000-0000-0000-000000000001', 'paid_claim',
+        '{"summary":"Δηλώνει έμβασμα."}');
+
+do $$
+begin
+  -- A second open claim on the same invoice folds into the first: the partial
+  -- unique index is also what keeps the anonymous endpoint from piling up rows.
+  begin
+    insert into public.invoice_reports (user_id, invoice_id, debtor_id, kind)
+    values ('11111111-1111-1111-1111-111111111111', 'bbbbbbbb-0000-0000-0000-000000000001',
+            'aaaaaaaa-0000-0000-0000-000000000001', 'paid_claim');
+    raise exception 'FAIL: two open reports of the same kind on one invoice';
+  exception when unique_violation then
+    null;
+  end;
+
+  -- A different kind is a different conversation and coexists.
+  insert into public.invoice_reports (user_id, invoice_id, debtor_id, kind)
+  values ('11111111-1111-1111-1111-111111111111', 'bbbbbbbb-0000-0000-0000-000000000001',
+          'aaaaaaaa-0000-0000-0000-000000000001', 'dispute');
+end $$;
+\echo '  ok  one open report per invoice and kind; kinds coexist'
+
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+
+do $$
+declare n integer;
+begin
+  select count(*) into n from public.invoice_reports;
+  if n <> 2 then raise exception 'FAIL: the tenant should see its 2 reports, got %', n; end if;
+
+  -- The row a money decision is based on takes no browser writes at all —
+  -- not from the debtor (anon) and not from the creditor's own session.
+  begin
+    update public.invoice_reports set status = 'resolved';
+    raise exception 'FAIL: a session edited a report';
+  exception when insufficient_privilege then
+    null;
+  end;
+
+  begin
+    insert into public.invoice_reports (user_id, invoice_id, debtor_id, kind)
+    values ('11111111-1111-1111-1111-111111111111', 'bbbbbbbb-0000-0000-0000-000000000002',
+            'aaaaaaaa-0000-0000-0000-000000000001', 'dispute');
+    raise exception 'FAIL: a session filed a report';
+  exception when insufficient_privilege then
+    null;
+  end;
+end $$;
+
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+
+do $$
+declare n integer;
+begin
+  select count(*) into n from public.invoice_reports;
+  if n <> 0 then raise exception 'FAIL: tenant B sees % of tenant A''s reports', n; end if;
+end $$;
+
+reset role;
+set role anon;
+
+do $$
+begin
+  begin
+    perform count(*) from public.invoice_reports;
+    raise exception 'FAIL: anon could read invoice reports';
+  exception when insufficient_privilege then
+    null;
+  end;
+end $$;
+
+reset role;
+\echo '  ok  reports are tenant-read, server-written, and invisible to anon'
+
 \echo ''
 \echo 'ALL SCHEMA CHECKS PASSED'

@@ -363,6 +363,56 @@ export type OrganizationInviteRow = {
   accepted_at: string | null;
 }
 
+/** What a debtor can say about an invoice from the payment page. */
+export type ReportKind = 'paid_claim' | 'dispute';
+export type ReportStatus = 'open' | 'resolved' | 'dismissed';
+
+/**
+ * A payment claim or a dispute, filed anonymously from the payment page.
+ *
+ * Written only by the server: the debtor's side arrives via the service role
+ * after the payment credential is verified, the creditor's resolution goes
+ * through an ownership-checked action. Browsers can read, never write.
+ */
+export type InvoiceReportRow = {
+  id: string;
+  user_id: string;
+  invoice_id: string;
+  debtor_id: string;
+  kind: ReportKind;
+  status: ReportStatus;
+  details: ReportDetails;
+  /** The conversation verbatim — the debtor's words, not our paraphrase. */
+  transcript: Array<{ role: 'user' | 'assistant'; content: string }> | null;
+  /** Unmatched bank credits that plausibly are the claimed payment. */
+  bank_match: ReportBankHint[] | null;
+  created_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+}
+
+/** The structured outcome of the collection chat (or the fallback form). */
+export type ReportDetails = {
+  /** One or two sentences for the creditor, in Greek. */
+  summary?: string;
+  /** ISO date the debtor says they paid. */
+  claimed_paid_on?: string;
+  claimed_amount_cents?: number;
+  method?: 'transfer' | 'cash' | 'card' | 'other';
+  /** Payment reference, sender bank, or whatever identifies the transfer. */
+  reference?: string;
+  /** What is wrong with the document, in the debtor's words. */
+  dispute_reason?: string;
+  /** How to reach the debtor about this, if they offered a way. */
+  contact?: string;
+}
+
+export type ReportBankHint = {
+  booked_on: string;
+  amount_cents: number;
+  counterparty_name: string | null;
+}
+
 /** One row of `my_organizations()` — the companies the caller may act for. */
 export type MyOrganizationRow = {
   organization_id: string;
@@ -538,6 +588,12 @@ export interface Database {
         Row: RevolutOrderRow;
         Insert: InsertOf<RevolutOrderRow, 'order_id' | 'user_id' | 'invoice_id' | 'amount_cents'>;
         Update: Partial<RevolutOrderRow>;
+        Relationships: NoRelationships;
+      };
+      invoice_reports: {
+        Row: InvoiceReportRow;
+        Insert: InsertOf<InvoiceReportRow, 'user_id' | 'invoice_id' | 'debtor_id' | 'kind'>;
+        Update: Partial<InvoiceReportRow>;
         Relationships: NoRelationships;
       };
     };

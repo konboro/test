@@ -134,6 +134,21 @@ const el = {
     redirecting: 'Ανακατεύθυνση…',
     buy: 'Αγορά',
   },
+  reports: {
+    title: (n: number) =>
+      n === 1 ? '1 δήλωση πελάτη προς εξέταση' : `${n} δηλώσεις πελατών προς εξέταση`,
+    subtitle:
+      'Από τη σελίδα πληρωμής. Οι υπενθυμίσεις για αυτά τα παραστατικά είναι σε αναμονή μέχρι να αποφασίσετε.',
+    kindPaid: 'Δηλώνει πληρωμή',
+    kindDispute: 'Αμφισβήτηση',
+    filed: (date: string) => `Καταχωρήθηκε ${date}`,
+    claimedOn: (date: string) => `Δηλωμένη πληρωμή: ${date}`,
+    bankHint: 'Πιθανή αντιστοίχιση στον τραπεζικό λογαριασμό:',
+    confirmPaid: 'Επιβεβαίωση εξόφλησης',
+    markResolved: 'Επιλύθηκε',
+    dismiss: 'Απόρριψη',
+  },
+
   snooze: {
     action: 'Παύση',
     change: 'Αλλαγή παύσης',
@@ -254,6 +269,10 @@ const el = {
     debtorMuted: 'Ο πελάτης είναι σε σίγαση. Καταργήστε τη σίγαση για να στείλετε υπενθύμιση.',
     debtorSnoozed: (until: string) =>
       `Οι υπενθυμίσεις είναι σε παύση έως ${until}. Άρετε την παύση για να στείλετε τώρα.`,
+    invoicePaidClaim:
+      'Ο πελάτης δηλώνει ότι έχει ήδη πληρώσει. Εξετάστε τη δήλωση στα Παραστατικά πριν σταλεί οτιδήποτε.',
+    invoiceDisputed:
+      'Ο πελάτης αμφισβητεί το παραστατικό. Εξετάστε τη δήλωση στα Παραστατικά πριν σταλεί οτιδήποτε.',
     noEmail: 'Ο πελάτης δεν έχει email.',
     noEmailProvider: 'Δεν έχει ρυθμιστεί πάροχος email (Resend).',
     noPhone: 'Ο πελάτης δεν έχει έγκυρο κινητό.',
@@ -1437,6 +1456,21 @@ const en: typeof el = {
     redirecting: 'Redirecting…',
     buy: 'Buy',
   },
+  reports: {
+    title: (n: number) =>
+      n === 1 ? '1 customer statement to review' : `${n} customer statements to review`,
+    subtitle:
+      'From the payment page. Reminders for these invoices are on hold until you decide.',
+    kindPaid: 'Says it is paid',
+    kindDispute: 'Disputed',
+    filed: (date: string) => `Filed ${date}`,
+    claimedOn: (date: string) => `Claimed payment: ${date}`,
+    bankHint: 'Possible match on your bank account:',
+    confirmPaid: 'Confirm settled',
+    markResolved: 'Resolved',
+    dismiss: 'Dismiss',
+  },
+
   snooze: {
     action: 'Pause',
     change: 'Change pause',
@@ -1556,6 +1590,10 @@ const en: typeof el = {
     debtorMuted: 'This customer is muted. Unmute them to send a reminder.',
     debtorSnoozed: (until: string) =>
       `Reminders are paused until ${until}. Lift the pause to send one now.`,
+    invoicePaidClaim:
+      'The customer says this is already paid. Review the claim on the Invoices screen before anything goes out.',
+    invoiceDisputed:
+      'The customer disputes this document. Review the claim on the Invoices screen before anything goes out.',
     noEmail: 'The customer has no email address.',
     noEmailProvider: 'No email provider is configured (Resend).',
     noPhone: 'The customer has no valid mobile number.',
