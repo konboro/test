@@ -390,7 +390,7 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
   if (!slot) redirect(to({ bulk: 'unknown_template' }));
 
   const org = await writableOrganization();
-  if (!org) redirect('/login');
+  if (!org) redirect(to({ bulk: 'forbidden' }));
 
   const only = channelChoice(formData.get('only'));
   const language = parseLanguageChoice(formData.get('lang'));

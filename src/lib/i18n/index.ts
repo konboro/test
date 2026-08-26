@@ -1,3 +1,5 @@
+import { cache } from 'react';
+
 import { cookies } from 'next/headers';
 
 import { createClient } from '@/lib/supabase/server';
@@ -21,7 +23,16 @@ export const LOCALE_COOKIE = 'lefta_locale';
  * Greek is the default: the product is sold in Greece, and an untouched account
  * should look exactly as it did before this existed.
  */
-export async function getLocale(): Promise<Locale> {
+/**
+ * Memoised for the request, the way listOrganizations already is.
+ *
+ * It is called five or six times per render — root metadata, root layout, panel
+ * layout, the language switch, every page's own metadata — and when the locale
+ * cookie has never been written each call costs two round-trips. That is up to
+ * a dozen avoidable trips on every navigation, and it only happens to people
+ * who never touched the language toggle.
+ */
+export const getLocale = cache(async (): Promise<Locale> => {
   const fromCookie = (await cookies()).get(LOCALE_COOKIE)?.value;
   if (isLocale(fromCookie)) return fromCookie;
 
@@ -39,7 +50,7 @@ export async function getLocale(): Promise<Locale> {
   // to Greek for them.
   const { data } = await supabase.from('users').select('locale').limit(1);
   return isLocale(data?.[0]?.locale) ? data[0].locale : 'el';
-}
+});
 
 export async function getDictionary(): Promise<Dictionary> {
   return DICTIONARIES[await getLocale()];

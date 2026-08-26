@@ -1,12 +1,11 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 
 import { Badge, Card, CardHeader, EmptyState, linkClass, subtleLinkClass } from '@/components/ui';
 import { displayName } from '@/lib/debtors';
 import { getDictionary } from '@/lib/i18n';
 import { nextChargeDate } from '@/lib/leases/schedule';
 import { athensDate, formatDate, formatMoney } from '@/lib/money';
-import { writableOrganization } from '@/lib/orgs/active';
+import { requireOrganization } from '@/lib/orgs/active';
 import { createClient } from '@/lib/supabase/server';
 
 import { toggleLease } from './actions';
@@ -21,8 +20,11 @@ export const dynamic = 'force-dynamic';
 export default async function LeasesPage() {
   const t = await getDictionary();
 
-  const org = await writableOrganization();
-  if (!org) redirect('/login');
+  // Viewing, not writing. A viewer belongs here — sending them to /login
+  // tells them their session expired, which it did not.
+  // Called for its guard, not its value: it sends somebody with no company at
+  // all to create one, and the queries below are scoped by policy.
+  await requireOrganization();
 
   const supabase = await createClient();
   const today = athensDate();

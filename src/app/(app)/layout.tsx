@@ -61,10 +61,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     );
   }
 
+  // No filter: the policy on `users` already shows exactly the active company,
+  // which is the whole point of it. Filtering by the resolved id made this wait
+  // for the organisation lookup for no reason — a serial round-trip on every
+  // navigation, across the Atlantic until the region was pinned.
   const { data: profile } = await supabase
     .from('users')
     .select('company_name, email, sms_credits, business_mode')
-    .eq('id', active.id)
+    .limit(1)
     .maybeSingle();
 
   const NAV = [

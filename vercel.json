@@ -6,5 +6,8 @@
       "path": "/api/cron/dunning",
       "schedule": "0 7 * * *"
     }
+  ],
+  "regions": [
+    "fra1"
   ]
 }

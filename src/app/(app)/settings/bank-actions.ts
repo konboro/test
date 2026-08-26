@@ -30,7 +30,8 @@ import { writableOrganization } from '@/lib/orgs/active';
  */
 export async function syncBankNow(): Promise<void> {
   const org = await writableOrganization();
-  if (!org) redirect('/login');
+  // Read-only members may look at the bank card; they may not press sync.
+  if (!org) redirect('/settings?bank=forbidden');
 
   // Customer-present, and said so. The nightly sweep passes no PSU context
   // because nobody is there — claiming otherwise would misstate to the bank why
