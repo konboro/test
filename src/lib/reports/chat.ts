@@ -1,5 +1,19 @@
 import Anthropic from '@anthropic-ai/sdk';
 
+/**
+ * Haiku 4.5, at import Anthropic from '@anthropic-ai/sdk';
+/$5 per million against Opus 5's $5/$25.
+ *
+ * This chat is reachable by anyone holding a payment link, and its whole job —
+ * stated below — is collecting two or three facts and filing them. The turn and
+ * length caps in validate.ts bound a single conversation, but on Opus an
+ * exhausted one costs roughly $0.48 against about $0.10 here: on the operator's
+ * current balance that is the difference between ten conversations and fifty.
+ *
+ * Raise it deliberately if the wording turns out to matter more than the count.
+ */
+const MODEL = 'claude-haiku-4-5';
+
 import { optionalEnv } from '@/lib/env';
 import { formatDate, formatMoney } from '@/lib/money';
 import type { ReportKind } from '@/types/database';
@@ -144,7 +158,7 @@ export async function chatTurn(
   messages: ChatMessage[],
 ): Promise<ChatTurnResult> {
   const response = await client().beta.messages.create({
-    model: 'claude-opus-5',
+    model: MODEL,
     max_tokens: 700,
     // A collection chat is simple; effort stays low so replies come back fast
     // and cheap. Thinking is on by default and adapts.
@@ -197,7 +211,7 @@ export async function closingTurn(
 
   try {
     const response = await client().beta.messages.create({
-      model: 'claude-opus-5',
+      model: MODEL,
       max_tokens: 300,
       output_config: { effort: 'low' },
       betas: ['server-side-fallback-2026-07-01'],
