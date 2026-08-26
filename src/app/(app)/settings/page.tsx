@@ -6,7 +6,7 @@ import { loadScenario } from '@/lib/dunning/engine';
 
 import { DEFAULT_TEMPLATES, EDITABLE_SLOTS, slotKey } from '@/lib/dunning/templates';
 import { getDictionary, type Dictionary } from '@/lib/i18n';
-import { smsCreditsEnforced } from '@/lib/limits';
+import { hourlySweep, smsCreditsEnforced } from '@/lib/limits';
 import { requireOrganization } from '@/lib/orgs/active';
 import { paymentsAvailable } from '@/lib/providers';
 import { connectConfigured, SMS_PACKS } from '@/lib/stripe';
@@ -338,7 +338,7 @@ export default async function SettingsPage({
       <Card>
         <div id="scenario" className="scroll-mt-20">
           <CardHeader title={t.scenario.title} subtitle={t.scenario.hint} />
-          <ScenarioForm scenario={scenario} />
+          <ScenarioForm scenario={scenario} showSendHour={hourlySweep()} />
         </div>
       </Card>
 

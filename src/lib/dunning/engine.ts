@@ -1,3 +1,4 @@
+import { hourlySweep } from '@/lib/limits';
 import { athensDate, athensHour, daysBetween } from '@/lib/money';
 import { channelAvailable, providerStatus, type Channel, type ProviderStatus } from '@/lib/providers';
 import { normalisePhone } from '@/lib/sms/send';
@@ -194,11 +195,20 @@ async function processTenant(
   // The cadence this tenant configured, or the built-in one if they never did.
   const scenario = await loadScenario(tenant.id);
 
-  // The sweep runs every hour; a tenant is swept only in the hour they chose.
-  // Read in Europe/Athens rather than UTC, because the choice is a local one: a
-  // fixed UTC schedule lands an hour later in summer than in winter, and a
-  // tenant who picked nine would be moved to ten without touching anything.
-  if (athensHour() !== scenario.sendHour) return;
+  // Honoured only where the sweep actually runs more than once a day.
+  //
+  // Vercel's Hobby plan permits one cron firing per day — confirmed by the
+  // platform refusing an hourly schedule outright — so with a single daily
+  // firing this check would sweep only the tenants whose chosen hour happened to
+  // match it and quietly strand everyone else. Off by default therefore means
+  // exactly today's behaviour.
+  //
+  // Set SWEEP_HOURLY once the route is called hourly, whether by a Pro cron or
+  // by an external scheduler pointed at it with the same secret. Read in
+  // Europe/Athens, not UTC: a fixed UTC schedule lands an hour later in summer
+  // than in winter, and a tenant who picked nine would be moved to ten without
+  // touching anything.
+  if (hourlySweep() && athensHour() !== scenario.sendHour) return;
 
   // AUTO-STOP is expressed here: only `pending` invoices are ever loaded. The
   // moment the Stripe webhook flips an invoice to `paid`, it leaves this set and

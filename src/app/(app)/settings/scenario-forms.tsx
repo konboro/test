@@ -27,7 +27,17 @@ function Submit({ label }: { label: string }) {
  * the polite half of that: it shows the bounds rather than letting someone save
  * a scenario the database will refuse, but it is not what enforces them.
  */
-export function ScenarioForm({ scenario }: { scenario: Scenario }) {
+export function ScenarioForm({
+  scenario,
+  showSendHour,
+}: {
+  scenario: Scenario;
+  /**
+   * False while the sweep fires once a day, when an hour cannot be kept.
+   * A control that silently does nothing is worse than its absence.
+   */
+  showSendHour: boolean;
+}) {
   const t = useT();
   const [state, action] = useActionState<ScenarioState, FormData>(saveScenario, {});
 
@@ -97,6 +107,7 @@ export function ScenarioForm({ scenario }: { scenario: Scenario }) {
 
       {/* When, rather than whether. The steps above decide which day a reminder
           falls on; this decides what time of day it leaves. */}
+      {showSendHour ? (
       <div className="rounded-xl border border-ink-200 p-4">
         <Field label={t.scenario.sendHour} hint={t.scenario.sendHourHint}>
           <select name="send_hour" defaultValue={String(scenario.sendHour)} className={inputClass}>
@@ -108,6 +119,7 @@ export function ScenarioForm({ scenario }: { scenario: Scenario }) {
           </select>
         </Field>
       </div>
+      ) : null}
 
       <div className="rounded-xl border border-ink-200 p-4">
         <label className="flex items-center gap-2 text-sm font-medium text-ink-900">
