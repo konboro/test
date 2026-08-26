@@ -20,8 +20,17 @@ export function SelectAll({ form }: { form: string }) {
         const owner = document.getElementById(form);
         if (!(owner instanceof HTMLFormElement)) return;
 
-        for (const box of owner.querySelectorAll<HTMLInputElement>('input[name="ids"]')) {
-          box.checked = event.currentTarget.checked;
+        const checked = event.currentTarget.checked;
+
+        // `form.elements`, not a query on the form's subtree. The row boxes sit
+        // inside the table and join this form by the `form` attribute, so they
+        // are associated with it without being descendants of it — which is why
+        // searching the subtree found none of them and ticking this box did
+        // nothing at all.
+        for (const element of Array.from(owner.elements)) {
+          if (element instanceof HTMLInputElement && element.name === 'ids') {
+            element.checked = checked;
+          }
         }
       }}
     />
