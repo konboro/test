@@ -32,7 +32,13 @@ export function emailAvailable(): boolean {
 }
 
 export function smsAvailable(): boolean {
-  return Boolean(optionalEnv('BREVO_API_KEY')) || dryRunMode();
+  // Either transport counts. Asking only about Brevo would tell the panel the
+  // SMS channel is off on the day the migration to Twilio completes.
+  const configured =
+    Boolean(optionalEnv('BREVO_API_KEY')) ||
+    (Boolean(optionalEnv('TWILIO_ACCOUNT_SID')) && Boolean(optionalEnv('TWILIO_AUTH_TOKEN')));
+
+  return configured || dryRunMode();
 }
 
 /**

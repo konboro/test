@@ -92,7 +92,9 @@ describe('sendSms without credentials', () => {
     const result = await sendSms({ phone: '6971234567', message: 'test' });
 
     expect(result.ok).toBe(false);
-    expect(result.error).toContain('BREVO_API_KEY');
+    // Provider-neutral since the transport became a choice: what matters is
+    // that it refuses loudly, not which vendor was missing.
+    expect(result.error).toContain('No SMS provider is configured');
     expect(calls).toHaveLength(0);
   });
 });
