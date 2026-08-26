@@ -154,7 +154,7 @@ export async function updateDebtor(
 export async function deleteDebtor(
   _prev: { error?: string },
   formData: FormData,
-): Promise<{ error?: string }> {
+): Promise<{ error?: string; ok?: boolean }> {
   const t = await getDictionary();
 
   const id = String(formData.get('id') ?? '');
@@ -182,7 +182,7 @@ export async function deleteDebtor(
   revalidatePath('/dashboard');
   revalidatePath('/logs');
 
-  return {};
+  return { ok: true };
 }
 
 export async function toggleMute(formData: FormData) {

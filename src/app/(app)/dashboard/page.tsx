@@ -55,7 +55,9 @@ export default async function DashboardPage() {
         .maybeSingle(),
       supabase
         .from('invoices')
-        .select('id, debtor_id, amount_cents, currency, due_date, status, paid_at, invoice_number, series, mark')
+        .select(
+          'id, debtor_id, amount_cents, currency, due_date, status, paid_at, paid_amount_cents, invoice_number, series, mark, stripe_payment_intent_id, viva_transaction_id, revolut_order_id',
+        )
         .in('status', ['pending', 'paid'])
         .order('due_date', { ascending: true }),
       supabase.from('debtors').select('id, name, vat_number, email, phone, muted'),
@@ -90,9 +92,30 @@ export default async function DashboardPage() {
   const outstandingCents = pending.reduce((sum, i) => sum + i.amount_cents, 0);
   const overdueCents = overdue.reduce((sum, i) => sum + i.amount_cents, 0);
 
-  const collectedCents = allInvoices
-    .filter((i) => i.status === 'paid')
-    .reduce((sum, i) => sum + i.amount_cents, 0);
+  /**
+   * Money that actually arrived through lefta.
+   *
+   * Every paid invoice used to count, which made the tile a total of everything
+   * ever marked settled — including documents synced from myDATA and Elorus that
+   * were paid long before this product touched them, and anything ticked off by
+   * hand. It read as revenue this tool collected, and it was not.
+   *
+   * A provider reference is what distinguishes the two: it exists only when the
+   * debtor paid through a link this system issued. The amount taken is what was
+   * actually captured where that is recorded, not what was invoiced.
+   */
+  const collectedThroughLefta = allInvoices.filter(
+    (i) =>
+      i.status === 'paid' &&
+      (i.stripe_payment_intent_id !== null ||
+        i.viva_transaction_id !== null ||
+        i.revolut_order_id !== null),
+  );
+
+  const collectedCents = collectedThroughLefta.reduce(
+    (sum, i) => sum + (i.paid_amount_cents ?? i.amount_cents),
+    0,
+  );
 
   // Aging buckets over the open balance. The thresholds mirror the ladder: at
   // 1–9 days overdue the automated steps are still doing the chasing; from day

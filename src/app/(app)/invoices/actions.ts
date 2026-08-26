@@ -200,7 +200,7 @@ export async function markInvoicePaid(formData: FormData) {
 export async function deleteInvoice(
   _prev: { error?: string },
   formData: FormData,
-): Promise<{ error?: string }> {
+): Promise<{ error?: string; ok?: boolean }> {
   const t = await getDictionary();
 
   const id = String(formData.get('id') ?? '');
@@ -227,7 +227,7 @@ export async function deleteInvoice(
   revalidatePath('/debtors');
   revalidatePath('/dashboard');
 
-  return {};
+  return { ok: true };
 }
 
 const dueDateSchema = z.object({

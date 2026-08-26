@@ -8,6 +8,9 @@ import { getDictionary } from '@/lib/i18n';
 import { athensDate, formatDate, formatMoney } from '@/lib/money';
 import { createClient } from '@/lib/supabase/server';
 
+import { DeleteButton } from '@/components/delete-button';
+
+import { deleteDebtor } from './actions';
 import { NotificationSwitch } from './notification-switch';
 import { CreateDebtorForm, EditDebtorForm } from './debtor-forms';
 import { SnoozeButton } from './snooze-button';
@@ -61,10 +64,28 @@ export default async function DebtorsPage({
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const [{ data: debtors }, { data: invoices }] = await Promise.all([
-    supabase.from('debtors').select('*').order('name'),
-    supabase.from('invoices').select('debtor_id, amount_cents, status').eq('status', 'pending'),
-  ]);
+  const [{ data: debtors }, { data: invoices }, { data: allInvoices }, { data: messages }] =
+    await Promise.all([
+      supabase.from('debtors').select('*').order('name'),
+      supabase.from('invoices').select('debtor_id, amount_cents, status').eq('status', 'pending'),
+      // Every invoice, not only the open ones: deleting a customer takes the
+      // settled ones too, and a confirmation that counts half of them is worse
+      // than one that counts none.
+      supabase.from('invoices').select('debtor_id'),
+      supabase.from('communications_log').select('debtor_id'),
+    ]);
+
+  const tally = (rows: Array<{ debtor_id: string | null }> | null) => {
+    const counts = new Map<string, number>();
+    for (const row of rows ?? []) {
+      if (!row.debtor_id) continue;
+      counts.set(row.debtor_id, (counts.get(row.debtor_id) ?? 0) + 1);
+    }
+    return counts;
+  };
+
+  const invoicesByDebtor = tally(allInvoices);
+  const messagesByDebtor = tally(messages);
 
   // A snooze expires by comparison rather than by a job, so every screen that
   // shows one needs today's date in the tenant's timezone.
@@ -269,6 +290,24 @@ export default async function DebtorsPage({
                       />
 
                       <NotificationSwitch debtorId={debtor.id} muted={debtor.muted} />
+
+                      <DeleteButton
+                        action={deleteDebtor}
+                        id={debtor.id}
+                        trigger={t.common.delete}
+                        title={t.debtors.deleteTitle}
+                        body={t.debtors.deleteBody(
+                          debtor.name ?? t.debtors.nameMissing,
+                          invoicesByDebtor.get(debtor.id) ?? 0,
+                          messagesByDebtor.get(debtor.id) ?? 0,
+                        )}
+                        warning={
+                          (messagesByDebtor.get(debtor.id) ?? 0) > 0
+                            ? t.debtors.deleteHistoryWarning
+                            : undefined
+                        }
+                        confirmLabel={t.common.delete}
+                      />
                     </div>
                   </div>
 

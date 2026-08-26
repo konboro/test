@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { Modal } from '@/components/modal';
@@ -9,6 +9,8 @@ import { useT } from '@/lib/i18n/provider';
 
 export interface DeleteState {
   error?: string;
+  /** Set once the row is gone, so the dialog can get out of the way. */
+  ok?: boolean;
 }
 
 /**
@@ -56,6 +58,13 @@ export function DeleteButton({
   const t = useT();
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState<DeleteState, FormData>(action, {});
+
+  // Left open, the dialog sat over a list that had already lost the row and a
+  // dashboard whose totals had already moved — so the delete looked like it had
+  // done nothing. The action revalidates; this just gets out of the way.
+  useEffect(() => {
+    if (state.ok) setOpen(false);
+  }, [state.ok]);
 
   return (
     <>
