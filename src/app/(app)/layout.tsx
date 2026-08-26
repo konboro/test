@@ -12,6 +12,7 @@ import { activeOrganization, listOrganizations } from '@/lib/orgs/active';
 import { createClient } from '@/lib/supabase/server';
 
 import { NavLink } from './nav-link';
+import { ProfileMenu } from './profile-menu';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [t, locale] = await Promise.all([getDictionary(), getLocale()]);
@@ -103,15 +104,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
 
           <div className="flex items-center gap-3">
-            {smsCreditsEnforced() ? (
-              <Link
-                href="/settings#credits"
-                className="tabular hidden rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700 sm:block"
-                title={t.nav.smsCredits}
-              >
-                {profile?.sms_credits ?? 0} SMS
-              </Link>
-            ) : null}
             <OrgSwitcher
               orgs={orgs.map((org) => ({
                 id: org.id,
@@ -121,15 +113,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               }))}
               activeId={active.id}
             />
-            <LocaleSwitch />
-            <form action={signOut}>
-              <button
-                type="submit"
-                className="rounded-lg border border-ink-300 px-3 py-1.5 text-sm text-ink-700 transition hover:bg-ink-50"
-              >
-                {t.common.signOut}
-              </button>
-            </form>
+            <ProfileMenu
+              companyName={profile?.company_name ?? null}
+              email={profile?.email ?? user.email ?? null}
+              smsCredits={profile?.sms_credits ?? 0}
+              showCredits={smsCreditsEnforced()}
+              localeSwitch={<LocaleSwitch />}
+            />
           </div>
         </div>
 

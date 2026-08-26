@@ -761,6 +761,8 @@ const el = {
     /** Εμφανίζεται μόνο σε όποιον διαχειρίζεται περισσότερες από μία. */
     companies: 'Εταιρείες',
     smsCredits: 'SMS',
+    account: 'Λογαριασμός',
+    topUpSms: 'Αγορά',
   },
 
   bank: {
@@ -2083,6 +2085,8 @@ const en: typeof el = {
     /** Only shown to someone who works on more than one. */
     companies: 'Companies',
     smsCredits: 'SMS',
+    account: 'Account',
+    topUpSms: 'Top up',
   },
 
   bank: {
