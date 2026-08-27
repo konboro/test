@@ -13,6 +13,7 @@ import { athensDate } from '@/lib/money';
 import { writableOrganization } from '@/lib/orgs/active';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import { noticeOnIssue } from '@/lib/dunning/issue-notice';
 
 export interface UploadState {
   error?: string;
@@ -217,6 +218,11 @@ export async function commitUpload(_prev: UploadState, formData: FormData): Prom
       updated_at: new Date().toISOString(),
     })
     .eq('id', id);
+
+  // Confirming the reading is the deliberate act, not dropping the file in —
+  // the fields were still being checked until this point. So this is where the
+  // customer gets told, and not a moment earlier.
+  if (created?.id) await noticeOnIssue(org.id, created.id);
 
   revalidatePath('/invoices/upload');
   revalidatePath('/invoices');

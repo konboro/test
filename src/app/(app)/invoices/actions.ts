@@ -20,6 +20,7 @@ import { saveFailed } from '@/lib/errors';
 import { formError, getDictionary } from '@/lib/i18n';
 import { redirect } from 'next/navigation';
 import { automationPaused, loadScenario, missingColumn, stepForInvoice } from '@/lib/dunning/engine';
+import { noticeOnIssue } from '@/lib/dunning/issue-notice';
 
 export interface InvoiceFormState {
   error?: string;
@@ -330,20 +331,30 @@ export async function createInvoice(
 
   if (!debtor) return { error: t.forms.errors.debtorNotFound };
 
-  const { error } = await supabase.from('invoices').insert({
-    user_id: org.id,
-    debtor_id: parsed.data.debtor_id,
-    invoice_number: parsed.data.invoice_number,
-    series: parsed.data.series,
-    amount_cents: toCents(parsed.data.amount),
-    currency: 'EUR',
-    issue_date: parsed.data.issue_date,
-    due_date: parsed.data.due_date,
-    mark: null,
-    source: 'manual',
-  });
+  const { data: created, error } = await supabase
+    .from('invoices')
+    .insert({
+      user_id: org.id,
+      debtor_id: parsed.data.debtor_id,
+      invoice_number: parsed.data.invoice_number,
+      series: parsed.data.series,
+      amount_cents: toCents(parsed.data.amount),
+      currency: 'EUR',
+      issue_date: parsed.data.issue_date,
+      due_date: parsed.data.due_date,
+      mark: null,
+      source: 'manual',
+    })
+    .select('id')
+    .maybeSingle();
 
   if (error) return { error: saveFailed(t, 'invoices', error) };
+
+  // The customer is told the invoice exists, now, while it is being raised —
+  // not on tomorrow's sweep, by which point "has been issued" is stale. It
+  // never fails the creation: the invoice is saved either way, and the sweep
+  // picks up a notice that did not go out.
+  if (created?.id) await noticeOnIssue(org.id, created.id);
 
   revalidatePath('/invoices');
   revalidatePath('/dashboard');

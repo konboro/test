@@ -5,7 +5,7 @@ import { useFormStatus } from 'react-dom';
 
 import { Button, Field, inputClass } from '@/components/ui';
 import type { Scenario } from '@/lib/dunning/scenario';
-import { stepLabels } from '@/lib/dunning/status';
+import { stepLabels } from '@/lib/dunning/step-labels';
 import { useT } from '@/lib/i18n/provider';
 
 import { saveScenario, type ScenarioState } from './scenario-actions';

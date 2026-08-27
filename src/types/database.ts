@@ -143,6 +143,13 @@ export type InvoiceRow = {
    * step; the flag stays because it is what the row switch has always written.
    */
   scenario_mode: InvoiceScenarioMode;
+  /**
+   * When the customer was told this invoice exists.
+   *
+   * Claimed before the notice is rendered, so it doubles as the exactly-once
+   * lock. Null means the notice is still owed.
+   */
+  issue_notice_sent_at: string | null;
   paid_at: string | null;
   paid_amount_cents: number | null;
   stripe_checkout_session_id: string | null;

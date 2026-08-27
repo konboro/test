@@ -13,6 +13,7 @@ import {
   rungFor,
   type Scenario,
 } from './scenario';
+import { sweepIssueNotices } from './issue-notice';
 import { isSnoozed } from './snooze';
 import { loadTemplateOverrides } from './template-store';
 import type { TemplateOverrides } from './templates';
@@ -45,6 +46,11 @@ export interface DunningRunResult {
   tenantsProcessed: number;
   invoicesConsidered: number;
   contactsMade: number;
+  /**
+   * Notices sent for invoices raised while the send at confirmation time did
+   * not happen. Normally zero — anything else is worth noticing.
+   */
+  issueNoticesSent: number;
   emailsSent: number;
   smsSent: number;
   skipped: Array<{ invoiceId: string; reason: string }>;
@@ -190,6 +196,7 @@ export async function runDunningSweep(
     tenantsProcessed: 0,
     invoicesConsidered: 0,
     contactsMade: 0,
+    issueNoticesSent: 0,
     emailsSent: 0,
     smsSent: 0,
     skipped: [],
@@ -221,6 +228,13 @@ async function processTenant(
 
   // The cadence this tenant configured, or the built-in one if they never did.
   const scenario = await loadScenario(tenant.id);
+
+  // Not held back by the hour a tenant chose to chase at. The notice on issue
+  // is a copy of a document rather than part of a cadence, and one that failed
+  // to send this morning should go now, not tomorrow morning. Normally there is
+  // nothing to do here at all: the send happens when the invoice is confirmed,
+  // and this only catches what did not.
+  if (!dryRun) result.issueNoticesSent += await sweepIssueNotices(tenant.id);
 
   // Honoured only where the sweep actually runs more than once a day.
   //

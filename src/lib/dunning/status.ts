@@ -2,54 +2,9 @@ import { DICTIONARIES, type Dictionary } from '@/lib/i18n/dictionaries';
 import { athensDate, daysBetween } from '@/lib/money';
 import type { DunningStep, InvoiceRow } from '@/types/database';
 
-import { LADDER, stepForInvoice } from './engine';
-
-/**
- * The rungs past the original three, numbered from their identifier.
- *
- * `step_4` and up were never given names because there is nothing to name: they
- * are whatever a tenant places them at. Deriving the number from the identifier
- * keeps one list instead of five dictionary entries per language that only ever
- * differ by a digit.
- */
-function extraNumber(step: DunningStep): number | null {
-  const match = /^step_(\d)$/.exec(step);
-  return match?.[1] ? Number(match[1]) : null;
-}
-
-export function stepLabels(t: Dictionary): Record<DunningStep, string> {
-  return {
-    on_issue: t.steps.longOnIssue,
-    pre_due: t.steps.longPreDue,
-    overdue_2: t.steps.longOverdue2,
-    overdue_10: t.steps.longOverdue10,
-    step_4: t.steps.longExtra(4),
-    step_5: t.steps.longExtra(5),
-    step_6: t.steps.longExtra(6),
-    step_7: t.steps.longExtra(7),
-    step_8: t.steps.longExtra(8),
-  };
-}
-
-export function stepShort(t: Dictionary): Record<DunningStep, string> {
-  return {
-    on_issue: t.steps.shortOnIssue,
-    pre_due: t.steps.shortPreDue,
-    overdue_2: t.steps.shortOverdue2,
-    overdue_10: t.steps.shortOverdue10,
-    step_4: t.steps.shortExtra(4),
-    step_5: t.steps.shortExtra(5),
-    step_6: t.steps.shortExtra(6),
-    step_7: t.steps.shortExtra(7),
-    step_8: t.steps.shortExtra(8),
-  };
-}
-
-/** One step's short label, for code that has a step rather than the whole map. */
-export function shortLabelFor(t: Dictionary, step: DunningStep): string {
-  const extra = extraNumber(step);
-  return extra ? t.steps.shortExtra(extra) : stepShort(t)[step];
-}
+import { stepForInvoice } from './engine';
+import { stepShort } from './step-labels';
+import { activeSteps, DEFAULT_SCENARIO, LADDER_STEPS, type Scenario } from './scenario';
 
 export interface WorkflowStatus {
   label: string;
@@ -73,6 +28,12 @@ export function workflowStatus(
   completedSteps: ReadonlySet<DunningStep>,
   today: string = athensDate(),
   t: Dictionary = DICTIONARIES.el,
+  /**
+   * The tenant's cadence. Without it this describes the built-in one, which is
+   * right for a tenant who never configured anything and wrong for one who did
+   * — so callers that have already loaded a scenario should pass it.
+   */
+  scenario: Scenario = DEFAULT_SCENARIO,
 ): WorkflowStatus {
   const daysOverdue = daysBetween(invoice.due_date, today);
   const short = stepShort(t);
@@ -85,20 +46,27 @@ export function workflowStatus(
     return { label: t.workflow.writtenOff, tone: 'neutral', daysOverdue };
   }
 
-  const lastDone = [...LADDER].reverse().find((rung) => completedSteps.has(rung.step));
+  // Ordered by the ladder's own order, so a rung past the original three counts
+  // as later than one before it. The notice on issue is not on this list and so
+  // never reads as a step of the chase, which is exactly right: being told an
+  // invoice exists is not being chased for it.
+  const placed = activeSteps(scenario).map((step) => step.step);
+  const order = placed.length ? placed : [...LADDER_STEPS];
+  const lastDone = [...order].reverse().find((step) => completedSteps.has(step));
 
   if (lastDone) {
-    const isFinal = lastDone.step === 'overdue_10';
+    // The last rung the tenant actually placed, not a name hard-coded here.
+    const isFinal = lastDone === order[order.length - 1] && !scenario.repeat.enabled;
     return {
       label: isFinal
-        ? t.workflow.stepSentFinal(short[lastDone.step])
-        : t.workflow.stepSent(short[lastDone.step]),
+        ? t.workflow.stepSentFinal(short[lastDone])
+        : t.workflow.stepSent(short[lastDone]),
       tone: isFinal ? 'danger' : 'warning',
       daysOverdue,
     };
   }
 
-  const pending = stepForInvoice(invoice.due_date, today);
+  const pending = stepForInvoice(invoice.due_date, today, scenario);
   if (pending) {
     return {
       label: t.workflow.stepPending(short[pending.step]),
@@ -113,3 +81,5 @@ export function workflowStatus(
 
   return { label: t.workflow.dueInDays(Math.abs(daysOverdue)), tone: 'neutral', daysOverdue };
 }
+
+export { shortLabelFor, stepLabels, stepShort } from './step-labels';

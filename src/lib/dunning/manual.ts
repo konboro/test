@@ -92,7 +92,13 @@ function fail(error: string, code?: ManualFailure): ManualReminderResult {
  * The admin client bypasses RLS, so every read is scoped by user_id explicitly —
  * this stands in for the policy that would otherwise do it.
  */
-async function loadTarget(
+/**
+ * The tenant, debtor and invoice a message is about, with every reason not to
+ * send it already checked: the invoice open, the debtor neither muted nor
+ * snoozed. Exported because the notice sent on issue has to make exactly the
+ * same checks, and two copies of "may we contact this person" is one too many.
+ */
+export async function loadTarget(
   userId: string,
   invoiceId: string,
 ): Promise<{ ok: true; target: Target } | { ok: false; error: string }> {
