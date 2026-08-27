@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyPlaceholders,
   DEFAULT_TEMPLATES,
+  defaultTemplateFor,
   EDITABLE_SLOTS,
   parseReminderChoice,
   parseReminderSlot,
@@ -80,12 +81,21 @@ describe('template resolution', () => {
     const overrides: TemplateOverrides = {
       'manual:sms': { subject: null, body: 'Χειροκίνητο: {{invoice}}' },
     };
-    expect(renderSms(null, ctx, overrides)).toBe('Χειροκίνητο: A 1042');
+    // The wording is the tenant's; the link is not optional, so it is appended
+    // to an override that left it out rather than being sent without one.
+    expect(renderSms(null, ctx, overrides)).toContain('Χειροκίνητο: A 1042');
+    expect(renderSms(null, ctx, overrides)).toContain(ctx.payUrl);
   });
 
   it('every editable slot has a built-in default behind it', () => {
+    // Resolved rather than looked up: the rungs past the original three have no
+    // copy of their own and borrow it, which is exactly the case a lookup into
+    // the table would miss while the editor showed an empty box.
     for (const slot of EDITABLE_SLOTS) {
-      expect(DEFAULT_TEMPLATES[slot.key]?.body ?? '').not.toBe('');
+      for (const locale of ['el', 'en'] as const) {
+        expect(defaultTemplateFor(slot.key, locale).body).not.toBe('');
+      }
+
       expect(parseSlotKey(slot.key)).toEqual({
         step: slot.step,
         channel: slot.channel,
@@ -197,8 +207,8 @@ describe('the Penny wording', () => {
       'manual:email': { subject: 'Manual subject', body: 'Manual body' },
     };
 
-    expect(renderEmail(null, ctx, overrides).text).toBe('Manual body');
-    expect(renderEmail(null, ctx, overrides, 'penny').text).not.toBe('Manual body');
+    expect(renderEmail(null, ctx, overrides).text).toContain('Manual body');
+    expect(renderEmail(null, ctx, overrides, 'penny').text).not.toContain('Manual body');
   });
 
   it('falls back to the plain slot on a channel it does not define', () => {

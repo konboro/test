@@ -149,7 +149,12 @@ const templateSchema = z.object({
     .string()
     .trim()
     .min(1, 'textEmpty')
-    .max(4000, 'textTooLong'),
+    .max(4000, 'textTooLong')
+    // A reminder that asks for money without saying how to pay it wastes the
+    // contact and the credit. The renderer puts the link back if it is missing,
+    // but silently repairing a template a person is looking at is worse than
+    // telling them, so the editor refuses it here.
+    .refine((v) => v.includes('{{pay_url}}'), 'payUrlRequired'),
 });
 
 /**

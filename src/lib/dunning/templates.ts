@@ -1,6 +1,6 @@
 import type { Locale } from '@/lib/i18n/dictionaries';
 import { formatDate, formatMoney } from '@/lib/money';
-import type { CommChannel, TemplateStep } from '@/types/database';
+import type { CommChannel, DunningStep, TemplateStep } from '@/types/database';
 
 export interface TemplateContext {
   debtorName: string;
@@ -42,8 +42,20 @@ export interface RenderedEmail {
  * the step is already null — a check constraint enforces that, not this type.
  */
 export type TemplateSlotKey =
-  | `${'pre_due' | 'overdue_2' | 'overdue_10' | 'manual'}:${CommChannel}`
+  | `${DunningStep | 'manual'}:${CommChannel}`
   | 'penny:email';
+
+/**
+ * A table of built-in copy.
+ *
+ * Partial, because the rungs past the original three share the neutral overdue
+ * wording until a tenant writes their own and there is nothing to gain from
+ * five identical entries per language. The manual slots are required: they are
+ * the last fallback, so a table without them would leave `templateFor` with
+ * nothing to return.
+ */
+type SlotTable = Partial<Record<TemplateSlotKey, { subject: string | null; body: string }>> &
+  Record<`manual:${CommChannel}`, { subject: string | null; body: string }>;
 
 /** Names a manual wording. Null is the plain manual reminder. */
 export type TemplateVariant = 'penny' | null;
@@ -73,13 +85,32 @@ export const EDITABLE_SLOTS: ReadonlyArray<{
   step: TemplateStep;
   channel: CommChannel;
   variant?: TemplateVariant;
-  label: string;
+  /**
+   * Only for the wordings a step name cannot describe.
+   *
+   * A rung's label is its position in the ladder, which the app already knows
+   * how to say in the reader's language. Baking it in here meant the editor
+   * listed Greek headings to an English tenant.
+   */
+  label?: string;
 }> = [
-  { key: 'pre_due:email', step: 'pre_due', channel: 'email', label: 'Βήμα 1 — πριν τη λήξη (email)' },
-  { key: 'overdue_2:email', step: 'overdue_2', channel: 'email', label: 'Βήμα 2 — ληξιπρόθεσμο (email)' },
-  { key: 'overdue_2:sms', step: 'overdue_2', channel: 'sms', label: 'Βήμα 2 — ληξιπρόθεσμο (SMS)' },
-  { key: 'overdue_10:email', step: 'overdue_10', channel: 'email', label: 'Βήμα 3 — τελική υπενθύμιση (email)' },
-  { key: 'overdue_10:sms', step: 'overdue_10', channel: 'sms', label: 'Βήμα 3 — τελική υπενθύμιση (SMS)' },
+  { key: 'on_issue:email', step: 'on_issue', channel: 'email' },
+  { key: 'on_issue:sms', step: 'on_issue', channel: 'sms' },
+  { key: 'pre_due:email', step: 'pre_due', channel: 'email' },
+  { key: 'overdue_2:email', step: 'overdue_2', channel: 'email' },
+  { key: 'overdue_2:sms', step: 'overdue_2', channel: 'sms' },
+  { key: 'overdue_10:email', step: 'overdue_10', channel: 'email' },
+  { key: 'overdue_10:sms', step: 'overdue_10', channel: 'sms' },
+  { key: 'step_4:email', step: 'step_4', channel: 'email' },
+  { key: 'step_4:sms', step: 'step_4', channel: 'sms' },
+  { key: 'step_5:email', step: 'step_5', channel: 'email' },
+  { key: 'step_5:sms', step: 'step_5', channel: 'sms' },
+  { key: 'step_6:email', step: 'step_6', channel: 'email' },
+  { key: 'step_6:sms', step: 'step_6', channel: 'sms' },
+  { key: 'step_7:email', step: 'step_7', channel: 'email' },
+  { key: 'step_7:sms', step: 'step_7', channel: 'sms' },
+  { key: 'step_8:email', step: 'step_8', channel: 'email' },
+  { key: 'step_8:sms', step: 'step_8', channel: 'sms' },
   { key: 'manual:email', step: null, channel: 'email', label: 'Χειροκίνητη υπενθύμιση (email)' },
   { key: 'manual:sms', step: null, channel: 'sms', label: 'Χειροκίνητη υπενθύμιση (SMS)' },
   // A second manual wording, for a debtor who is a person rather than a
@@ -184,10 +215,24 @@ export function applyPlaceholders(template: string, ctx: TemplateContext): strin
   });
 }
 
-export const DEFAULT_TEMPLATES: Record<
-  TemplateSlotKey,
-  { subject: string | null; body: string }
-> = {
+export const DEFAULT_TEMPLATES: SlotTable = {
+  'on_issue:email': {
+    subject: 'Νέο παραστατικό {{invoice}} — {{amount}}',
+    body: [
+      'Αγαπητοί συνεργάτες ({{debtor_name}}),',
+      '',
+      'εκδόθηκε το παραστατικό {{invoice}} ποσού {{amount}}, με ημερομηνία λήξης {{due_date}}.',
+      '',
+      'Μπορείτε να εξοφλήσετε ηλεκτρονικά εδώ: {{pay_url}}',
+      '',
+      'Με εκτίμηση,',
+      '{{creditor_name}}',
+    ].join('\n'),
+  },
+  'on_issue:sms': {
+    subject: null,
+    body: '{{creditor_name}}: νέο παραστατικό {{invoice}} ({{amount}}), λήξη {{due_date}}. Εξόφληση: {{pay_url}}',
+  },
   'pre_due:email': {
     subject: 'Υπενθύμιση: το παραστατικό {{invoice}} λήγει στις {{due_date}}',
     body: [
@@ -299,7 +344,24 @@ export const DEFAULT_TEMPLATES: Record<
  * in the formal plural, which English has no equivalent for; reaching for
  * "Dear Sirs" would be a worse match than a neutral greeting.
  */
-const TEMPLATES_EN: Record<TemplateSlotKey, { subject: string | null; body: string }> = {
+const TEMPLATES_EN: SlotTable = {
+  'on_issue:email': {
+    subject: 'Invoice {{invoice}} — {{amount}}',
+    body: [
+      'Dear {{debtor_name}},',
+      '',
+      'invoice {{invoice}} for {{amount}} has been issued, due {{due_date}}.',
+      '',
+      'You can pay online here: {{pay_url}}',
+      '',
+      'Kind regards,',
+      '{{creditor_name}}',
+    ].join('\n'),
+  },
+  'on_issue:sms': {
+    subject: null,
+    body: '{{creditor_name}}: invoice {{invoice}} ({{amount}}) issued, due {{due_date}}. Pay: {{pay_url}}',
+  },
   'pre_due:email': {
     subject: 'Reminder: invoice {{invoice}} is due on {{due_date}}',
     body: [
@@ -393,7 +455,7 @@ const TEMPLATES_EN: Record<TemplateSlotKey, { subject: string | null; body: stri
 };
 
 /** The built-in copy, per language. A tenant's overrides sit on top of this. */
-const BUILT_IN_TEMPLATES: Record<Locale, Record<TemplateSlotKey, { subject: string | null; body: string }>> = {
+const BUILT_IN_TEMPLATES: Record<Locale, SlotTable> = {
   el: DEFAULT_TEMPLATES,
   en: TEMPLATES_EN,
 };
@@ -409,9 +471,25 @@ function builtIn(
   key: TemplateSlotKey,
   locale: Locale = 'el',
 ): { subject: string | null; body: string } | undefined {
-  const table: Partial<Record<TemplateSlotKey, { subject: string | null; body: string }>> =
-    BUILT_IN_TEMPLATES[locale];
-  return table[key];
+  const table = BUILT_IN_TEMPLATES[locale];
+  const direct = table[key];
+  if (direct) return direct;
+
+  // A rung past the original three borrows the plain overdue wording, not the
+  // final-reminder one: that text promises no further reminders, which is false
+  // for a step with more of the ladder below it.
+  const extra = /^step_\d:(email|sms)$/.exec(key);
+  if (extra?.[1]) return table[`overdue_2:${extra[1] as CommChannel}`];
+
+  return undefined;
+}
+
+/** The built-in copy a slot falls back to, for the editor to show as its default. */
+export function defaultTemplateFor(
+  key: TemplateSlotKey,
+  locale: Locale = 'el',
+): { subject: string | null; body: string } {
+  return builtIn(key, locale) ?? BUILT_IN_TEMPLATES[locale]['manual:email'];
 }
 
 /**
@@ -435,7 +513,30 @@ export function templateFor(
   if (chosen) return chosen;
 
   const base = slotKey(step, channel);
-  return overrides[base] ?? BUILT_IN_TEMPLATES[locale][base];
+  return (
+    overrides[base] ??
+    builtIn(base, locale) ??
+    // Every table declares both manual slots, so this is the end of the chain
+    // rather than a guess.
+    BUILT_IN_TEMPLATES[locale][`manual:${channel}`]
+  );
+}
+
+/**
+ * The payment link, guaranteed.
+ *
+ * The link is the message. A template stored before the editor started
+ * insisting on it, or written straight into the database, can still be missing
+ * the placeholder — and the result is a demand for money with no way to pay it.
+ *
+ * The HTML email cannot lose it: the button belongs to the frame, not the body.
+ * The plain-text alternative and the SMS can, so they get it back here. On an
+ * SMS that may cost a second segment; a segment is cheaper than a reply asking
+ * where to pay.
+ */
+function withPayUrl(text: string, payUrl: string, separator = '\n'): string {
+  if (!payUrl || text.includes(payUrl)) return text;
+  return `${text.trimEnd()}${separator}${payUrl}`;
 }
 
 function escapeHtml(value: string): string {
@@ -609,7 +710,7 @@ export function renderEmail(
       '',
     ctx,
   );
-  const text = applyPlaceholders(template.body, ctx);
+  const text = withPayUrl(applyPlaceholders(template.body, ctx), ctx.payUrl);
 
   // The inbox preview line. The greeting is the same on every reminder, so the
   // second paragraph carries the actual news and makes the more useful preview.
@@ -637,5 +738,9 @@ export function renderSms(
   variant: TemplateVariant = null,
   locale: Locale = 'el',
 ): string {
-  return applyPlaceholders(templateFor(step, 'sms', overrides, variant, locale).body, ctx);
+  return withPayUrl(
+    applyPlaceholders(templateFor(step, 'sms', overrides, variant, locale).body, ctx),
+    ctx.payUrl,
+    ' ',
+  );
 }

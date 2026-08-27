@@ -4,8 +4,9 @@ import { Badge, Card, CardHeader } from '@/components/ui';
 import { bankingConfigured, listAspsps } from '@/lib/bank/client';
 import { loadScenario } from '@/lib/dunning/engine';
 
-import { DEFAULT_TEMPLATES, EDITABLE_SLOTS, slotKey } from '@/lib/dunning/templates';
-import { getDictionary, type Dictionary } from '@/lib/i18n';
+import { stepLabels } from '@/lib/dunning/status';
+import { defaultTemplateFor, EDITABLE_SLOTS, slotKey } from '@/lib/dunning/templates';
+import { getDictionary, getLocale, type Dictionary } from '@/lib/i18n';
 import { hourlySweep, smsCreditsEnforced } from '@/lib/limits';
 import { requireOrganization } from '@/lib/orgs/active';
 import { paymentsAvailable } from '@/lib/providers';
@@ -249,13 +250,23 @@ export default async function SettingsPage({
   // Not `t` — that is the dictionary in this scope.
   const overrides = new Map((templates ?? []).map((row) => [slotKey(row.step, row.channel), row]));
 
+  // A rung's heading is its position in the ladder, which the app can say in
+  // the reader's language; only the named wordings carry a label of their own.
+  const locale = await getLocale();
+  const stepName = stepLabels(t);
+  const channelName = (channel: 'email' | 'sms') => (channel === 'email' ? 'email' : 'SMS');
+
   const slots: TemplateSlotView[] = EDITABLE_SLOTS.map((slot) => {
     const override = overrides.get(slot.key);
-    const fallback = DEFAULT_TEMPLATES[slot.key];
+    // The default shown is the one in the reader's language, not the Greek copy
+    // every tenant used to be shown regardless of which language they work in.
+    const fallback = defaultTemplateFor(slot.key, locale);
 
     return {
       key: slot.key,
-      label: slot.label,
+      label: slot.step
+        ? `${stepName[slot.step]} (${channelName(slot.channel)})`
+        : (slot.label ?? slot.key),
       channel: slot.channel,
       subject: override?.subject ?? fallback.subject,
       body: override?.body ?? fallback.body,
