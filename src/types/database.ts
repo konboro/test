@@ -568,6 +568,12 @@ export interface Database {
         Update: Partial<DunningSettingsRow>;
         Relationships: NoRelationships;
       };
+      invoice_dunning_steps: {
+        Row: InvoiceDunningStepRow;
+        Insert: InsertOf<InvoiceDunningStepRow, 'invoice_id' | 'step' | 'offset_days'>;
+        Update: Partial<InvoiceDunningStepRow>;
+        Relationships: NoRelationships;
+      };
       leases: {
         Row: LeaseRow;
         Insert: InsertOf<

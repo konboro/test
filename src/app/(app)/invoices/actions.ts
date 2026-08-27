@@ -21,6 +21,7 @@ import { formError, getDictionary } from '@/lib/i18n';
 import { redirect } from 'next/navigation';
 import { automationPaused, loadScenario, missingColumn, stepForInvoice } from '@/lib/dunning/engine';
 import { noticeOnIssue } from '@/lib/dunning/issue-notice';
+import { invoiceScenarioProblem, parseInvoiceScenario } from '@/lib/dunning/invoice-scenario';
 
 export interface InvoiceFormState {
   error?: string;
@@ -331,6 +332,13 @@ export async function createInvoice(
 
   if (!debtor) return { error: t.forms.errors.debtorNotFound };
 
+  // What the operator chose beside the invoice, read before anything is
+  // written: a cadence the database would refuse should not leave an invoice
+  // saved with a mode it does not match.
+  const cadence = parseInvoiceScenario(formData, await loadScenario(org.id));
+  const problem = invoiceScenarioProblem(cadence);
+  if (problem) return { error: t.scenario[problem] };
+
   const { data: created, error } = await supabase
     .from('invoices')
     .insert({
@@ -344,11 +352,27 @@ export async function createInvoice(
       due_date: parsed.data.due_date,
       mark: null,
       source: 'manual',
+      scenario_mode: cadence.mode,
+      // Kept in step with the mode, because the row switch has always written
+      // this one and the two disagreeing would mean the invoice is chased or
+      // not depending on which the reader happened to look at.
+      automation_enabled: cadence.mode !== 'off',
     })
     .select('id')
     .maybeSingle();
 
   if (error) return { error: saveFailed(t, 'invoices', error) };
+
+  if (created?.id && cadence.rows.length) {
+    const { error: rowsError } = await createAdminClient()
+      .from('invoice_dunning_steps')
+      .insert(cadence.rows.map((row) => ({ ...row, invoice_id: created.id })));
+
+    // The invoice exists and the mode says custom, so a failure here would
+    // leave it following the account cadence while claiming its own. Saying so
+    // is better than a silent difference nobody can see.
+    if (rowsError) return { error: saveFailed(t, 'invoices:scenario', rowsError) };
+  }
 
   // The customer is told the invoice exists, now, while it is being raised —
   // not on tomorrow's sweep, by which point "has been issued" is stale. It

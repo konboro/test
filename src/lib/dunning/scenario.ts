@@ -114,6 +114,49 @@ export interface Rung {
 }
 
 /**
+ * A tenant's scenario with one invoice's changes laid over it.
+ *
+ * Only the rungs and the notice are overridable. The repeat and the sending
+ * hour stay the tenant's: the hour is a property of when the sweep runs for a
+ * whole account, not of a document, and letting one invoice claim a different
+ * one would describe something the engine cannot do.
+ *
+ * A step with no row keeps whatever the tenant set, so an override that changes
+ * one reminder does not silently freeze the rest at the day they were on when
+ * it was written.
+ */
+export function scenarioWithOverrides(
+  base: Scenario,
+  rows: ReadonlyArray<{
+    step: DunningStep;
+    enabled: boolean;
+    offset_days: number;
+    channels: Channel[];
+  }>,
+): Scenario {
+  if (rows.length === 0) return base;
+
+  const override = new Map(rows.map((row) => [row.step, row]));
+  const issue = override.get('on_issue');
+
+  return {
+    ...base,
+    onIssue: issue ? { enabled: issue.enabled, channels: issue.channels } : base.onIssue,
+    steps: base.steps.map((step) => {
+      const row = override.get(step.step);
+      if (!row) return step;
+
+      return {
+        step: step.step,
+        enabled: row.enabled,
+        offsetDays: row.offset_days,
+        channels: row.channels,
+      };
+    }),
+  };
+}
+
+/**
  * The enabled steps in the order they actually fire.
  *
  * Sorted by offset rather than by enum order: a tenant may well decide the SMS

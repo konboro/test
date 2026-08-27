@@ -11,6 +11,7 @@ import {
   EXTRA_STEP_OFFSETS,
   LADDER_STEPS,
   rungFor,
+  scenarioWithOverrides,
   type Scenario,
 } from './scenario';
 import { sweepIssueNotices } from './issue-notice';
@@ -282,6 +283,35 @@ async function processTenant(
   const debtorsById = new Map((debtors ?? []).map((d) => [d.id, d]));
   const reportedInvoices = new Map((openReports ?? []).map((r) => [r.invoice_id, r.kind]));
 
+  // Invoices following their own cadence rather than the tenant's. Loaded in
+  // one query for the whole sweep: per invoice it would be a round trip each,
+  // and the overwhelming majority have none.
+  const customIds = invoices.filter((i) => i.scenario_mode === 'custom').map((i) => i.id);
+
+  const { data: overrideRows } = customIds.length
+    ? await supabase.from('invoice_dunning_steps').select('*').in('invoice_id', customIds)
+    : { data: [] };
+
+  const overridesByInvoice = new Map<string, typeof overrideRows>();
+  for (const row of overrideRows ?? []) {
+    const rows = overridesByInvoice.get(row.invoice_id) ?? [];
+    rows.push(row);
+    overridesByInvoice.set(row.invoice_id, rows);
+  }
+
+  /** The cadence this one document follows. */
+  const scenarioFor = (invoiceId: string): Scenario => {
+    const rows = overridesByInvoice.get(invoiceId);
+    return rows?.length
+      ? scenarioWithOverrides(scenario, rows.map((row) => ({
+          step: row.step,
+          enabled: row.enabled,
+          offset_days: row.offset_days,
+          channels: row.channels as Channel[],
+        })))
+      : scenario;
+  };
+
   // Build today's candidate list.
   const candidates: Candidate[] = [];
 
@@ -325,7 +355,7 @@ async function processTenant(
       continue;
     }
 
-    const rung = stepForInvoice(invoice.due_date, today, scenario);
+    const rung = stepForInvoice(invoice.due_date, today, scenarioFor(invoice.id));
     if (!rung) continue;
 
     // Reachability is per step, not per debtor: a debtor with only a phone

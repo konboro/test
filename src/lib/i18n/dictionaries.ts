@@ -284,6 +284,23 @@ const el = {
     contactFailed: (detail: string) => `Δεν ήταν δυνατή η καταχώριση της επικοινωνίας: ${detail}`,
   },
 
+  invoiceScenario: {
+    title: 'Αυτόματες υπενθυμίσεις',
+    modeDefault: 'Το σενάριό μου',
+    modeDefaultHint: 'Ακολουθεί ό,τι έχετε ορίσει στις ρυθμίσεις. Αλλάζοντάς το εκεί, αλλάζει και εδώ.',
+    modeCustom: 'Κάτι διαφορετικό γι αυτό το παραστατικό',
+    modeCustomHint: 'Ίδια βήματα, δικές του ημέρες και κανάλια. Δεν επηρεάζει τα υπόλοιπα παραστατικά.',
+    modeOff: 'Καμία αυτόματη υπενθύμιση',
+    modeOffHint: 'Ούτε ειδοποίηση έκδοσης ούτε υπενθυμίσεις. Οι χειροκίνητες αποστολές λειτουργούν κανονικά.',
+    customHint:
+      'Η ώρα αποστολής και η επανάληψη παραμένουν του λογαριασμού — ένα παραστατικό δεν μπορεί να έχει δική του ώρα.',
+    saved: 'Αποθηκεύτηκε.',
+    nextStep: 'Επόμενο βήμα',
+    nextNone: 'Δεν έχει προγραμματιστεί άλλη υπενθύμιση.',
+    issueNoticeSent: 'Η ειδοποίηση έκδοσης στάλθηκε',
+    issueNoticePending: 'Η ειδοποίηση έκδοσης δεν έχει σταλεί.',
+  },
+
   scenario: {
     title: 'Σενάριο υπενθυμίσεων',
     hint: 'Πότε φεύγει κάθε βήμα, από ποιο κανάλι, και αν επαναλαμβάνεται.',
@@ -1641,6 +1658,23 @@ const en: typeof el = {
     noChannel: 'No delivery channel is available.',
     dailyLimit: 'This customer has already been contacted today. One contact per day is allowed.',
     contactFailed: (detail: string) => `The contact could not be recorded: ${detail}`,
+  },
+
+  invoiceScenario: {
+    title: 'Automatic reminders',
+    modeDefault: 'My scenario',
+    modeDefaultHint: 'Follows what you set in settings. Change it there and this follows.',
+    modeCustom: 'Something different for this invoice',
+    modeCustomHint: 'The same steps, on its own days and channels. Other invoices are unaffected.',
+    modeOff: 'No automatic reminders',
+    modeOffHint: 'No notice on issue and no reminders. Sending by hand still works.',
+    customHint:
+      'The sending hour and the repeat stay with the account — one invoice cannot have an hour of its own.',
+    saved: 'Saved.',
+    nextStep: 'Next step',
+    nextNone: 'No further reminder is scheduled.',
+    issueNoticeSent: 'Notice on issue sent',
+    issueNoticePending: 'The notice on issue has not been sent.',
   },
 
   scenario: {

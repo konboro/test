@@ -32,6 +32,8 @@ import {
 import { BulkActions } from './bulk-actions';
 import { ReportReview } from './report-review';
 import { SelectAll } from './select-all';
+import { loadScenario } from '@/lib/dunning/engine';
+import { requireOrganization } from '@/lib/orgs/active';
 
 export async function generateMetadata() {
   return { title: (await getDictionary()).invoices.title };
@@ -69,6 +71,12 @@ export default async function InvoicesPage({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
+
+  // Needed twice on this page: the create form offers it as a choice, and the
+  // status column describes where each invoice sits in it. Loading it once here
+  // is what stops the list describing a cadence nobody is on.
+  const org = await requireOrganization();
+  const scenario = await loadScenario(org.id);
 
   // Customer is not a column here — it lives on the debtor row — so that one
   // sort is applied after the join below. The rest the database can do.
@@ -285,7 +293,7 @@ export default async function InvoicesPage({
           <Link href="/invoices/upload" className={`text-sm ${linkClass}`}>
             {t.upload.title}
           </Link>
-          <CreateInvoiceForm debtors={debtors ?? []} />
+          <CreateInvoiceForm debtors={debtors ?? []} scenario={scenario} />
         </div>
       </div>
 
@@ -507,20 +515,30 @@ export default async function InvoicesPage({
                               {t.debtors.nameMissing}
                             </span>
                           )}
+                          {/* The number opens the invoice rather than the scan
+                              behind it: the scan is one of the things the
+                              invoice shows, along with what was sent and what
+                              happens next. */}
                           <p className="tabular mt-0.5 truncate text-xs text-ink-500">
-                            {number && withDocument.has(invoice.id) ? (
-                              <a
-                                href={`/api/invoices/${invoice.id}/document`}
-                                target="_blank"
-                                rel="noreferrer"
-                                title={t.invoices.openDocument}
-                                className="underline decoration-ink-300 underline-offset-2"
-                              >
-                                {number}
-                              </a>
-                            ) : (
-                              (number ?? t.invoices.noNumber)
-                            )}
+                            <Link
+                              href={`/invoices/${invoice.id}`}
+                              className="underline decoration-ink-300 underline-offset-2"
+                            >
+                              {number ?? t.invoices.noNumber}
+                            </Link>
+                            {withDocument.has(invoice.id) ? (
+                              <>
+                                <span className="px-1.5 text-ink-300">·</span>
+                                <a
+                                  href={`/api/invoices/${invoice.id}/document`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="underline decoration-ink-300 underline-offset-2"
+                                >
+                                  {t.invoices.openDocument}
+                                </a>
+                              </>
+                            ) : null}
                           </p>
                         </div>
 
@@ -670,13 +688,14 @@ export default async function InvoicesPage({
                         </td>
                       ) : null}
                       <td className="px-5 py-3">
-                        {number ? (
-                          <div className="font-medium text-ink-900">{number}</div>
-                        ) : (
-                          <div className="font-medium italic text-ink-400">
-                            {t.invoices.noNumber}
-                          </div>
-                        )}
+                        <Link
+                          href={`/invoices/${invoice.id}`}
+                          className={`font-medium underline-offset-2 hover:underline ${
+                            number ? 'text-ink-900' : 'italic text-ink-400'
+                          }`}
+                        >
+                          {number ?? t.invoices.noNumber}
+                        </Link>
                         <div className="tabular mt-0.5 text-xs text-ink-500">
                           {invoice.mark ? (
                             <>

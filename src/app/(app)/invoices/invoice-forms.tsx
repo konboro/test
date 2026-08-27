@@ -11,6 +11,8 @@ import { Switch } from '@/components/switch';
 import { useT } from '@/lib/i18n/provider';
 import { payPath } from '@/lib/pay-code';
 
+import type { Scenario } from '@/lib/dunning/scenario';
+
 import {
   createInvoice,
   previewReminder,
@@ -20,6 +22,7 @@ import {
   type InvoiceFormState,
   type ReminderState,
 } from './actions';
+import { InvoiceScenarioEditor } from './scenario-editor';
 
 function Submit() {
   const t = useT();
@@ -33,8 +36,15 @@ function Submit() {
 
 export function CreateInvoiceForm({
   debtors,
+  scenario,
 }: {
   debtors: Array<{ id: string; name: string }>;
+  /**
+   * The account cadence, so the choice can be made here rather than remembered
+   * and applied afterwards. Raising an invoice for a customer who has agreed
+   * different terms is the moment a person knows that — not a screen later.
+   */
+  scenario: Scenario;
 }) {
   const t = useT();
   const [state, action] = useActionState<InvoiceFormState, FormData>(createInvoice, {});
@@ -87,6 +97,13 @@ export function CreateInvoiceForm({
         <Field label={t.invoiceForm.dueDate}>
           <input name="due_date" type="date" required className={inputClass} />
         </Field>
+      </div>
+
+      <div className="border-t border-ink-100 pt-4">
+        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-500">
+          {t.invoiceScenario.title}
+        </p>
+        <InvoiceScenarioEditor scenario={scenario} />
       </div>
 
       {state.error ? (
