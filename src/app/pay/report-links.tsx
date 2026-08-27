@@ -35,18 +35,29 @@ export function ReportLinks({ token }: { token: string }) {
 
   return (
     <div className="mt-4 border-t border-ink-100 pt-3">
+      {/* These are the only two things a customer can do here other than pay.
+          They were 16px tall and squeezed side by side; on a phone they now sit
+          one above the other with a real tap area each. */}
       {kind === null ? (
-        <p className="flex items-center justify-center gap-4 text-center text-xs">
-          <button type="button" onClick={() => setKind('paid_claim')} className={linkClass}>
+        <div className="flex flex-col items-center gap-1 text-center text-sm sm:flex-row sm:justify-center sm:gap-4">
+          <button
+            type="button"
+            onClick={() => setKind('paid_claim')}
+            className={`inline-flex min-h-11 items-center px-2 ${linkClass}`}
+          >
             {TITLES.paid_claim}
           </button>
-          <span aria-hidden className="text-ink-300">
+          <span aria-hidden className="hidden text-ink-300 sm:inline">
             ·
           </span>
-          <button type="button" onClick={() => setKind('dispute')} className={linkClass}>
+          <button
+            type="button"
+            onClick={() => setKind('dispute')}
+            className={`inline-flex min-h-11 items-center px-2 ${linkClass}`}
+          >
             {TITLES.dispute}
           </button>
-        </p>
+        </div>
       ) : (
         <ReportPanel token={token} kind={kind} onClose={() => setKind(null)} />
       )}
@@ -145,7 +156,7 @@ function ReportPanel({
           type="button"
           onClick={onClose}
           aria-label="Κλείσιμο"
-          className="text-ink-400 transition hover:text-ink-700"
+          className="-mr-2 inline-flex h-11 w-11 items-center justify-center text-ink-400 transition hover:text-ink-700"
         >
           ✕
         </button>
@@ -269,14 +280,16 @@ function ReportForm({
         />
       </label>
 
+      {/* One column on a phone: side by side each field was about 120px,
+          narrower than iOS renders a date input, and both clipped. */}
       {kind === 'paid_claim' ? (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block text-xs text-ink-500">
             Ημερομηνία πληρωμής
             <input
               type="date"
               name="paid_on"
-              className="mt-1 w-full rounded-lg border border-ink-300 px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+              className="mt-1 min-h-11 w-full rounded-lg border border-ink-300 px-3 py-2 text-base outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:min-h-0 sm:text-sm"
             />
           </label>
           <label className="block text-xs text-ink-500">
@@ -285,7 +298,7 @@ function ReportForm({
               name="amount"
               inputMode="decimal"
               placeholder="π.χ. 455,00"
-              className="mt-1 w-full rounded-lg border border-ink-300 px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+              className="mt-1 min-h-11 w-full rounded-lg border border-ink-300 px-3 py-2 text-base outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:min-h-0 sm:text-sm"
             />
           </label>
           <label className="col-span-2 block text-xs text-ink-500">
@@ -293,7 +306,7 @@ function ReportForm({
             <input
               name="reference"
               maxLength={200}
-              className="mt-1 w-full rounded-lg border border-ink-300 px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+              className="mt-1 min-h-11 w-full rounded-lg border border-ink-300 px-3 py-2 text-base outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:min-h-0 sm:text-sm"
             />
           </label>
         </div>
@@ -303,7 +316,7 @@ function ReportForm({
           <input
             name="contact"
             maxLength={200}
-            className="mt-1 w-full rounded-lg border border-ink-300 px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            className="mt-1 min-h-11 w-full rounded-lg border border-ink-300 px-3 py-2 text-base outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:min-h-0 sm:text-sm"
           />
         </label>
       )}

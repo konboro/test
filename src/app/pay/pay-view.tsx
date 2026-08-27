@@ -144,9 +144,11 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
 
 function Row({ label, value, href }: { label: string; value: string; href?: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 px-6 py-3">
-      <dt className="text-ink-500">{label}</dt>
-      <dd className="tabular text-right font-medium text-ink-900">
+    // A company name with no spaces in it was setting the width of the card and
+    // pushing the page sideways on a phone.
+    <div className="flex items-start justify-between gap-4 px-5 py-3 sm:px-6">
+      <dt className="shrink-0 text-ink-500">{label}</dt>
+      <dd className="tabular min-w-0 break-words text-right font-medium text-ink-900">
         {href ? (
           <a
             href={href}

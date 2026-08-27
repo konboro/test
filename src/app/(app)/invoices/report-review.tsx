@@ -84,7 +84,7 @@ export function ReportReview({ t, reports }: { t: Dictionary; reports: Reviewabl
                 ) : null}
               </div>
 
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">
                 {report.kind === 'paid_claim' ? (
                   <form action={confirmPaidReport}>
                     <input type="hidden" name="id" value={report.id} />

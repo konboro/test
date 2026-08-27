@@ -15,7 +15,7 @@ export function SelectAll({ form }: { form: string }) {
     <input
       type="checkbox"
       aria-label={useT().invoices.bulk.selectAll}
-      className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500"
+      className="h-5 w-5 cursor-pointer rounded border-ink-300 text-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500"
       onChange={(event) => {
         const owner = document.getElementById(form);
         if (!(owner instanceof HTMLFormElement)) return;

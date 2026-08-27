@@ -375,7 +375,7 @@ function TransferRow({
           {row.state === 'dismissed' ? (
             <form action={reopenTransaction} className="mt-1">
               <input type="hidden" name="transaction_id" value={row.id} />
-              <button type="submit" className={`text-xs ${subtleLinkClass}`}>
+              <button type="submit" className={`inline-flex min-h-11 items-center text-sm sm:min-h-0 sm:text-xs ${subtleLinkClass}`}>
                 {t.bank.reopen}
               </button>
             </form>
@@ -397,18 +397,18 @@ function TransferRow({
                       <span className="text-ink-500"> · {candidate.debtorName}</span>
                     ) : null}
                   </span>
-                  <span className="flex gap-3">
+                  <span className="flex flex-wrap items-center gap-x-4">
                     <form action={confirmMatch}>
                       <input type="hidden" name="transaction_id" value={row.id} />
                       <input type="hidden" name="invoice_id" value={candidate.id} />
-                      <button type="submit" className={`text-xs ${linkClass}`}>
+                      <button type="submit" className={`inline-flex min-h-11 items-center text-sm sm:min-h-0 sm:text-xs ${linkClass}`}>
                         {t.bank.confirm}
                       </button>
                     </form>
                     <form action={dismissMatch}>
                       <input type="hidden" name="transaction_id" value={row.id} />
                       <input type="hidden" name="invoice_id" value={candidate.id} />
-                      <button type="submit" className={`text-xs ${subtleLinkClass}`}>
+                      <button type="submit" className={`inline-flex min-h-11 items-center text-sm sm:min-h-0 sm:text-xs ${subtleLinkClass}`}>
                         {t.bank.reject}
                       </button>
                     </form>
@@ -422,7 +422,7 @@ function TransferRow({
 
           <form action={dismissMatch} className="mt-2">
             <input type="hidden" name="transaction_id" value={row.id} />
-            <button type="submit" className={`text-xs ${subtleLinkClass}`}>
+            <button type="submit" className={`inline-flex min-h-11 items-center text-sm sm:min-h-0 sm:text-xs ${subtleLinkClass}`}>
               {t.bank.dismissAll}
             </button>
           </form>

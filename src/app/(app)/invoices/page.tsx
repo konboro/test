@@ -448,7 +448,7 @@ export default async function InvoicesPage({
               they are actually wanted — who, how much, how late — with the
               controls underneath. From `md` up the table returns, because
               comparing invoices side by side is what it is good at. */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-ink-200 px-5 py-2.5 md:hidden">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-ink-200 px-4 py-2.5 md:hidden">
             {showBulk ? (
               <label className="flex items-center gap-2 text-sm text-ink-700">
                 <SelectAll form="bulk" />
@@ -462,6 +462,7 @@ export default async function InvoicesPage({
                 [
                   ['customer', t.invoices.colCustomer],
                   ['amount', t.invoices.colAmount],
+                  ['issued', t.invoices.colIssue],
                   ['due', t.invoices.colDue],
                 ] as const
               ).map(([key, label]) => (
@@ -496,7 +497,7 @@ export default async function InvoicesPage({
                         name="ids"
                         value={invoice.id}
                         aria-label={label}
-                        className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-ink-300 text-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500"
+                        className="mt-1 h-5 w-5 shrink-0 cursor-pointer rounded border-ink-300 text-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500"
                       />
                     ) : null}
 
@@ -549,6 +550,18 @@ export default async function InvoicesPage({
 
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         <Badge tone={status.tone}>{status.label}</Badge>
+                        {(() => {
+                          if (!showSettled) return null;
+                          const method = settlementMethod(invoice, {
+                            settledByBank: bankSettled.has(invoice.id),
+                          });
+                          if (!method) return null;
+                          return (
+                            <Badge tone={method.startsWith('card') ? 'info' : 'neutral'}>
+                              <span className="whitespace-nowrap">{methodLabel[method]}</span>
+                            </Badge>
+                          );
+                        })()}
                         {age ? <Badge tone={age.tone}>{age.label}</Badge> : null}
                         {reportByInvoice.has(invoice.id) ? (
                           <Badge
@@ -562,6 +575,13 @@ export default async function InvoicesPage({
                           </Badge>
                         ) : null}
                       </div>
+
+                      {showSettled && invoice.paid_at ? (
+                        <p className="tabular mt-2 text-xs text-ink-500">
+                          {t.invoices.colPaid}:{' '}
+                          {new Date(invoice.paid_at).toLocaleString(t.dateTimeTag)}
+                        </p>
+                      ) : null}
 
                       <p className="tabular mt-2 text-xs text-ink-500">
                         {t.invoices.colDue}:{' '}
@@ -587,7 +607,7 @@ export default async function InvoicesPage({
                               <input type="hidden" name="id" value={invoice.id} />
                               <button
                                 type="submit"
-                                className={`py-0.5 text-sm ${subtleLinkClass}`}
+                                className={`inline-flex min-h-11 items-center text-sm sm:min-h-0 ${subtleLinkClass}`}
                                 title={t.invoices.markPaidHint}
                               >
                                 {t.invoices.markPaid}
@@ -682,7 +702,7 @@ export default async function InvoicesPage({
                               name="ids"
                               value={invoice.id}
                               aria-label={label}
-                              className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500"
+                              className="h-5 w-5 cursor-pointer rounded border-ink-300 text-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500"
                             />
                           ) : null}
                         </td>
