@@ -17,6 +17,7 @@ import { DeleteButton } from '@/components/delete-button';
 
 import {
   deleteInvoice,
+  markBulkPaid,
   markInvoicePaid,
   runScenarioForSelected,
   sendBulkReminder,
@@ -49,6 +50,8 @@ export default async function InvoicesPage({
     q?: string;
     bulk?: string;
     sent?: string;
+    /** How many rows a bulk settle actually moved. */
+    paid?: string;
     limited?: string;
     skipped?: string;
     failed?: string;
@@ -333,6 +336,12 @@ export default async function InvoicesPage({
         </div>
       ) : null}
 
+      {params.paid ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <p className="font-medium">{t.invoices.bulk.paidDone(Number(params.paid))}</p>
+        </div>
+      ) : null}
+
       {params.bulk === 'done' ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           <p className="font-medium">{t.invoices.bulk.done(bulkSent)}</p>
@@ -418,7 +427,10 @@ export default async function InvoicesPage({
                   sendLabel={t.invoices.bulk.send}
                   sendingLabel={t.invoices.bulk.sending}
                   scenarioLabel={t.invoices.bulk.runScenario}
+                  paidLabel={t.invoices.bulk.markPaid}
+                  paidConfirm={t.invoices.bulk.markPaidConfirm}
                   runScenario={runScenarioForSelected}
+                  markPaid={markBulkPaid}
                 />
             </form>
           ) : null}

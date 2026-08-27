@@ -566,3 +566,66 @@ export async function runScenarioForSelected(formData: FormData): Promise<void> 
     }),
   );
 }
+/**
+ * Marks every selected invoice as settled.
+ *
+ * The gap this fills is not convenience. Invoices synced from myDATA and Elorus
+ * arrive without a paid flag even when the money came in years ago, and the only
+ * way to clear a book of them one at a time was the per-row button — so they got
+ * deleted instead, which destroys the record rather than completing it.
+ *
+ * Only `pending` rows are touched, and the filter is repeated in the statement
+ * as well as in the read: two operators pressing this at once must not settle
+ * the same invoice twice, and the row that already moved simply does not match.
+ *
+ * `paid_amount_cents` is set to the invoice amount, because that is the claim
+ * being made — somebody is asserting this was paid in full. A partial payment is
+ * a different fact and does not belong behind a bulk button.
+ */
+export async function markBulkPaid(formData: FormData): Promise<void> {
+  const ids = formData.getAll('ids').map(String).filter(Boolean);
+  const back = safeNextPath(formData.get('back'), '/invoices');
+
+  const to = (params: Record<string, string | number>) => {
+    const query = new URLSearchParams(back.split('?')[1] ?? '');
+    for (const [k, v] of Object.entries(params)) query.set(k, String(v));
+    return `${back.split('?')[0]}?${query}`;
+  };
+
+  if (!ids.length) redirect(to({ bulk: 'none' }));
+
+  const org = await writableOrganization();
+  if (!org) redirect(to({ bulk: 'forbidden' }));
+
+  const admin = createAdminClient();
+
+  const { data: changed, error } = await admin
+    .from('invoices')
+    .update({
+      status: 'paid',
+      paid_at: new Date().toISOString(),
+    })
+    .eq('user_id', org.id)
+    .eq('status', 'pending')
+    .in('id', ids.slice(0, BULK_LIMIT))
+    .select('id, amount_cents');
+
+  if (error) {
+    console.error('[bulk:paid]', error.message);
+    redirect(to({ bulk: 'failed' }));
+  }
+
+  // The amount is per row, so it cannot ride along with the update above.
+  for (const invoice of changed ?? []) {
+    await admin
+      .from('invoices')
+      .update({ paid_amount_cents: invoice.amount_cents })
+      .eq('id', invoice.id);
+  }
+
+  revalidatePath('/invoices');
+  revalidatePath('/debtors');
+  revalidatePath('/dashboard');
+
+  redirect(to({ paid: changed?.length ?? 0 }));
+}

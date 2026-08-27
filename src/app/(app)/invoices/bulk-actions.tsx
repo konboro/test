@@ -20,13 +20,20 @@ export function BulkActions({
   sendLabel,
   sendingLabel,
   scenarioLabel,
+  paidLabel,
+  paidConfirm,
   runScenario,
+  markPaid,
 }: {
   sendLabel: string;
   sendingLabel: string;
   scenarioLabel: string;
-  /** The alternative server action, bound to its own button. */
+  paidLabel: string;
+  /** Asked before settling a batch, because nothing in the app un-settles one. */
+  paidConfirm: string;
+  /** The alternative server actions, each bound to its own button. */
   runScenario: (formData: FormData) => void | Promise<void>;
+  markPaid: (formData: FormData) => void | Promise<void>;
 }) {
   const { pending } = useFormStatus();
 
@@ -50,6 +57,20 @@ export function BulkActions({
         className="rounded-lg border border-ink-300 bg-white px-3.5 py-1.5 text-sm font-medium text-ink-700 outline-none transition hover:bg-ink-50 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {scenarioLabel}
+      </button>
+
+      {/* Settling a batch is the one action here with no way back — nothing in
+          the product marks an invoice unpaid again — so it asks first. */}
+      <button
+        type="submit"
+        formAction={markPaid}
+        disabled={pending}
+        onClick={(event) => {
+          if (!window.confirm(paidConfirm)) event.preventDefault();
+        }}
+        className="rounded-lg border border-ink-300 bg-white px-3.5 py-1.5 text-sm font-medium text-ink-700 outline-none transition hover:bg-ink-50 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {paidLabel}
       </button>
     </>
   );

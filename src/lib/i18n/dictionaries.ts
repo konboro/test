@@ -933,6 +933,11 @@ const el = {
   invoices: {
     bulk: {
       runScenario: 'Εκτέλεση σεναρίου',
+      markPaid: 'Σήμανση ως εξοφλημένα',
+      markPaidConfirm:
+        'Τα επιλεγμένα παραστατικά θα σημανθούν ως εξοφλημένα. Η ενέργεια δεν αναιρείται.',
+      paidDone: (n: number) =>
+        n === 1 ? '1 παραστατικό σημάνθηκε ως εξοφλημένο.' : `${n} παραστατικά σημάνθηκαν ως εξοφλημένα.`,
       sending: 'Αποστολή…',
       notDue: (n: number) => `${n} δεν έχουν φτάσει ακόμη σε βήμα του σεναρίου.`,
       paused: (n: number) => `${n} σε παύση — ο αυτοματισμός τα αφήνει εκτός.`,
@@ -2262,6 +2267,11 @@ const en: typeof el = {
   invoices: {
     bulk: {
       runScenario: 'Run the scenario',
+      markPaid: 'Mark as paid',
+      markPaidConfirm:
+        'The selected invoices will be marked as paid. This cannot be undone.',
+      paidDone: (n: number) =>
+        n === 1 ? '1 invoice marked as paid.' : `${n} invoices marked as paid.`,
       sending: 'Sending…',
       notDue: (n: number) => `${n} have not reached a step of the scenario yet.`,
       paused: (n: number) => `${n} are paused — the automation leaves them alone.`,
