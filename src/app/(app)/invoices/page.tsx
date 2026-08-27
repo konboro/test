@@ -561,6 +561,20 @@ export default async function InvoicesPage({
                           <>
                             <RemindButton invoiceId={invoice.id} label={label} />
                             <CopyPayLink code={invoice.short_code ?? invoice.pay_token} />
+                            {/* The same control the table row has. Settling an
+                                invoice is the one thing people do standing in
+                                front of the customer, so the phone is where it
+                                is needed most. */}
+                            <form action={markInvoicePaid}>
+                              <input type="hidden" name="id" value={invoice.id} />
+                              <button
+                                type="submit"
+                                className={`py-0.5 text-sm ${subtleLinkClass}`}
+                                title={t.invoices.markPaidHint}
+                              >
+                                {t.invoices.markPaid}
+                              </button>
+                            </form>
                             <label className="flex items-center gap-2 text-sm text-ink-600">
                               <InvoiceAutomationSwitch
                                 invoiceId={invoice.id}
