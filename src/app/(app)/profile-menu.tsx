@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
 import { signOut } from '@/app/auth/actions';
-import { useT } from '@/lib/i18n/provider';
+import { switchLocale } from '@/lib/i18n/actions';
+import { LOCALES } from '@/lib/i18n/dictionaries';
+import { useLocale, useT } from '@/lib/i18n/provider';
 
 /**
  * The account menu, in place of a sign-out button sitting in the bar.
@@ -55,6 +57,7 @@ export function ProfileMenu({
     };
   }, [open]);
 
+  const locale = useLocale();
   const label = companyName ?? email ?? t.nav.account;
   const initial = (companyName ?? email ?? '?').trim().charAt(0).toUpperCase();
 
@@ -113,11 +116,38 @@ export function ProfileMenu({
             <Link
               href="/settings"
               onClick={() => setOpen(false)}
-              className="block rounded-lg px-2 py-1.5 text-sm text-ink-700 transition hover:bg-ink-50"
+              className="flex min-h-11 items-center rounded-lg px-2 text-sm text-ink-700 transition hover:bg-ink-50"
             >
               {t.nav.settings}
             </Link>
           </div>
+
+          {/* The top bar has room for the language switch from the small
+              breakpoint up; on a phone it does not, and a control that exists
+              only on desktop is a control a phone user cannot reach. The action
+              is the same one, so both places behave identically. */}
+          <form
+            action={switchLocale}
+            className="flex items-center justify-between gap-3 border-t border-ink-100 px-4 py-3 sm:hidden"
+          >
+            <span className="text-xs text-ink-500">{t.nav.language}</span>
+            <span className="flex items-center gap-0.5 rounded-lg border border-ink-200 p-0.5">
+              {LOCALES.map((code) => (
+                <button
+                  key={code}
+                  type="submit"
+                  name="locale"
+                  value={code}
+                  aria-current={code === locale ? 'true' : undefined}
+                  className={`min-h-9 rounded-md px-2.5 text-xs font-semibold uppercase tracking-wide transition ${
+                    code === locale ? 'bg-ink-900 text-white' : 'text-ink-500'
+                  }`}
+                >
+                  {code}
+                </button>
+              ))}
+            </span>
+          </form>
 
           <div className="flex items-center justify-end border-t border-ink-100 px-4 py-3">
             <form action={signOut}>

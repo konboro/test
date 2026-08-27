@@ -783,6 +783,8 @@ const el = {
 
   nav: {
     dashboard: 'Επισκόπηση',
+    primary: 'Κύρια πλοήγηση',
+    more: 'Περισσότερα',
     invoices: 'Παραστατικά',
     leases: 'Μισθώσεις',
     debtors: 'Πελάτες',
@@ -793,6 +795,7 @@ const el = {
     companies: 'Εταιρείες',
     smsCredits: 'SMS',
     account: 'Λογαριασμός',
+    language: 'Γλώσσα',
     topUpSms: 'Αγορά',
   },
 
@@ -2156,6 +2159,8 @@ const en: typeof el = {
 
   nav: {
     dashboard: 'Overview',
+    primary: 'Primary navigation',
+    more: 'More',
     invoices: 'Invoices',
     leases: 'Leases',
     debtors: 'Customers',
@@ -2166,6 +2171,7 @@ const en: typeof el = {
     companies: 'Companies',
     smsCredits: 'SMS',
     account: 'Account',
+    language: 'Language',
     topUpSms: 'Top up',
   },
 

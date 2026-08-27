@@ -11,6 +11,7 @@ import { smsCreditsEnforced } from '@/lib/limits';
 import { activeOrganization, listOrganizations } from '@/lib/orgs/active';
 import { createClient } from '@/lib/supabase/server';
 
+import { MobileNav } from './mobile-nav';
 import { NavLink } from './nav-link';
 import { ProfileMenu } from './profile-menu';
 
@@ -117,7 +118,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               }))}
               activeId={active.id}
             />
-            <LocaleSwitch />
+            <div className="hidden sm:block">
+              <LocaleSwitch />
+            </div>
             <ProfileMenu
               companyName={profile?.company_name ?? null}
               email={profile?.email ?? user.email ?? null}
@@ -127,16 +130,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
 
-        <nav className="flex gap-1 overflow-x-auto border-t border-ink-200 px-4 py-2 md:hidden">
-          {NAV.map((item) => (
-            <NavLink key={item.href} href={item.href}>
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
+      {/* Room for the bar, plus whatever the phone reserves for its own home
+          indicator. Without it the last row of every page sits under the bar. */}
+      <main className="mx-auto max-w-6xl px-4 py-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:py-8 md:pb-8">
+        {children}
+      </main>
+
+      <MobileNav items={NAV} />
     </div>
     </LocaleProvider>
   );

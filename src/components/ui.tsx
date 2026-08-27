@@ -19,8 +19,8 @@ export function Card({
 
 export function CardHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-ink-200 px-5 py-4">
-      <div>
+    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-ink-200 px-4 py-4 sm:flex-nowrap sm:gap-4 sm:px-5">
+      <div className="min-w-0">
         <h2 className="text-sm font-semibold text-ink-900">{title}</h2>
         {subtitle ? <p className="mt-0.5 text-xs text-ink-500">{subtitle}</p> : null}
       </div>
@@ -47,7 +47,7 @@ export function Stat({
   // digit as wide as a zero reads loose. Tabular numerals stay in table columns,
   // where vertical alignment is what matters.
   return (
-    <Card className="px-5 py-4">
+    <Card className="px-4 py-4 sm:px-5">
       <p className="text-xs font-medium uppercase tracking-wide text-ink-500">{label}</p>
       <p className={`mt-2 text-[28px] font-semibold leading-9 tracking-tight ${toneClass}`}>
         {value}
@@ -108,8 +108,10 @@ export function ButtonLink({
  * the message they clicked rather than a different site.
  */
 function buttonClass(variant: ButtonVariant) {
+  // 44px tall on a phone, unchanged on desktop. A 36px button is comfortable
+  // with a mouse and a coin-toss with a thumb.
   const base =
-    'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
+    'inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0';
 
   if (variant === 'primary') {
     return `${base} bg-ink-900 text-white hover:bg-ink-800 focus-visible:ring-ink-400`;
@@ -141,8 +143,19 @@ export function Field({
   );
 }
 
+/**
+ * Every text input, select and textarea in the product.
+ *
+ * 16px on a phone, 14px from the small breakpoint up. Not a taste decision:
+ * Safari on iOS zooms the page when a field smaller than 16px takes focus, and
+ * it does not zoom back out. Every form in the app was doing that — tap a
+ * field, the layout jumps and stays jumped. The desktop size is unchanged.
+ *
+ * The height floor is the other half: 44px is the smallest thing a thumb hits
+ * reliably, and `py-2` on 14px text came to 38.
+ */
 export const inputClass =
-  'mt-1.5 w-full rounded-lg border border-ink-300 bg-white px-3 py-2 text-sm text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100';
+  'mt-1.5 min-h-11 w-full rounded-lg border border-ink-300 bg-white px-3 py-2 text-base text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 sm:min-h-0 sm:text-sm';
 
 /**
  * Link styling, in two weights.

@@ -56,7 +56,7 @@ export function OrgSwitcher({ orgs, activeId }: { orgs: SwitcherOrg[]; activeId:
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex max-w-[22ch] items-center gap-1.5 rounded-lg border border-ink-300 px-2.5 py-1.5 text-sm text-ink-700 transition hover:bg-ink-50"
+        className="flex min-h-11 max-w-[9rem] items-center gap-1.5 rounded-lg border border-ink-300 px-2.5 text-sm text-ink-700 transition hover:bg-ink-50 sm:min-h-0 sm:max-w-[22ch] sm:py-1.5"
         aria-haspopup="menu"
         aria-expanded={open}
       >
@@ -77,7 +77,10 @@ export function OrgSwitcher({ orgs, activeId }: { orgs: SwitcherOrg[]; activeId:
             onClick={() => setOpen(false)}
           />
 
-          <div className="absolute right-0 z-50 mt-1 w-80 rounded-xl border border-ink-200 bg-white p-2 shadow-lg">
+          {/* Fixed at 320px it hung off the left edge of a 360px screen and
+              could not be reached. It now takes the width it is given, up to
+              the same 320px, and stays inside the viewport. */}
+          <div className="absolute right-0 z-50 mt-1 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-ink-200 bg-white p-2 shadow-lg">
             {orgs.length > SHOWN ? (
               <input
                 type="search"
@@ -86,7 +89,7 @@ export function OrgSwitcher({ orgs, activeId }: { orgs: SwitcherOrg[]; activeId:
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={t.companies.searchPlaceholder}
                 aria-label={t.companies.searchPlaceholder}
-                className="mb-1 w-full rounded-lg border border-ink-300 px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                className="mb-1 min-h-11 w-full rounded-lg border border-ink-300 px-3 text-base outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:min-h-0 sm:py-1.5 sm:text-sm"
               />
             ) : null}
 

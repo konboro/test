@@ -26,3 +26,13 @@ export function LocaleProvider({ locale, children }: { locale: Locale; children:
 export function useT(): Dictionary {
   return DICTIONARIES[useContext(LocaleContext)];
 }
+
+/**
+ * The active language itself, not its dictionary.
+ *
+ * For the handful of controls that have to mark which language is current
+ * rather than read a string in it.
+ */
+export function useLocale(): Locale {
+  return useContext(LocaleContext);
+}
