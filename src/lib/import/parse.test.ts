@@ -163,7 +163,9 @@ describe('preview', () => {
 
     expect(preview.rows).toHaveLength(1);
     expect(preview.problems.map((p) => p.line)).toEqual([3, 4, 5]);
-    expect(preview.problems[2]?.message).toContain('θετικό');
+    // The parser has no language; it says what is wrong and the screen says it
+    // in whichever of the two the reader works in.
+    expect(preview.problems[2]?.code).toBe('amountNotPositive');
   });
 
   it('counts what it cannot reach without refusing it', () => {

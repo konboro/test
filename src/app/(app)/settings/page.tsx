@@ -254,6 +254,17 @@ export default async function SettingsPage({
   // the reader's language; only the named wordings carry a label of their own.
   const locale = await getLocale();
   const stepName = stepLabels(t);
+
+  // The wordings that are not rungs. Their names were baked into the slot list
+  // in Greek, which is what an English tenant was reading.
+  const slotName = (key: string) =>
+    key === 'manual:email'
+      ? t.templates.slotManualEmail
+      : key === 'manual:sms'
+        ? t.templates.slotManualSms
+        : key === 'penny:email'
+          ? t.templates.slotPennyEmail
+          : key;
   const channelName = (channel: 'email' | 'sms') => (channel === 'email' ? 'email' : 'SMS');
 
   const slots: TemplateSlotView[] = EDITABLE_SLOTS.map((slot) => {
@@ -266,7 +277,7 @@ export default async function SettingsPage({
       key: slot.key,
       label: slot.step
         ? `${stepName[slot.step]} (${channelName(slot.channel)})`
-        : (slot.label ?? slot.key),
+        : slotName(slot.key),
       channel: slot.channel,
       subject: override?.subject ?? fallback.subject,
       body: override?.body ?? fallback.body,

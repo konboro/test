@@ -85,14 +85,6 @@ export const EDITABLE_SLOTS: ReadonlyArray<{
   step: TemplateStep;
   channel: CommChannel;
   variant?: TemplateVariant;
-  /**
-   * Only for the wordings a step name cannot describe.
-   *
-   * A rung's label is its position in the ladder, which the app already knows
-   * how to say in the reader's language. Baking it in here meant the editor
-   * listed Greek headings to an English tenant.
-   */
-  label?: string;
 }> = [
   { key: 'on_issue:email', step: 'on_issue', channel: 'email' },
   { key: 'on_issue:sms', step: 'on_issue', channel: 'sms' },
@@ -111,18 +103,12 @@ export const EDITABLE_SLOTS: ReadonlyArray<{
   { key: 'step_7:sms', step: 'step_7', channel: 'sms' },
   { key: 'step_8:email', step: 'step_8', channel: 'email' },
   { key: 'step_8:sms', step: 'step_8', channel: 'sms' },
-  { key: 'manual:email', step: null, channel: 'email', label: 'Χειροκίνητη υπενθύμιση (email)' },
-  { key: 'manual:sms', step: null, channel: 'sms', label: 'Χειροκίνητη υπενθύμιση (SMS)' },
+  { key: 'manual:email', step: null, channel: 'email' },
+  { key: 'manual:sms', step: null, channel: 'sms' },
   // A second manual wording, for a debtor who is a person rather than a
   // business. Email only: the SMS side of this copy has not been written, and
   // an editable body that nothing ever sends is worse than its absence.
-  {
-    key: 'penny:email',
-    step: null,
-    channel: 'email',
-    variant: 'penny',
-    label: 'Penny email — ιδιώτης πελάτης',
-  },
+  { key: 'penny:email', step: null, channel: 'email', variant: 'penny' },
 ];
 
 /** Validates a slot key coming from a form and splits it back into its parts. */
@@ -144,13 +130,12 @@ export const REMINDER_CHOICES: ReadonlyArray<{
   value: string;
   step: TemplateStep;
   variant?: TemplateVariant;
-  label: string;
 }> = [
-  { value: 'manual', step: null, label: 'Χειροκίνητη υπενθύμιση' },
-  { value: 'penny', step: null, variant: 'penny', label: 'Penny email — ιδιώτης πελάτης' },
-  { value: 'pre_due', step: 'pre_due', label: 'Κείμενο βήματος 1 — πριν τη λήξη' },
-  { value: 'overdue_2', step: 'overdue_2', label: 'Κείμενο βήματος 2 — ληξιπρόθεσμο' },
-  { value: 'overdue_10', step: 'overdue_10', label: 'Κείμενο βήματος 3 — τελική υπενθύμιση' },
+  { value: 'manual', step: null },
+  { value: 'penny', step: null, variant: 'penny' },
+  { value: 'pre_due', step: 'pre_due' },
+  { value: 'overdue_2', step: 'overdue_2' },
+  { value: 'overdue_10', step: 'overdue_10' },
 ];
 
 /**
@@ -179,19 +164,24 @@ export function parseReminderSlot(
   return choice ? { step: choice.step, variant: choice.variant ?? null } : undefined;
 }
 
+/**
+ * A variable the renderer substitutes.
+ *
+ * Only the token: what it means is copy, and copy belongs in the dictionary.
+ * It lived here as a Greek string and was shown to every tenant as a tooltip.
+ */
 export interface PlaceholderInfo {
   token: string;
-  label: string;
 }
 
 /** Offered by the template editor; every one is always substituted. */
 export const PLACEHOLDERS: ReadonlyArray<PlaceholderInfo> = [
-  { token: '{{debtor_name}}', label: 'Επωνυμία πελάτη' },
-  { token: '{{creditor_name}}', label: 'Η επωνυμία σας' },
-  { token: '{{invoice}}', label: 'Παραστατικό (σειρά + αριθμός)' },
-  { token: '{{amount}}', label: 'Ποσό' },
-  { token: '{{due_date}}', label: 'Ημερομηνία λήξης' },
-  { token: '{{pay_url}}', label: 'Σύνδεσμος πληρωμής' },
+  { token: '{{debtor_name}}' },
+  { token: '{{creditor_name}}' },
+  { token: '{{invoice}}' },
+  { token: '{{amount}}' },
+  { token: '{{due_date}}' },
+  { token: '{{pay_url}}' },
 ];
 
 /**
@@ -539,6 +529,43 @@ function withPayUrl(text: string, payUrl: string, separator = '\n'): string {
   return `${text.trimEnd()}${separator}${payUrl}`;
 }
 
+/**
+ * The words the frame says, as opposed to the words a tenant wrote.
+ *
+ * The body has been localised since templates gained an English half. The frame
+ * around it was not: an English tenant sent English copy inside a Greek box,
+ * with a Greek button, a Greek footer and lang="el" on the document. The parts
+ * a tenant cannot edit have to follow the same language as the parts they can.
+ */
+const FRAME: Record<Locale, {
+  invoice: string;
+  dueDate: string;
+  amountDue: string;
+  payNow: string;
+  ignoreIfPaid: string;
+  sentOnBehalfOf: string;
+  viaPlatform: string;
+}> = {
+  el: {
+    invoice: 'Παραστατικό',
+    dueDate: 'Ημερομηνία λήξης',
+    amountDue: 'Οφειλόμενο ποσό',
+    payNow: 'Πληρωμή τώρα',
+    ignoreIfPaid: 'Αν έχετε ήδη εξοφλήσει, αγνοήστε αυτό το μήνυμα.',
+    sentOnBehalfOf: 'Αποστέλλεται για λογαριασμό της',
+    viaPlatform: 'μέσω της πλατφόρμας lefta.app.',
+  },
+  en: {
+    invoice: 'Invoice',
+    dueDate: 'Due date',
+    amountDue: 'Amount due',
+    payNow: 'Pay now',
+    ignoreIfPaid: 'If you have already paid, please ignore this message.',
+    sentOnBehalfOf: 'Sent on behalf of',
+    viaPlatform: 'via the lefta.app platform.',
+  },
+};
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -577,7 +604,7 @@ function toParagraphs(text: string): string {
  * scannable place, the way a receipt would — and it is part of the frame, so a
  * template override cannot remove or forge it.
  */
-function factsBlock(ctx: TemplateContext): string {
+function factsBlock(ctx: TemplateContext, frame: (typeof FRAME)[Locale]): string {
   const row = (label: string, value: string, emphasis = false) => `
                         <tr>
                           <td style="padding:4px 0;font-size:13px;color:#64748b;${emphasis ? 'border-top:1px solid #e2e8f0;padding-top:9px;' : ''}">${label}</td>
@@ -591,9 +618,9 @@ function factsBlock(ctx: TemplateContext): string {
                         <tr>
                           <td style="padding:12px 18px;">
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                              ${row('Παραστατικό', escapeHtml(ctx.invoiceLabel))}
-                              ${row('Ημερομηνία λήξης', escapeHtml(formatDate(ctx.dueDate)))}
-                              ${row('Οφειλόμενο ποσό', escapeHtml(formatMoney(ctx.amountCents, ctx.currency)), true)}
+                              ${row(frame.invoice, escapeHtml(ctx.invoiceLabel))}
+                              ${row(frame.dueDate, escapeHtml(formatDate(ctx.dueDate)))}
+                              ${row(frame.amountDue, escapeHtml(formatMoney(ctx.amountCents, ctx.currency)), true)}
                             </table>
                           </td>
                         </tr>
@@ -607,12 +634,14 @@ function shell(
   payUrl: string,
   creditorName: string,
   preheader: string,
+  locale: Locale,
   factsHtml = '',
 ): string {
   const safeUrl = escapeHtml(payUrl);
+  const frame = FRAME[locale];
 
   return `<!doctype html>
-<html lang="el">
+<html lang="${locale}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -661,7 +690,7 @@ ${factsHtml}
                         <tr>
                           <td bgcolor="#2b55d4" style="border-radius:10px;">
                             <a href="${safeUrl}" style="display:inline-block;padding:13px 26px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">
-                              Πληρωμή τώρα
+                              ${frame.payNow}
                             </a>
                           </td>
                         </tr>
@@ -678,10 +707,10 @@ ${factsHtml}
 
             <tr>
               <td style="padding:18px 8px 0;font-size:12px;line-height:1.7;color:#64748b;">
-                Αν έχετε ήδη εξοφλήσει, αγνοήστε αυτό το μήνυμα.<br />
-                Αποστέλλεται για λογαριασμό της
+                ${frame.ignoreIfPaid}<br />
+                ${frame.sentOnBehalfOf}
                 <span style="color:#334155;">${escapeHtml(creditorName)}</span>
-                μέσω της πλατφόρμας lefta.app.
+                ${frame.viaPlatform}
               </td>
             </tr>
           </table>
@@ -723,7 +752,14 @@ export function renderEmail(
   return {
     subject,
     text,
-    html: shell(toParagraphs(text), ctx.payUrl, ctx.creditorName, preheader, factsBlock(ctx)),
+    html: shell(
+      toParagraphs(text),
+      ctx.payUrl,
+      ctx.creditorName,
+      preheader,
+      locale,
+      factsBlock(ctx, FRAME[locale]),
+    ),
   };
 }
 

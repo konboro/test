@@ -397,7 +397,7 @@ export default async function InvoicesPage({
               >
                 {REMINDER_CHOICES.map((choice) => (
                   <option key={choice.value} value={choice.value}>
-                    {t.reminder.choices[choice.value] ?? choice.label}
+                    {t.reminder.choices[choice.value] ?? choice.value}
                   </option>
                 ))}
               </select>

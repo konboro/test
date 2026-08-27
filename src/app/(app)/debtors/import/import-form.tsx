@@ -9,6 +9,7 @@ import {
   parseCsv,
   type ImportField,
   type ParsedTable,
+  type RowProblem,
 } from '@/lib/import/parse';
 import { useT } from '@/lib/i18n/provider';
 import { formatDate, formatMoney } from '@/lib/money';
@@ -46,6 +47,18 @@ const PREVIEW_PROBLEMS = 12;
  * the reason. An import that reports "148 of 150" and nothing else leaves the
  * operator unable to tell a mis-mapped column from twelve broken rows.
  */
+/** What went wrong with a row, in the language the reader works in. */
+function problemText(t: ReturnType<typeof useT>, problem: RowProblem): string {
+  switch (problem.code) {
+    case 'nameMissing':
+      return t.importer.problemNameMissing;
+    case 'amountUnreadable':
+      return t.importer.problemAmountUnreadable(problem.value ?? '');
+    case 'amountNotPositive':
+      return t.importer.problemAmountNotPositive(problem.value ?? '');
+  }
+}
+
 export function ImportForm({ termDays }: { termDays: number }) {
   const t = useT();
   const [text, setText] = useState('');
@@ -259,7 +272,7 @@ export function ImportForm({ termDays }: { termDays: number }) {
                     <span className="tabular font-medium">
                       {t.importer.rejectedLine(problem.line)}
                     </span>{' '}
-                    {problem.message}
+                    {problemText(t, problem)}
                   </li>
                 ))}
                 {preview.problems.length > PREVIEW_PROBLEMS ? (

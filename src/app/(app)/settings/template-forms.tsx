@@ -36,6 +36,31 @@ const SAMPLE: TemplateContext = {
   payUrl: 'https://lefta.app/6JF5BN4Q8S',
 };
 
+/**
+ * What a variable stands for, in the reader's language.
+ *
+ * The list of variables is code — the tokens are what the renderer substitutes —
+ * but the description beside each one is copy, and it was Greek for everybody.
+ */
+function tokenLabel(t: ReturnType<typeof useT>, token: string): string {
+  switch (token) {
+    case '{{debtor_name}}':
+      return t.templates.tokenDebtorName;
+    case '{{creditor_name}}':
+      return t.templates.tokenCreditorName;
+    case '{{invoice}}':
+      return t.templates.tokenInvoice;
+    case '{{amount}}':
+      return t.templates.tokenAmount;
+    case '{{due_date}}':
+      return t.templates.tokenDueDate;
+    case '{{pay_url}}':
+      return t.templates.tokenPayUrl;
+    default:
+      return token;
+  }
+}
+
 function SlotEditor({ slot }: { slot: TemplateSlotView }) {
   const t = useT();
   const [saveState, save, saving] = useActionState<SettingsState, FormData>(saveTemplate, {});
@@ -123,7 +148,7 @@ function SlotEditor({ slot }: { slot: TemplateSlotView }) {
                     key={p.token}
                     type="button"
                     onClick={() => insert(p.token)}
-                    title={p.label}
+                    title={tokenLabel(t, p.token)}
                     className="rounded bg-white px-1.5 py-0.5 font-mono text-xs text-ink-700 ring-1 ring-ink-200 transition hover:bg-brand-50 hover:text-brand-700 hover:ring-brand-200"
                   >
                     {p.token}

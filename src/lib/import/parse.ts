@@ -326,9 +326,19 @@ export interface ImportRow {
   notes: string | null;
 }
 
+/**
+ * What is wrong with one row of a spreadsheet.
+ *
+ * A code and the offending value, not a sentence. The parser has no language:
+ * it ran on a file, and the person reading the result may be working in either
+ * of the two the product speaks. It used to answer in Greek, which is what an
+ * English tenant saw beside their failed import.
+ */
 export interface RowProblem {
   line: number;
-  message: string;
+  code: 'nameMissing' | 'amountUnreadable' | 'amountNotPositive';
+  /** The cell as it was written, for the message to quote back. */
+  value?: string;
 }
 
 export interface ImportPreview {
@@ -372,19 +382,19 @@ export function buildPreview(
     if (!name && !rawAmount) return; // A blank trailing row, not a problem.
 
     if (!name) {
-      problems.push({ line, message: 'Λείπει η επωνυμία του πελάτη' });
+      problems.push({ line, code: 'nameMissing' });
       return;
     }
 
     const amountCents = parseAmountCents(rawAmount);
     if (amountCents === null) {
-      problems.push({ line, message: `Μη αναγνώσιμο ποσό: «${rawAmount}»` });
+      problems.push({ line, code: 'amountUnreadable', value: rawAmount });
       return;
     }
     if (amountCents <= 0) {
       // A zero or a credit note is not a debt. Importing it would put a customer
       // on the ladder for money they do not owe.
-      problems.push({ line, message: `Το ποσό δεν είναι θετικό: «${rawAmount}»` });
+      problems.push({ line, code: 'amountNotPositive', value: rawAmount });
       return;
     }
 

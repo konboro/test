@@ -236,7 +236,7 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
             >
               {REMINDER_CHOICES.map((c) => (
                 <option key={c.value} value={c.value}>
-                  {t.reminder.choices[c.value] ?? c.label}
+                  {t.reminder.choices[c.value] ?? c.value}
                 </option>
               ))}
             </select>

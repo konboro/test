@@ -624,6 +624,9 @@ const el = {
   },
   importer: {
     title: 'Εισαγωγή απαιτήσεων',
+    problemNameMissing: 'Λείπει η επωνυμία του πελάτη',
+    problemAmountUnreadable: (value: string) => `Μη αναγνώσιμο ποσό: «${value}»`,
+    problemAmountNotPositive: (value: string) => `Το ποσό δεν είναι θετικό: «${value}»`,
     subtitle:
       'Ανεβάστε έναν πίνακα με τους οφειλέτες σας, αν οι απαιτήσεις σας δεν βρίσκονται σε κανένα από τα συνδεδεμένα συστήματα.',
     back: 'Πελάτες',
@@ -1356,6 +1359,16 @@ const el = {
   },
 
   templates: {
+    /** The wordings a step name cannot describe, and what each variable means. */
+    slotManualEmail: 'Χειροκίνητη υπενθύμιση (email)',
+    slotManualSms: 'Χειροκίνητη υπενθύμιση (SMS)',
+    slotPennyEmail: 'Penny email — ιδιώτης πελάτης',
+    tokenDebtorName: 'Επωνυμία πελάτη',
+    tokenCreditorName: 'Η επωνυμία σας',
+    tokenInvoice: 'Παραστατικό (σειρά + αριθμός)',
+    tokenAmount: 'Ποσό',
+    tokenDueDate: 'Ημερομηνία λήξης',
+    tokenPayUrl: 'Σύνδεσμος πληρωμής',
     emailGroup: 'Μηνύματα email',
     emailGroupHint: 'Χωρίς όριο μήκους. Το πλαίσιο και το κουμπί πληρωμής προστίθενται αυτόματα.',
     smsGroup: 'Μηνύματα SMS',
@@ -2007,6 +2020,9 @@ const en: typeof el = {
   },
   importer: {
     title: 'Import receivables',
+    problemNameMissing: 'The customer name is missing',
+    problemAmountUnreadable: (value: string) => `Amount could not be read: "${value}"`,
+    problemAmountNotPositive: (value: string) => `Amount is not positive: "${value}"`,
     subtitle:
       'Upload a table of who owes you, for the debts that are not in any of the connected systems.',
     back: 'Customers',
@@ -2721,6 +2737,15 @@ const en: typeof el = {
   },
 
   templates: {
+    slotManualEmail: 'Reminder sent by hand (email)',
+    slotManualSms: 'Reminder sent by hand (SMS)',
+    slotPennyEmail: 'Penny email — private customer',
+    tokenDebtorName: 'Customer name',
+    tokenCreditorName: 'Your company name',
+    tokenInvoice: 'Invoice (series + number)',
+    tokenAmount: 'Amount',
+    tokenDueDate: 'Due date',
+    tokenPayUrl: 'Payment link',
     emailGroup: 'Email messages',
     emailGroupHint: 'No length limit. The frame and payment button are added automatically.',
     smsGroup: 'SMS messages',
