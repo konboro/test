@@ -111,6 +111,7 @@ export async function readInvoiceDocument(
   file: { bytes: Uint8Array; mimeType: string },
   options: {
     ownVatNumber?: string | null;
+    ownName?: string | null;
     vision?: (input: { bytes: Uint8Array; mimeType: string }) => Promise<string | null>;
     assist?: (
       text: string,
@@ -130,10 +131,18 @@ export async function readInvoiceDocument(
    */
   const finish = async (source: ReadSource, text: string): Promise<ReadResult> => {
     const read = extractInvoiceFields(text, options);
-    if (read.missing.length === 0) return { source, ...read };
+
+    // A missing name is not a missing field — a tax number alone is enough to
+    // raise the invoice. It is still the only part of a debtor a person reads in
+    // a list, so it is worth the same question.
+    const gaps: RequiredField[] = read.fields.debtorName
+      ? read.missing
+      : [...new Set<RequiredField>([...read.missing, 'customer'])];
+
+    if (gaps.length === 0) return { source, ...read };
 
     const assist = options.assist ?? assistFields;
-    return { source, ...merge(read.fields, await assist(text, read.missing)) };
+    return { source, ...merge(read.fields, await assist(text, gaps)) };
   };
 
   let pages = 0;

@@ -196,29 +196,66 @@ function currencyIn(text: string): string {
 }
 
 /**
- * Every tax number a VAT label points at, in reading order.
+ * Every tax number on the page, with where on its line each one sits.
  *
- * Length varies by country — Greek nine digits, Polish ten, others between — so
- * the range is wide and the label does the real filtering. That matters more
- * than it sounds: a Polish invoice carries a REGON right next to the NIP and it
- * is nine digits, exactly the shape the old pattern insisted on. Matching a
- * bare run of digits would have picked the wrong identifier off the correct
- * document.
+ * The position matters because an invoice printed in two columns extracts as one
+ * line per row: "NIP 5252445111      NIP 6772391626" is the seller and the buyer
+ * side by side. Reading only the first match per line made the buyer invisible,
+ * left a single candidate standing, and quietly returned the company that issued
+ * the invoice as the one that owes money.
  */
-function vatCandidates(lines: string[]): Array<{ value: string; index: number }> {
-  const found: Array<{ value: string; index: number }> = [];
+function vatCandidates(
+  lines: string[],
+): Array<{ value: string; index: number; offset: number }> {
+  const found: Array<{ value: string; index: number; offset: number }> = [];
+  const label = new RegExp(VAT_LABEL.source, 'gu');
 
   lines.forEach((line, index) => {
-    if (!VAT_LABEL.test(fold(line))) return;
+    const hits = [...fold(line).matchAll(label)];
 
-    const after = tail(line, VAT_LABEL) || lines[index + 1] || '';
-    const digits = /(?:EL|PL|DE|FR|IT|ES|RO|BG|CZ|HU)?(\d{8,12})(?!\d)/.exec(
-      after.replace(/[\s.-]/g, ''),
-    );
-    if (digits?.[1]) found.push({ value: digits[1], index });
+    hits.forEach((hit, k) => {
+      const start = (hit.index ?? 0) + hit[0].length;
+      // Stop at the next label so a number is never read out of the neighbouring
+      // column, which is the seller's.
+      const stop = hits[k + 1]?.index ?? line.length;
+      const sameLine = line.slice(start, stop);
+
+      // A label alone on its line has its number underneath. Only when it is the
+      // line's only label: in a two-column row an empty half means that column
+      // has no number, not that it borrowed the row below.
+      const window =
+        sameLine.trim() === '' && hits.length === 1 ? (lines[index + 1] ?? '') : sameLine;
+
+      const digits = /(?:EL|PL|DE|FR|IT|ES|RO|BG|CZ|HU)?(\d{8,12})(?!\d)/.exec(
+        window.replace(/[\s.-]/g, ''),
+      );
+      if (digits?.[1]) found.push({ value: digits[1], index, offset: start });
+    });
   });
 
   return found;
+}
+
+type Side = 'left' | 'right';
+
+/**
+ * Which half of the page the customer block occupies, when there are two.
+ *
+ * Polish invoices in particular print Sprzedawca and Nabywca beside each other,
+ * and the text layer flattens that into one line per row. The heading row is the
+ * only place the order is stated, so it decides which half of the rows under it
+ * belongs to the customer. No heading row carrying both means one column, and
+ * the ordinary rules apply.
+ */
+function customerSide(lines: string[]): Side | null {
+  for (const line of lines) {
+    const folded = fold(line);
+    const customer = CUSTOMER_MARKER.exec(folded);
+    const issuer = ISSUER_MARKER.exec(folded);
+    if (customer && issuer) return customer.index > issuer.index ? 'right' : 'left';
+  }
+
+  return null;
 }
 
 /**
@@ -226,15 +263,32 @@ function vatCandidates(lines: string[]): Array<{ value: string; index: number }>
  *
  * The tenant's own number is the reliable half: we know it, so we can remove it
  * and stop guessing. The fallbacks after that are ordered by how much they
- * actually tell us — a number under a customer heading, then one that is not
- * under an issuer heading, then the last on the page, because the letterhead
- * comes first.
+ * actually tell us — the customer's column of a two-column row, then a number
+ * under a customer heading and no issuer heading, then merely under a customer
+ * heading, then one that is not under an issuer heading, then the last on the
+ * page, because the letterhead comes first.
  */
 function customerVat(lines: string[], ownVatNumber?: string | null): string | null {
   const own = ownVatNumber?.replace(/\D/g, '') ?? '';
   const candidates = vatCandidates(lines).filter((c) => c.value !== own);
   if (candidates.length === 0) return null;
   if (candidates.length === 1) return candidates[0]?.value ?? null;
+
+  // Two numbers sharing a line is the two-column layout. This has to be decided
+  // before the heading rules below, which read downwards and so cannot tell two
+  // columns of the same row apart at all.
+  const side = customerSide(lines);
+  if (side) {
+    for (const candidate of candidates) {
+      const row = candidates
+        .filter((other) => other.index === candidate.index)
+        .sort((a, b) => a.offset - b.offset);
+      if (row.length < 2) continue;
+
+      const pick = side === 'right' ? row[row.length - 1] : row[0];
+      if (pick) return pick.value;
+    }
+  }
 
   const nearest = (index: number, marker: RegExp) => {
     for (let i = index; i >= Math.max(0, index - 6); i -= 1) {
@@ -243,6 +297,11 @@ function customerVat(lines: string[], ownVatNumber?: string | null): string | nu
     }
     return false;
   };
+
+  const unambiguous = candidates.find(
+    (c) => nearest(c.index, CUSTOMER_MARKER) && !nearest(c.index, ISSUER_MARKER),
+  );
+  if (unambiguous) return unambiguous.value;
 
   const underCustomer = candidates.find((c) => nearest(c.index, CUSTOMER_MARKER));
   if (underCustomer) return underCustomer.value;
@@ -270,21 +329,55 @@ function looksLikeName(line: string): boolean {
   if (VAT_LABEL.test(folded)) return false;
   if (NUMBER_LABEL.test(folded)) return false;
   if (ISSUE_DATE_LABEL.test(folded)) return false;
+  // A heading is not a name, and "Sprzedawca" reaching this far is how the
+  // seller ends up being dunned for the buyer's debt.
+  if (ISSUER_MARKER.test(folded)) return false;
+  if (CUSTOMER_MARKER.test(folded)) return false;
 
   return /\p{L}/u.test(trimmed);
 }
 
-function customerName(lines: string[]): string | null {
+function customerName(lines: string[], ownName?: string | null): string | null {
+  const side = customerSide(lines);
+  const own = ownName ? fold(ownName).replace(/\s+/g, ' ').trim() : '';
+
+  const acceptable = (value: string): string | null => {
+    const name = value.trim();
+    if (!looksLikeName(name)) return null;
+    // Whoever uploaded the document is not the one who owes money on it.
+    if (own && fold(name).replace(/\s+/g, ' ').trim() === own) return null;
+    return name;
+  };
+
+  const columns = (line: string) =>
+    line.split(/\s{2,}/).map((part) => part.trim()).filter(Boolean);
+
+  /** The customer's half of a row, once we know the page has two of them. */
+  const half = (line: string): string | null => {
+    if (!side) return acceptable(line);
+
+    const parts = columns(line);
+    // One segment means the gap between the columns did not survive extraction.
+    // Taking the line whole would return the seller glued to the buyer, so this
+    // row is skipped and the next one tried instead.
+    if (parts.length < 2) return null;
+    return acceptable((side === 'right' ? parts[parts.length - 1] : parts[0]) ?? '');
+  };
+
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
     if (line === undefined || !CUSTOMER_MARKER.test(fold(line))) continue;
 
-    const sameLine = tail(line, CUSTOMER_MARKER);
-    if (sameLine && looksLikeName(sameLine)) return sameLine;
+    // "Nabywca: Jan Kowalski" — the first column after the heading is the name,
+    // whatever else the row carries to the right of it.
+    const sameLine = columns(tail(line, CUSTOMER_MARKER))[0];
+    const named = sameLine ? acceptable(sameLine) : null;
+    if (named) return named;
 
     for (let j = i + 1; j < Math.min(i + 4, lines.length); j += 1) {
       const below = lines[j];
-      if (below && looksLikeName(below)) return below.trim();
+      const found = below ? half(below) : null;
+      if (found) return found;
     }
   }
 
@@ -356,7 +449,10 @@ function totalCents(lines: string[]): number | null {
       if (!pattern.test(folded)) continue;
       if (vetoComponents && NOT_A_TOTAL.test(folded)) continue;
 
-      const onLine = TRAILING_AMOUNT.exec(line.trim());
+      // Folded, because the suffix alternation is uppercase and a Polish invoice
+      // writes its currency as 'zł'. Matching the raw line made every amount that
+      // shared a line with its label invisible.
+      const onLine = TRAILING_AMOUNT.exec(fold(line.trim()));
       const cents = onLine?.[1] ? parseAmountCents(onLine[1]) : null;
       if (cents !== null) return cents;
 
@@ -385,7 +481,7 @@ function markIn(lines: string[]): string | null {
  */
 export function extractInvoiceFields(
   text: string,
-  options: { ownVatNumber?: string | null } = {},
+  options: { ownVatNumber?: string | null; ownName?: string | null } = {},
 ): { fields: ExtractedInvoice; missing: RequiredField[] } {
   const lines = text
     .split(/\r?\n/)
@@ -395,7 +491,7 @@ export function extractInvoiceFields(
   const dueDateRaw = valueFor(lines, DUE_DATE_LABEL);
 
   const fields: ExtractedInvoice = {
-    debtorName: customerName(lines),
+    debtorName: customerName(lines, options.ownName),
     vatNumber: customerVat(lines, options.ownVatNumber),
     invoiceNumber: valueFor(lines, NUMBER_LABEL),
     series: valueFor(lines, SERIES_LABEL),

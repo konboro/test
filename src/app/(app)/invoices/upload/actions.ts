@@ -58,7 +58,7 @@ export async function uploadInvoiceDocuments(
 
   const { data: profile } = await supabase
     .from('users')
-    .select('vat_number')
+    .select('vat_number, company_name')
     .eq('id', org.id)
     .maybeSingle();
 
@@ -89,7 +89,11 @@ export async function uploadInvoiceDocuments(
 
     const result = await readInvoiceDocument(
       { bytes, mimeType: file.type },
-      { ownVatNumber: profile?.vat_number ?? null, vision: visionReader() ?? undefined },
+      {
+        ownVatNumber: profile?.vat_number ?? null,
+        ownName: profile?.company_name ?? null,
+        vision: visionReader() ?? undefined,
+      },
     );
 
     await admin.from('invoice_uploads').insert({
