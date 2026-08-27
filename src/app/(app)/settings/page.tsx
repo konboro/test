@@ -349,7 +349,7 @@ export default async function SettingsPage({
       <Card>
         <div id="scenario" className="scroll-mt-20">
           <CardHeader title={t.scenario.title} subtitle={t.scenario.hint} />
-          <ScenarioForm scenario={scenario} showSendHour={hourlySweep()} />
+          <ScenarioForm scenario={scenario} hourlySweepOn={hourlySweep()} />
         </div>
       </Card>
 

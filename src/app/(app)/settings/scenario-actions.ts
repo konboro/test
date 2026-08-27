@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 
-import { DEFAULT_SCENARIO } from '@/lib/dunning/scenario';
+import { DEFAULT_SCENARIO, EXTRA_STEP_OFFSETS, LADDER_STEPS } from '@/lib/dunning/scenario';
 import { saveFailed } from '@/lib/errors';
 import { getDictionary } from '@/lib/i18n';
 import { activeOrganization } from '@/lib/orgs/active';
@@ -29,7 +29,10 @@ const LIMITS = {
   repeatMax: { min: 1, max: 6 },
 };
 
-const STEPS: DunningStep[] = ['pre_due', 'overdue_2', 'overdue_10'];
+// Every slot the ladder can hold. The ones a tenant has not placed arrive
+// switched off and are stored that way, so the editor and the engine agree on
+// what exists without either of them keeping a second list.
+const STEPS: ReadonlyArray<DunningStep> = LADDER_STEPS;
 
 const clamp = (value: number, { min, max }: { min: number; max: number }) =>
   Math.min(max, Math.max(min, value));
@@ -53,6 +56,10 @@ export async function saveScenario(
       .filter((c): c is CommChannel => c === 'email' || c === 'sms');
 
     const fallback = DEFAULT_SCENARIO.steps.find((s) => s.step === step);
+    // A rung the form did not render keeps the day the editor would propose for
+    // it rather than collapsing onto the due date, where switching it on later
+    // would collide with whatever else sits there.
+    const unplaced = EXTRA_STEP_OFFSETS[step] ?? 0;
     const raw = Number(formData.get(`${step}_offset`));
 
     return {
@@ -61,7 +68,10 @@ export async function saveScenario(
       // A step with no channel is off, not broken. Saying so here keeps the
       // engine from having to guess what an empty channel list meant.
       enabled: formData.get(`${step}_enabled`) === 'on' && channels.length > 0,
-      offset_days: clamp(Number.isFinite(raw) ? raw : (fallback?.offsetDays ?? 0), LIMITS.offset),
+      offset_days: clamp(
+        Number.isFinite(raw) ? raw : (fallback?.offsetDays ?? unplaced),
+        LIMITS.offset,
+      ),
       channels: channels.length ? channels : ((fallback?.channels ?? ['email']) as CommChannel[]),
       updated_at: new Date().toISOString(),
     };
@@ -95,10 +105,29 @@ export async function saveScenario(
     { min: 0, max: 23 },
   );
 
+  // The notice sent on issue. Stored beside the rungs because that is where a
+  // tenant looks for it, but with no offset: it is not measured from the due
+  // date, and the database refuses a non-zero one.
+  const issueChannels = formData
+    .getAll('on_issue_channels')
+    .map(String)
+    .filter((c): c is CommChannel => c === 'email' || c === 'sms');
+
+  const issueRow = {
+    user_id: org.id,
+    step: 'on_issue' as DunningStep,
+    enabled: formData.get('on_issue_enabled') === 'on' && issueChannels.length > 0,
+    offset_days: 0,
+    channels: issueChannels.length
+      ? issueChannels
+      : (DEFAULT_SCENARIO.onIssue.channels as CommChannel[]),
+    updated_at: new Date().toISOString(),
+  };
+
   const admin = createAdminClient();
 
   const [{ error: stepError }, { error: settingsError }] = await Promise.all([
-    admin.from('dunning_steps').upsert(rows, { onConflict: 'user_id,step' }),
+    admin.from('dunning_steps').upsert([...rows, issueRow], { onConflict: 'user_id,step' }),
     admin.from('dunning_settings').upsert(
       {
         user_id: org.id,

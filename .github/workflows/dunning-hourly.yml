@@ -1,0 +1,67 @@
+# Calls the sweep once an hour, so the sending hour a tenant chooses is real.
+#
+# Vercel's Hobby plan runs one cron a day, which is enough to decide *which*
+# day a reminder falls on and useless for deciding what time it leaves. Every
+# tenant would have been swept at the same moment and the hour in the settings
+# would have been a control that saved a value and changed nothing.
+#
+# The endpoint is the same one Vercel calls and takes the same shared secret, so
+# this adds a caller rather than a second code path. It is safe to fire every
+# hour: the sweep skips any tenant whose chosen hour is not the current one, and
+# the once-per-invoice-per-step index makes a double firing a no-op rather than
+# a second message.
+#
+# Two things have to be set for this to do anything:
+#   * repository secret CRON_SECRET — the same value as the Vercel env var
+#   * SWEEP_HOURLY=1 in the Vercel environment, which is what makes the sweep
+#     read the hour at all. Without it every tenant is swept on every call.
+#
+# GitHub schedules on UTC and runs a scheduled job late under load, sometimes by
+# several minutes. That is fine here — the hour gate is compared in Athens time
+# and a run that arrives at 09:07 still lands in the nine o'clock hour — but it
+# is the reason the schedule is not on the hour exactly.
+
+name: dunning-hourly
+
+on:
+  schedule:
+    - cron: '5 * * * *'
+  # So a person can prove it works without waiting for the top of an hour.
+  workflow_dispatch:
+
+# One sweep at a time. A run that overlaps its predecessor would work correctly
+# — the claims are in the database — but it would double the load for nothing.
+concurrency:
+  group: dunning-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Call the sweep
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${CRON_SECRET}" ]; then
+            echo "CRON_SECRET is not set on this repository — nothing to call with."
+            exit 1
+          fi
+
+          # --max-time rather than the default: a sweep that hangs should fail
+          # the run and be visible, not hold a runner for six minutes.
+          status=$(curl --silent --show-error --max-time 300 \
+            --output response.json --write-out '%{http_code}' \
+            --request POST \
+            --header "Authorization: Bearer ${CRON_SECRET}" \
+            https://lefta.app/api/cron/dunning)
+
+          echo "HTTP ${status}"
+          cat response.json || true
+          echo
+
+          test "${status}" = "200"

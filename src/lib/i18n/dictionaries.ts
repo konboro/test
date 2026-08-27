@@ -303,6 +303,16 @@ const el = {
     repeatEnabled: 'Επανάληψη μέχρι να εξοφληθεί',
     sendHour: 'Ώρα αποστολής',
     sendHourHint: 'Τοπική ώρα Ελλάδας. Οι αυτόματες υπενθυμίσεις φεύγουν σε αυτήν την ώρα.',
+    sendHourInactive:
+      'Η ώρα αποθηκεύεται, αλλά τηρείται μόνο όταν η σάρωση τρέχει ωριαία. Μέχρι τότε οι υπενθυμίσεις φεύγουν στην ημερήσια εκτέλεση.',
+    onIssueTitle: 'Κατά την έκδοση',
+    onIssueEnabled: 'Ειδοποίηση μόλις εκδοθεί το παραστατικό',
+    onIssueHint:
+      'Φεύγει μόλις επιβεβαιωθεί το παραστατικό, με τον σύνδεσμο πληρωμής. Δεν είναι υπενθύμιση: δεν δεσμεύει την ημερήσια επαφή του πελάτη.',
+    ladderTitle: 'Υπενθυμίσεις',
+    addStep: 'Προσθήκη υπενθύμισης',
+    removeStep: 'Αφαίρεση',
+    stepsFull: 'Έχετε φτάσει τις 8 υπενθυμίσεις — το όριο.',
     repeatEvery: 'Κάθε (ημέρες)',
     repeatMax: 'Μέγιστες επαναλήψεις',
     repeatHint:
@@ -1652,6 +1662,16 @@ const en: typeof el = {
     repeatEnabled: 'Repeat until it is paid',
     sendHour: 'Sending hour',
     sendHourHint: 'Greek local time. Automatic reminders go out at this hour.',
+    sendHourInactive:
+      'The hour is saved, but only kept once the sweep runs hourly. Until then reminders go out on the daily run.',
+    onIssueTitle: 'When the invoice is raised',
+    onIssueEnabled: 'Tell the customer as soon as the invoice is confirmed',
+    onIssueHint:
+      'Goes out with the payment link the moment the invoice is confirmed. Not a reminder: it does not spend the one contact a customer gets each day.',
+    ladderTitle: 'Reminders',
+    addStep: 'Add a reminder',
+    removeStep: 'Remove',
+    stepsFull: 'Eight reminders is the limit.',
     repeatEvery: 'Every (days)',
     repeatMax: 'Most repeats',
     repeatHint:
