@@ -1,5 +1,5 @@
 import { hourlySweep } from '@/lib/limits';
-import { athensDate, athensHour, daysBetween } from '@/lib/money';
+import { daysBetween, zonedDate, zonedHour } from '@/lib/money';
 import { channelAvailable, providerStatus, type Channel, type ProviderStatus } from '@/lib/providers';
 import { normalisePhone } from '@/lib/sms/send';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -190,7 +190,9 @@ export async function runDunningSweep(
   options: { userId?: string; dryRun?: boolean } = {},
 ): Promise<DunningRunResult> {
   const supabase = createAdminClient();
-  const today = athensDate();
+  // Only for the report header. Each tenant is then swept in its own day, which
+  // is the one that decides whether their invoices are late.
+  const today = zonedDate();
 
   const result: DunningRunResult = {
     runDate: today,
@@ -213,7 +215,7 @@ export async function runDunningSweep(
 
   for (const tenant of tenants ?? []) {
     result.tenantsProcessed += 1;
-    await processTenant(tenant, today, result, options.dryRun ?? false);
+    await processTenant(tenant, zonedDate(tenant.timezone), result, options.dryRun ?? false);
   }
 
   return result;
@@ -250,7 +252,7 @@ async function processTenant(
   // Europe/Athens, not UTC: a fixed UTC schedule lands an hour later in summer
   // than in winter, and a tenant who picked nine would be moved to ten without
   // touching anything.
-  if (hourlySweep() && athensHour() !== scenario.sendHour) return;
+  if (hourlySweep() && zonedHour(tenant.timezone) !== scenario.sendHour) return;
 
   // AUTO-STOP is expressed here: only `pending` invoices are ever loaded. The
   // moment the Stripe webhook flips an invoice to `paid`, it leaves this set and

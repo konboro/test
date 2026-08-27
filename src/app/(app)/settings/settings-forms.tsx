@@ -9,6 +9,7 @@ import type { SMS_PACKS } from '@/lib/stripe';
 
 import { updateProfile, type SettingsState } from './actions';
 import { useT } from '@/lib/i18n/provider';
+import { TimezoneField } from './timezone-field';
 
 function Submit({ label }: { label?: string }) {
   const t = useT();
@@ -29,6 +30,7 @@ export function ProfileForm({
     reply_to_email: string | null;
     business_mode: 'general' | 'landlord';
     email: string | null;
+    timezone: string;
   };
 }) {
   const t = useT();
@@ -66,6 +68,11 @@ export function ProfileForm({
             className={inputClass}
           />
         </Field>
+
+        {/* Beside the company details rather than with the reminder settings:
+            it describes where the business is, and everything about dates in
+            the product follows from it. */}
+        <TimezoneField value={profile.timezone} />
 
         {/* Not a preference but a description of the business, which is why
             it sits with the company details rather than in a feature list. */}

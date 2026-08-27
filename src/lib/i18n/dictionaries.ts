@@ -366,6 +366,7 @@ const el = {
       invalidPhone: 'Μη έγκυρος αριθμός τηλεφώνου. Χρησιμοποιήστε μορφή +30 69… ',
       textEmpty: 'Το κείμενο δεν μπορεί να είναι κενό.',
       textTooLong: 'Το κείμενο είναι πολύ μεγάλο.',
+      invalidTimezone: 'Άγνωστη ζώνη ώρας.',
       payUrlRequired: 'Το κείμενο πρέπει να περιέχει τον σύνδεσμο πληρωμής {{pay_url}}.',
       invalidText: 'Μη έγκυρο κείμενο.',
       badCredentials: 'Λάθος email ή κωδικός.',
@@ -1190,6 +1191,10 @@ const el = {
     creditsSuccess:
       'Η πληρωμή ολοκληρώθηκε. Τα SMS πιστώνονται μόλις επιβεβαιωθεί από το Stripe — συνήθως σε λίγα δευτερόλεπτα.',
     creditsCancelled: 'Η αγορά ακυρώθηκε. Δεν χρεωθήκατε.',
+    timezone: 'Ζώνη ώρας',
+    timezoneHint:
+      'Καθορίζει σε ποια ημέρα ένα παραστατικό θεωρείται ληξιπρόθεσμο και σε ποια τοπική ώρα φεύγουν οι υπενθυμίσεις.',
+    timezoneDetected: (zone: string) => `Χρήση της ζώνης της συσκευής: ${zone}`,
     paymentNotice: {
       title: 'Ειδοποίηση πληρωμής',
       label: 'Email σε κάθε εξόφληση',
@@ -1741,6 +1746,7 @@ const en: typeof el = {
       invalidPhone: 'That phone number is not valid. Use the format +30 69… ',
       textEmpty: 'The text cannot be empty.',
       textTooLong: 'The text is too long.',
+      invalidTimezone: 'Unknown timezone.',
       payUrlRequired: 'The text must contain the payment link {{pay_url}}.',
       invalidText: 'That text is not valid.',
       badCredentials: 'Wrong email or password.',
@@ -2550,6 +2556,10 @@ const en: typeof el = {
     creditsSuccess:
       'Payment complete. The SMS credits appear as soon as Stripe confirms — usually within seconds.',
     creditsCancelled: 'The purchase was cancelled. You have not been charged.',
+    timezone: 'Timezone',
+    timezoneHint:
+      'Decides which day an invoice counts as overdue on, and the local hour reminders go out at.',
+    timezoneDetected: (zone: string) => `Use this device's timezone: ${zone}`,
     paymentNotice: {
       title: 'Payment notice',
       label: 'Email me on every settlement',

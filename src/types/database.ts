@@ -90,6 +90,11 @@ export type UserRow = {
   automation_enabled: boolean;
   reply_to_email: string | null;
   locale: UserLocale;
+  /**
+   * IANA name. Which calendar day an invoice is late on, and which local hour
+   * the sweep sends at. Defaults to Europe/Athens, where the product started.
+   */
+  timezone: string;
   /** general | landlord. Chooses the vocabulary and whether leases are offered. */
   business_mode: 'general' | 'landlord';
   /** Email the creditor when an invoice settles. */

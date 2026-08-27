@@ -9,6 +9,7 @@ import { formError, getDictionary } from '@/lib/i18n';
 import { activeOrganization } from '@/lib/orgs/active';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import { DEFAULT_TIMEZONE, isTimezone } from '@/lib/money';
 
 export interface SettingsState {
   error?: string;
@@ -24,6 +25,12 @@ const profileSchema = z.object({
     .optional()
     .transform((v) => (v ? v : null)),
   business_mode: z.enum(['general', 'landlord']).default('general'),
+  timezone: z
+    .string()
+    .trim()
+    .max(64)
+    .default(DEFAULT_TIMEZONE)
+    .refine(isTimezone, { message: 'invalidTimezone' }),
   reply_to_email: z
     .string()
     .trim()
@@ -46,6 +53,10 @@ export async function updateProfile(
     vat_number: formData.get('vat_number'),
     reply_to_email: formData.get('reply_to_email'),
     business_mode: formData.get('business_mode') ?? 'general',
+    // Validated against the runtime's own list rather than a pattern: a name
+    // that looks plausible and does not exist would be stored happily and then
+    // silently fall back on every date the product prints.
+    timezone: formData.get('timezone') ?? DEFAULT_TIMEZONE,
   });
 
   if (!parsed.success) return { error: formError(t, parsed.error.issues[0]?.message) };
