@@ -111,7 +111,7 @@ export default async function MembersPage() {
                     <input type="hidden" name="member_id" value={person.member_id} />
                     <button
                       type="submit"
-                      className="text-sm text-ink-500 underline-offset-2 transition hover:text-red-600 hover:underline"
+                      className="inline-flex min-h-11 items-center sm:min-h-0 text-sm text-ink-500 underline-offset-2 transition hover:text-red-600 hover:underline"
                     >
                       {isSelf ? t.members.leave : t.members.remove}
                     </button>
@@ -147,7 +147,7 @@ export default async function MembersPage() {
                     <input type="hidden" name="id" value={invite.id} />
                     <button
                       type="submit"
-                      className="text-sm text-ink-500 underline-offset-2 transition hover:text-red-600 hover:underline"
+                      className="inline-flex min-h-11 items-center sm:min-h-0 text-sm text-ink-500 underline-offset-2 transition hover:text-red-600 hover:underline"
                     >
                       {t.members.revoke}
                     </button>
@@ -173,7 +173,7 @@ export default async function MembersPage() {
       {manages ? (
         <Card>
           <CardHeader title={t.members.dangerTitle} subtitle={t.members.dangerSubtitle} />
-          <div className="flex items-center justify-between gap-3 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
             <p className="text-sm text-ink-600">
               {t.members.deleteBody(org.name ?? t.companies.unnamed)}
             </p>

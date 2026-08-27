@@ -73,7 +73,7 @@ export function ReviewCard({ proposal }: { proposal: Proposal }) {
                 href={proposal.fileUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs text-brand-700 underline"
+                className="inline-flex min-h-11 items-center sm:min-h-0 text-sm text-brand-700 underline sm:text-xs"
               >
                 {t.upload.openFile}
               </a>

@@ -140,7 +140,7 @@ export function Dropzone() {
                 <button
                   type="button"
                   onClick={() => remove(index)}
-                  className="text-xs text-ink-500 underline transition hover:text-red-600"
+                  className="inline-flex min-h-11 items-center sm:min-h-0 text-sm text-ink-500 underline transition hover:text-red-600 sm:text-xs"
                 >
                   {t.upload.remove}
                 </button>

@@ -80,7 +80,7 @@ export function RoleSelect({ memberId, role }: { memberId: string; role: OrgRole
         defaultValue={role}
         aria-label={t.members.roleLabel}
         onChange={(event) => event.currentTarget.form?.requestSubmit()}
-        className="rounded-lg border border-ink-300 bg-white px-2.5 py-1 text-sm text-ink-700 outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+        className="rounded-lg border border-ink-300 bg-white min-h-11 px-2.5 text-sm sm:min-h-0 sm:py-1 text-ink-700 outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
       >
         {ORG_ROLES.map((option) => (
           <option key={option} value={option}>

@@ -136,7 +136,7 @@ function SlotEditor({ slot }: { slot: TemplateSlotView }) {
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 rows={slot.channel === 'sms' ? 4 : 12}
-                className={`${inputClass} font-mono text-xs leading-relaxed`}
+                className={`${inputClass} font-mono leading-relaxed sm:text-xs`}
               />
             </Field>
 
