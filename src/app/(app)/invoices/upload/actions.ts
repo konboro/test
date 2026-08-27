@@ -183,23 +183,27 @@ export async function commitUpload(_prev: UploadState, formData: FormData): Prom
   const outcome = await commitImport(org.id, [row], await getDictionary());
   if (outcome.errors.length > 0) return { error: outcome.errors[0] };
 
-  // Link the document to what it became, so a disputed reminder can be answered
-  // by producing the invoice it was based on. Only attempted when the document
-  // carries a number: without one there is nothing that identifies the new row
-  // among a tenant's invoices, and a confident wrong link is worse than none.
-  const created = row.reference
-    ? (
-        await admin
-          .from('invoices')
-          .select('id')
-          .eq('user_id', org.id)
-          .eq('invoice_number', row.reference)
-          .eq('amount_cents', row.amountCents)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-      ).data
-    : null;
+  // Link the document to what it became. This is what puts the scan behind the
+  // invoice number, both in the list and on the page the debtor is sent to, so
+  // the link has to be established for every upload rather than only for the
+  // ones that carried a readable number.
+  //
+  // Matched on amount and issue date, narrowed by the number when there is one,
+  // newest first. The commit that just ran is the only thing that could have
+  // created a row with this combination a moment ago.
+  let finder = admin
+    .from('invoices')
+    .select('id')
+    .eq('user_id', org.id)
+    .eq('amount_cents', row.amountCents)
+    .eq('issue_date', row.issueDate);
+
+  if (row.reference) finder = finder.eq('invoice_number', row.reference);
+
+  const { data: created } = await finder
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   await admin
     .from('invoice_uploads')

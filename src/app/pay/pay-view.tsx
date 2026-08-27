@@ -28,6 +28,14 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
   const invoice = data?.[0];
   if (error || !invoice) notFound();
 
+  // The scan this invoice was read from, if there was one.
+  //
+  // Signed here rather than behind a route: whoever is looking at this page has
+  // already presented the payment credential, so there is nothing further to
+  // check, and a debtor being asked for money is entitled to see the document
+  // the demand is based on. The URL expires; the bucket stays private.
+  const documentUrl = await payableDocumentUrl(invoice.invoice_id);
+
   const settled = invoice.status === 'paid';
   const payable = invoice.status === 'pending';
 
@@ -60,7 +68,11 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
           </div>
 
           <dl className="divide-y divide-ink-100 text-sm">
-            <Row label="Παραστατικό" value={invoice.invoice_number ?? '—'} />
+            <Row
+              label="Παραστατικό"
+              value={invoice.invoice_number ?? '—'}
+              href={invoice.invoice_number ? (documentUrl ?? undefined) : undefined}
+            />
             <Row label="Επωνυμία" value={invoice.debtor_name} />
             <Row label="Ημ. έκδοσης" value={formatDate(invoice.issue_date)} />
             <Row label="Ημ. λήξης" value={formatDate(invoice.due_date)} />
@@ -130,11 +142,24 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value, href }: { label: string; value: string; href?: string }) {
   return (
     <div className="flex items-center justify-between gap-4 px-6 py-3">
       <dt className="text-ink-500">{label}</dt>
-      <dd className="tabular text-right font-medium text-ink-900">{value}</dd>
+      <dd className="tabular text-right font-medium text-ink-900">
+        {href ? (
+          <a
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className="underline decoration-ink-300 underline-offset-2 hover:decoration-ink-900"
+          >
+            {value}
+          </a>
+        ) : (
+          value
+        )}
+      </dd>
     </div>
   );
 }
@@ -166,4 +191,27 @@ function LockIcon() {
       <path d="M5.5 7V5.2a2.5 2.5 0 0 1 5 0V7" stroke="currentColor" strokeWidth="1.4" />
     </svg>
   );
+}
+
+/** Fifteen minutes: long enough to open and read, not long enough to circulate. */
+const DOCUMENT_URL_SECONDS = 900;
+
+async function payableDocumentUrl(invoiceId: string): Promise<string | null> {
+  const admin = createAdminClient();
+
+  const { data: upload } = await admin
+    .from('invoice_uploads')
+    .select('storage_path')
+    .eq('invoice_id', invoiceId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!upload) return null;
+
+  const { data: signed } = await admin.storage
+    .from('invoice-uploads')
+    .createSignedUrl(upload.storage_path, DOCUMENT_URL_SECONDS);
+
+  return signed?.signedUrl ?? null;
 }

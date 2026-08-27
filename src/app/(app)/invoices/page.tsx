@@ -84,6 +84,7 @@ export default async function InvoicesPage({
     { data: bankMatches },
     { data: openReports },
     { data: sentMessages },
+    { data: documents },
   ] = await Promise.all([
     query.limit(500),
     supabase.from('debtors').select('id, name, vat_number').order('name'),
@@ -109,10 +110,16 @@ export default async function InvoicesPage({
     // ladder, while this answers the question an operator asks before pressing
     // Remind again — how many times has this person already been told.
     supabase.from('communications_log').select('invoice_id').eq('status', 'sent'),
+    // The scans an invoice was created from. Only the ids: the file itself is
+    // fetched through a route that signs a URL on demand, so a list of five
+    // hundred rows costs one query rather than five hundred signatures.
+    supabase.from('invoice_uploads').select('invoice_id').not('invoice_id', 'is', null),
   ]);
 
   const bankSettled = new Set((bankMatches ?? []).map((row) => row.matched_invoice_id));
   const reportByInvoice = new Map((openReports ?? []).map((r) => [r.invoice_id, r.kind]));
+
+  const withDocument = new Set((documents ?? []).map((row) => row.invoice_id));
 
   const sentByInvoice = new Map<string, number>();
   for (const row of sentMessages ?? []) {
@@ -489,7 +496,19 @@ export default async function InvoicesPage({
                             </span>
                           )}
                           <p className="tabular mt-0.5 truncate text-xs text-ink-500">
-                            {number ?? t.invoices.noNumber}
+                            {number && withDocument.has(invoice.id) ? (
+                              <a
+                                href={`/api/invoices/${invoice.id}/document`}
+                                target="_blank"
+                                rel="noreferrer"
+                                title={t.invoices.openDocument}
+                                className="underline decoration-ink-300 underline-offset-2"
+                              >
+                                {number}
+                              </a>
+                            ) : (
+                              (number ?? t.invoices.noNumber)
+                            )}
                           </p>
                         </div>
 
