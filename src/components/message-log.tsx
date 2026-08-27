@@ -1,6 +1,7 @@
 import { Badge } from '@/components/ui';
+import { stepShort as shortStepLabels } from '@/lib/dunning/status';
 import { getDictionary } from '@/lib/i18n';
-import type { CommStatus, CommunicationLogRow, DunningStep } from '@/types/database';
+import type { CommStatus, CommunicationLogRow } from '@/types/database';
 
 /**
  * The list of messages that went out, as one rendering used everywhere.
@@ -50,11 +51,9 @@ export async function MessageLog({
     skipped: t.logs.statusSkipped,
   };
 
-  const stepShort: Record<DunningStep, string> = {
-    pre_due: t.steps.shortPreDue,
-    overdue_2: t.steps.shortOverdue2,
-    overdue_10: t.steps.shortOverdue10,
-  };
+  // One list of step names, shared with the scenario editor and the invoice
+  // view. Three copies of it drifted apart the moment a fourth rung existed.
+  const stepShort = shortStepLabels(t);
 
   return (
     <ul className="divide-y divide-ink-100">

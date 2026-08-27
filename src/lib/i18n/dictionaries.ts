@@ -1272,12 +1272,17 @@ const el = {
   },
 
   steps: {
+    longOnIssue: 'Έκδοση — ειδοποίηση με σύνδεσμο πληρωμής',
     longPreDue: '1 — Υπενθύμιση πριν τη λήξη',
-    longOverdue2: '2 — Ληξιπρόθεσμο (email + SMS)',
-    longOverdue10: '3 — Τελική υπενθύμιση (email + SMS)',
+    longOverdue2: '2 — Ληξιπρόθεσμο',
+    longOverdue10: '3 — Τελική υπενθύμιση',
+    shortOnIssue: 'Έκδοση',
     shortPreDue: 'Βήμα 1',
     shortOverdue2: 'Βήμα 2',
     shortOverdue10: 'Βήμα 3',
+    /** Rungs past the original three, which were never given names. */
+    longExtra: (n: number) => `${n} — Πρόσθετη υπενθύμιση`,
+    shortExtra: (n: number) => `Βήμα ${n}`,
   },
 
   sync: {
@@ -2597,12 +2602,16 @@ const en: typeof el = {
   },
 
   steps: {
+    longOnIssue: 'On issue — notice with the payment link',
     longPreDue: '1 — Reminder before the due date',
-    longOverdue2: '2 — Overdue (email + SMS)',
-    longOverdue10: '3 — Final reminder (email + SMS)',
+    longOverdue2: '2 — Overdue',
+    longOverdue10: '3 — Final reminder',
+    shortOnIssue: 'Issued',
     shortPreDue: 'Step 1',
     shortOverdue2: 'Step 2',
     shortOverdue10: 'Step 3',
+    longExtra: (n: number) => `${n} — Additional reminder`,
+    shortExtra: (n: number) => `Step ${n}`,
   },
 
   sync: {

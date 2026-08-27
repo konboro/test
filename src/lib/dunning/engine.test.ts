@@ -11,18 +11,18 @@ import { workflowStatus } from './status';
 const TODAY = '2026-08-15';
 
 describe('stepForInvoice', () => {
-  it('fires step 1 three days before the due date', () => {
-    expect(stepForInvoice(addDays(TODAY, 3), TODAY)?.step).toBe('pre_due');
+  it('fires the pre-due reminder the day before the due date', () => {
+    expect(stepForInvoice(addDays(TODAY, 1), TODAY)?.step).toBe('pre_due');
   });
 
-  it('stays silent between the pre-due window and day 2 overdue', () => {
+  it('stays silent between the pre-due window and the first overdue step', () => {
     // Due today, and one day overdue: nothing scheduled.
     expect(stepForInvoice(TODAY, TODAY)).toBeNull();
     expect(stepForInvoice(addDays(TODAY, -1), TODAY)).toBeNull();
   });
 
-  it('fires step 2 at two days overdue', () => {
-    const rung = stepForInvoice(addDays(TODAY, -2), TODAY);
+  it('fires step 2 at three days overdue', () => {
+    const rung = stepForInvoice(addDays(TODAY, -3), TODAY);
     expect(rung?.step).toBe('overdue_2');
     expect(rung?.channels).toEqual(['email', 'sms']);
   });

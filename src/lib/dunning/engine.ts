@@ -6,7 +6,13 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import type { DebtorRow, DunningStep, InvoiceRow, UserRow } from '@/types/database';
 
 import { dispatchContact } from './dispatch';
-import { DEFAULT_SCENARIO, rungFor, type Scenario } from './scenario';
+import {
+  DEFAULT_SCENARIO,
+  EXTRA_STEP_OFFSETS,
+  LADDER_STEPS,
+  rungFor,
+  type Scenario,
+} from './scenario';
 import { isSnoozed } from './snooze';
 import { loadTemplateOverrides } from './template-store';
 import type { TemplateOverrides } from './templates';
@@ -122,16 +128,37 @@ export async function loadScenario(userId: string): Promise<Scenario> {
 
   const configured = new Map((steps ?? []).map((row) => [row.step, row]));
 
+  const defaults = new Map(DEFAULT_SCENARIO.steps.map((step) => [step.step, step]));
+  const issue = configured.get('on_issue');
+
   return {
-    steps: DEFAULT_SCENARIO.steps.map((fallback) => {
-      const row = configured.get(fallback.step);
-      if (!row) return { ...fallback };
+    onIssue: issue
+      ? { enabled: issue.enabled, channels: issue.channels as Channel[] }
+      : { ...DEFAULT_SCENARIO.onIssue },
+
+    // Every rung the ladder can hold, not only the three that have defaults.
+    // A slot nobody has placed comes back switched off, so it changes nothing
+    // until a tenant reaches for it — but it comes back, because the editor has
+    // to be able to offer it and the engine has to agree it exists.
+    steps: LADDER_STEPS.map((step) => {
+      const row = configured.get(step);
+      if (row) {
+        return {
+          step,
+          enabled: row.enabled,
+          offsetDays: row.offset_days,
+          channels: row.channels as Channel[],
+        };
+      }
+
+      const fallback = defaults.get(step);
+      if (fallback) return { ...fallback };
 
       return {
-        step: fallback.step,
-        enabled: row.enabled,
-        offsetDays: row.offset_days,
-        channels: row.channels as Channel[],
+        step,
+        enabled: false,
+        offsetDays: EXTRA_STEP_OFFSETS[step] ?? 30,
+        channels: ['email' as Channel],
       };
     }),
     repeat: settings

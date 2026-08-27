@@ -9,7 +9,31 @@
 export type InvoiceStatus = 'pending' | 'paid' | 'cancelled' | 'written_off';
 export type CommChannel = 'email' | 'sms';
 export type CommStatus = 'sent' | 'failed' | 'skipped';
-export type DunningStep = 'pre_due' | 'overdue_2' | 'overdue_10';
+/**
+ * One rung of the ladder, identified rather than described.
+ *
+ * The names are historical. A step's timing is whatever offset its tenant gave
+ * it, so `overdue_2` has not meant "two days late" since the scenario became
+ * configurable, and `step_4` upwards were never named at all — they are slots.
+ * The one that genuinely differs in kind is `on_issue`, which is not measured
+ * from the due date: it fires once, when the invoice is confirmed.
+ */
+export type DunningStep =
+  | 'on_issue'
+  | 'pre_due'
+  | 'overdue_2'
+  | 'overdue_10'
+  | 'step_4'
+  | 'step_5'
+  | 'step_6'
+  | 'step_7'
+  | 'step_8';
+
+/** Every rung except the one that fires on issue — the due-date ladder. */
+export type RelativeDunningStep = Exclude<DunningStep, 'on_issue'>;
+
+/** How a scenario applies to one invoice. */
+export type InvoiceScenarioMode = 'default' | 'custom' | 'off';
 export type MyDataEnvironment = 'production' | 'sandbox';
 /** Viva runs two separate estates; a credential pair belongs to exactly one. */
 export type VivaEstate = 'demo' | 'production';
@@ -112,6 +136,13 @@ export type InvoiceRow = {
   status: InvoiceStatus;
   /** False pauses the automatic sweep for this invoice alone. Manual sends are unaffected. */
   automation_enabled: boolean;
+  /**
+   * Which scenario this invoice follows: the tenant's, its own, or none.
+   *
+   * `off` and `automation_enabled: false` say the same thing and are kept in
+   * step; the flag stays because it is what the row switch has always written.
+   */
+  scenario_mode: InvoiceScenarioMode;
   paid_at: string | null;
   paid_amount_cents: number | null;
   stripe_checkout_session_id: string | null;
@@ -140,6 +171,23 @@ export type DunningStepRow = {
   step: DunningStep;
   enabled: boolean;
   /** Days from the due date; negative is before it. Bounded by a check constraint. */
+  offset_days: number;
+  channels: CommChannel[];
+  updated_at: string;
+}
+
+/**
+ * One rung overridden for a single invoice.
+ *
+ * Only consulted when the invoice is in `custom` mode. Rows are stored rather
+ * than a jsonb blob so the same check constraints that bound a tenant scenario
+ * bound these too — otherwise the bounds would hold everywhere except the one
+ * place a person is most likely to reach for them.
+ */
+export type InvoiceDunningStepRow = {
+  invoice_id: string;
+  step: DunningStep;
+  enabled: boolean;
   offset_days: number;
   channels: CommChannel[];
   updated_at: string;

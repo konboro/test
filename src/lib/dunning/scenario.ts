@@ -29,18 +29,71 @@ export interface ScenarioRepeat {
   max: number;
 }
 
+/**
+ * The notice that goes out when the invoice is raised.
+ *
+ * Not a rung: it has no offset because it is not measured from the due date,
+ * and it does not compete for a window with anything. It is here rather than in
+ * its own module because a tenant thinks of it as the first thing the scenario
+ * does, and splitting it would only mean two places to look.
+ */
+export interface ScenarioNotice {
+  enabled: boolean;
+  channels: Channel[];
+}
+
 export interface Scenario {
+  onIssue: ScenarioNotice;
   steps: ScenarioStep[];
   repeat: ScenarioRepeat;
   /** Local Europe/Athens hour, 0-23, at which the sweep may act for this tenant. */
   sendHour: number;
 }
 
+/**
+ * Every rung a scenario may place, in the order the editor shows them.
+ *
+ * The first three are named after what they once were; the rest never had a
+ * meaning to lose. Order here is presentation only — the engine sorts by the
+ * offsets a tenant actually chose.
+ */
+export const LADDER_STEPS: ReadonlyArray<DunningStep> = [
+  'pre_due',
+  'overdue_2',
+  'overdue_10',
+  'step_4',
+  'step_5',
+  'step_6',
+  'step_7',
+  'step_8',
+];
+
+/**
+ * Where an unplaced rung sits the first time somebody switches it on.
+ *
+ * These are off until chosen, so the numbers are not a cadence anybody receives
+ * — they are what the editor proposes, spread out rather than stacked on the
+ * step above so that enabling one does not silently create two reminders on the
+ * same day.
+ */
+export const EXTRA_STEP_OFFSETS: Readonly<Record<string, number>> = {
+  step_4: 20,
+  step_5: 30,
+  step_6: 45,
+  step_7: 60,
+  step_8: 90,
+};
+
 /** What a tenant gets before they have touched anything. */
 export const DEFAULT_SCENARIO: Scenario = {
+  // Email only. An SMS the moment an invoice is raised costs money to tell
+  // somebody something they are not yet late for.
+  onIssue: { enabled: true, channels: ['email'] },
   steps: [
-    { step: 'pre_due', enabled: true, offsetDays: -3, channels: ['email'] },
-    { step: 'overdue_2', enabled: true, offsetDays: 2, channels: ['email', 'sms'] },
+    // The day before, not three days before: close enough to be the thing that
+    // reminds someone to pay, far enough not to arrive as a demand.
+    { step: 'pre_due', enabled: true, offsetDays: -1, channels: ['email'] },
+    { step: 'overdue_2', enabled: true, offsetDays: 3, channels: ['email', 'sms'] },
     { step: 'overdue_10', enabled: true, offsetDays: 10, channels: ['email', 'sms'] },
   ],
   repeat: { enabled: false, everyDays: 14, max: 3 },
@@ -69,7 +122,10 @@ export interface Rung {
  */
 export function activeSteps(scenario: Scenario): ScenarioStep[] {
   return scenario.steps
-    .filter((s) => s.enabled && s.channels.length > 0)
+    // `on_issue` is not placed on this ladder. It has no offset to sort by and
+    // no window to own; a copy of it stored among the steps would be handed a
+    // window here and fire twice.
+    .filter((s) => s.step !== 'on_issue' && s.enabled && s.channels.length > 0)
     .sort((a, b) => a.offsetDays - b.offsetDays);
 }
 

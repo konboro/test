@@ -9,10 +9,13 @@ const scenario = (over: Partial<Scenario> = {}): Scenario => ({
   repeat: { ...DEFAULT_SCENARIO.repeat, ...(over.repeat ?? {}) },
 });
 
-describe('the default scenario still behaves like the ladder it replaced', () => {
-  it('fires each step on the day it always did', () => {
-    expect(rungFor(-3, scenario())?.step).toBe('pre_due');
-    expect(rungFor(2, scenario())?.step).toBe('overdue_2');
+describe('the default scenario', () => {
+  // The day before the due date, three days after it, then ten. The first two
+  // moved when the notice on issue was added: with the customer already told
+  // about the invoice, a reminder three days early is one message too many.
+  it('fires each step on the day it is placed', () => {
+    expect(rungFor(-1, scenario())?.step).toBe('pre_due');
+    expect(rungFor(3, scenario())?.step).toBe('overdue_2');
     expect(rungFor(10, scenario())?.step).toBe('overdue_10');
   });
 
@@ -53,8 +56,8 @@ describe('a scenario the tenant has changed', () => {
 
     // The days the disabled step owned fall silent; they are not handed back to
     // the pre-due reminder, which by definition cannot fire after the due date.
-    expect(rungFor(2, s)).toBeNull();
-    expect(rungFor(-2, s)?.step).toBe('pre_due');
+    expect(rungFor(3, s)).toBeNull();
+    expect(rungFor(-1, s)?.step).toBe('pre_due');
     expect(rungFor(10, s)?.step).toBe('overdue_10');
   });
 
@@ -79,7 +82,7 @@ describe('a scenario the tenant has changed', () => {
   it('carries the channels of the step that fired', () => {
     const s = scenario();
     s.steps[1]!.channels = ['sms'];
-    expect(rungFor(2, s)?.channels).toEqual(['sms']);
+    expect(rungFor(3, s)?.channels).toEqual(['sms']);
   });
 
   it('says nothing when every step is off', () => {

@@ -5,8 +5,8 @@ import { useFormStatus } from 'react-dom';
 
 import { Button, Field, inputClass } from '@/components/ui';
 import type { Scenario } from '@/lib/dunning/scenario';
+import { stepLabels } from '@/lib/dunning/status';
 import { useT } from '@/lib/i18n/provider';
-import type { DunningStep } from '@/types/database';
 
 import { saveScenario, type ScenarioState } from './scenario-actions';
 
@@ -41,11 +41,7 @@ export function ScenarioForm({
   const t = useT();
   const [state, action] = useActionState<ScenarioState, FormData>(saveScenario, {});
 
-  const stepLabel: Record<DunningStep, string> = {
-    pre_due: t.steps.longPreDue,
-    overdue_2: t.steps.longOverdue2,
-    overdue_10: t.steps.longOverdue10,
-  };
+  const stepLabel = stepLabels(t);
 
   return (
     <form action={action} className="space-y-5 px-5 py-4">
