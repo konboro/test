@@ -41,7 +41,10 @@ function Detail({
   return (
     <div className="min-w-0">
       <dt className="text-xs uppercase tracking-wide text-ink-400">{label}</dt>
+      {/* The title is what makes a truncated email recoverable. Without it a
+          long address is simply cut, with nothing to say there is more. */}
       <dd
+        title={value ?? undefined}
         className={`truncate text-sm ${value ? 'text-ink-800' : 'text-ink-400'} ${mono ? 'tabular' : ''}`}
       >
         {value ?? '—'}
@@ -161,7 +164,7 @@ export default async function DebtorsPage({
             <a
               key={option.key}
               href={link({ sort: option.key, dir: sort === option.key && !descending ? 'desc' : 'asc' })}
-              className={`rounded-lg px-2.5 py-1.5 ${
+              className={`inline-flex min-h-11 items-center rounded-lg px-2.5 sm:min-h-0 sm:py-1.5 ${
                 sort === option.key ? 'font-medium text-ink-900' : 'text-ink-500 hover:text-ink-800'
               }`}
             >
@@ -217,7 +220,7 @@ export default async function DebtorsPage({
               const paused = isSnoozed(debtor, today);
 
               return (
-                <li key={debtor.id} className="px-5 py-4">
+                <li key={debtor.id} className="px-4 py-4 sm:px-5">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
@@ -252,8 +255,12 @@ export default async function DebtorsPage({
                       ) : null}
                     </div>
 
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
+                    {/* Six blocks in a row that could not wrap: the amount,
+                        the pause, and four controls. On a phone that is nearly
+                        twice the width of the screen, and it took the whole
+                        page into horizontal scroll with it. */}
+                    <div className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-3 sm:w-auto sm:flex-nowrap sm:justify-end">
+                      <div className="text-left sm:text-right">
                         <p className="text-xs uppercase tracking-wide text-ink-400">
                           {t.debtors.outstandingLabel}
                         </p>
@@ -268,7 +275,7 @@ export default async function DebtorsPage({
                           its own leaves the operator counting days in their
                           head to know whether it is nearly over. */}
                       {paused ? (
-                        <div className="text-right">
+                        <div className="text-left sm:text-right">
                           <p className="text-xs uppercase tracking-wide text-ink-400">
                             {t.snooze.blockLabel}
                           </p>
@@ -281,6 +288,7 @@ export default async function DebtorsPage({
                         </div>
                       ) : null}
 
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                       <EditDebtorForm debtor={debtor} />
 
                       <SnoozeButton
@@ -308,6 +316,7 @@ export default async function DebtorsPage({
                         }
                         confirmLabel={t.common.delete}
                       />
+                      </div>
                     </div>
                   </div>
 

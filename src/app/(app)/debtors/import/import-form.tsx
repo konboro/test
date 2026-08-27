@@ -271,7 +271,29 @@ export function ImportForm({ termDays }: { termDays: number }) {
             </div>
           ) : null}
 
-          <div className="overflow-x-auto">
+          {/* Confirming an import is a decision about money, and on a phone
+              it was made by dragging a four-column table sideways to find the
+              amount. The card shows all four at once. */}
+          <ul className="divide-y divide-ink-100 md:hidden">
+            {preview.rows.slice(0, PREVIEW_ROWS).map((row) => (
+              <li key={row.line} className="px-4 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="min-w-0 flex-1 break-words text-sm text-ink-800">{row.name}</span>
+                  <span className="tabular shrink-0 text-sm font-semibold text-ink-900">
+                    {formatMoney(row.amountCents)}
+                  </span>
+                </div>
+                <p className="tabular mt-1 text-xs text-ink-500">{formatDate(row.dueDate)}</p>
+                <p className="mt-0.5 break-all text-sm text-ink-600">
+                  {row.email ?? row.phone ?? (
+                    <span className="text-amber-700">{t.importer.noContact}</span>
+                  )}
+                </p>
+              </li>
+            ))}
+          </ul>
+
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-500">

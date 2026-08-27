@@ -82,13 +82,15 @@ export async function MessageLog({
             </time>
           </div>
 
-          <p className="tabular mt-1 text-xs text-ink-500">{entry.recipient}</p>
+          {/* An address has no spaces to break at, so without this it decides
+              the width of the card and pushes the page sideways. */}
+          <p className="tabular mt-1 break-all text-xs text-ink-500">{entry.recipient}</p>
 
           {entry.subject ? (
             <p className="mt-2 text-sm font-medium text-ink-700">{entry.subject}</p>
           ) : null}
 
-          <p className="mt-1 whitespace-pre-line text-sm text-ink-600">{entry.content}</p>
+          <p className="mt-1 whitespace-pre-line break-words text-sm text-ink-600">{entry.content}</p>
 
           {entry.error ? (
             <p className="mt-2 rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-700">

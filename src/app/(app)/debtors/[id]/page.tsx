@@ -38,6 +38,7 @@ function Detail({ label, value, mono = false }: { label: string; value: string |
     <div className="min-w-0">
       <dt className="text-xs uppercase tracking-wide text-ink-400">{label}</dt>
       <dd
+        title={value ?? undefined}
         className={`truncate text-sm ${value ? 'text-ink-800' : 'text-ink-400'} ${mono ? 'tabular' : ''}`}
       >
         {value ?? '—'}
@@ -161,7 +162,7 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
           ) : null}
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <EditDebtorForm debtor={debtor} />
           <SnoozeButton
             debtorId={debtor.id}
@@ -202,7 +203,7 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
         {debtor.notes ? (
           <div className="border-t border-ink-100 px-5 py-4">
             <p className="text-xs uppercase tracking-wide text-ink-400">{t.debtors.notesLabel}</p>
-            <p className="mt-1 whitespace-pre-line text-sm text-ink-600">{debtor.notes}</p>
+            <p className="mt-1 whitespace-pre-line break-words text-sm text-ink-600">{debtor.notes}</p>
           </div>
         ) : null}
       </Card>

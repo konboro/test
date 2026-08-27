@@ -412,7 +412,44 @@ export default async function DashboardPage() {
           <EmptyState title={t.dashboard.funnelEmptyTitle} body={t.dashboard.funnelEmptyBody} />
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* The other three tables on this page have a card list behind
+                them; this one did not, so on a phone it was a sideways drag
+                with the number that matters — paid — always off the edge. */}
+            <ul className="divide-y divide-ink-100 md:hidden">
+              {funnelRows.map((row) => {
+                const pct = (part: number) =>
+                  row.sent > 0 ? `${Math.round((part / row.sent) * 100)}%` : null;
+
+                const stat = (label: string, value: number, share: string | null) => (
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-ink-400">{label}</dt>
+                    <dd className="tabular mt-0.5 text-sm font-medium text-ink-900">
+                      {value}
+                      {share !== null ? (
+                        <span className="ml-1.5 text-xs font-normal text-ink-400">{share}</span>
+                      ) : null}
+                    </dd>
+                  </div>
+                );
+
+                return (
+                  <li key={row.channel} className="px-4 py-4">
+                    <Badge tone={row.channel === 'sms' ? 'info' : 'neutral'}>
+                      {row.channel === 'sms' ? t.common.sms : t.common.email}
+                    </Badge>
+
+                    <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
+                      {stat(t.dashboard.funnelSent, row.sent, null)}
+                      {stat(t.dashboard.funnelOpened, row.opened, pct(row.opened))}
+                      {stat(t.dashboard.funnelCheckout, row.checkout, pct(row.checkout))}
+                      {stat(t.dashboard.funnelPaid, row.paid, pct(row.paid))}
+                    </dl>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-500">
