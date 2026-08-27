@@ -472,6 +472,22 @@ function markIn(lines: string[]): string | null {
 }
 
 /**
+ * The document number without the word that introduced it.
+ *
+ * A Polish invoice names its type and then its number: 'FAKTURA VAT nr FV/2026/08/17'.
+ * The label consumes the type and leaves the ordinal word behind, which then
+ * travels into the system as part of the number and onto the reminder the
+ * debtor reads. The separator is required, so a number that genuinely starts
+ * with one of these letters keeps it.
+ */
+function documentNumber(raw: string | null): string | null {
+  if (!raw) return null;
+
+  const cleaned = raw.replace(/^(?:nr|no|n|ar|αρ)[.\s:]+\s*/iu, '').trim();
+  return cleaned === '' ? null : cleaned;
+}
+
+/**
  * Reads a document's text into invoice fields.
  *
  * Never throws, and never guesses past what it found: a field it cannot read
@@ -493,7 +509,7 @@ export function extractInvoiceFields(
   const fields: ExtractedInvoice = {
     debtorName: customerName(lines, options.ownName),
     vatNumber: customerVat(lines, options.ownVatNumber),
-    invoiceNumber: valueFor(lines, NUMBER_LABEL),
+    invoiceNumber: documentNumber(valueFor(lines, NUMBER_LABEL)),
     series: valueFor(lines, SERIES_LABEL),
     issueDate: parseAnyDate(valueFor(lines, ISSUE_DATE_LABEL)),
     dueDate: parseAnyDate(dueDateRaw),
