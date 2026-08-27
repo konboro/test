@@ -22,6 +22,7 @@ import { redirect } from 'next/navigation';
 import { automationPaused, loadScenario, missingColumn, stepForInvoice } from '@/lib/dunning/engine';
 import { noticeOnIssue } from '@/lib/dunning/issue-notice';
 import { invoiceScenarioProblem, parseInvoiceScenario } from '@/lib/dunning/invoice-scenario';
+import type { InvoiceScenarioMode } from '@/types/database';
 
 export interface InvoiceFormState {
   error?: string;
@@ -339,9 +340,7 @@ export async function createInvoice(
   const problem = invoiceScenarioProblem(cadence);
   if (problem) return { error: t.scenario[problem] };
 
-  const { data: created, error } = await supabase
-    .from('invoices')
-    .insert({
+  const base = {
       user_id: org.id,
       debtor_id: parsed.data.debtor_id,
       invoice_number: parsed.data.invoice_number,
@@ -350,23 +349,36 @@ export async function createInvoice(
       currency: 'EUR',
       issue_date: parsed.data.issue_date,
       due_date: parsed.data.due_date,
-      mark: null,
-      source: 'manual',
-      scenario_mode: cadence.mode,
-      // Kept in step with the mode, because the row switch has always written
-      // this one and the two disagreeing would mean the invoice is chased or
-      // not depending on which the reader happened to look at.
-      automation_enabled: cadence.mode !== 'off',
-    })
-    .select('id')
-    .maybeSingle();
+    mark: null,
+    source: 'manual' as const,
+    // Kept in step with the mode, because the row switch has always written
+    // this one and the two disagreeing would mean the invoice is chased or not
+    // depending on which the reader happened to look at.
+    automation_enabled: cadence.mode !== 'off',
+  };
+
+  const write = (row: typeof base & { scenario_mode?: InvoiceScenarioMode }) =>
+    supabase.from('invoices').insert(row).select('id').maybeSingle();
+
+  let { data: created, error } = await write({ ...base, scenario_mode: cadence.mode });
+
+  // Deploys and migrations do not land together. Raising an invoice is the
+  // work; the cadence column is how we describe it afterwards, and the absence
+  // of the column must not take the work down with it. The invoice is saved
+  // without it and follows the account scenario, which is the default anyway.
+  if (missingColumn(error)) {
+    console.warn('[invoices] scenario_mode column absent — migration not applied yet');
+    ({ data: created, error } = await write(base));
+  }
 
   if (error) return { error: saveFailed(t, 'invoices', error) };
 
-  if (created?.id && cadence.rows.length) {
+  const invoiceId = created?.id;
+
+  if (invoiceId && cadence.rows.length) {
     const { error: rowsError } = await createAdminClient()
       .from('invoice_dunning_steps')
-      .insert(cadence.rows.map((row) => ({ ...row, invoice_id: created.id })));
+      .insert(cadence.rows.map((row) => ({ ...row, invoice_id: invoiceId })));
 
     // The invoice exists and the mode says custom, so a failure here would
     // leave it following the account cadence while claiming its own. Saying so
