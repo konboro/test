@@ -99,44 +99,44 @@ function valueFor(lines: string[], label: RegExp): string | null {
 const VAT_LABEL =
   /(?<![\p{L}\p{N}])(?:Α\.Φ\.Μ\.?|ΑΦΜ|VAT(?:\s*(?:NO|NUMBER|ID|REG))?|TAX\s*ID|NIP|UST-?IDNR\.?|STEUERNUMMER|TVA|P\.?\s*IVA|PARTITA\s*IVA|CIF|NIF|CUI)(?![\p{L}\p{N}])/u;
 
+// ΠΕΛΑΤΗΣ, not ΠΕΛΑΤΗ. Greek inflects, and a boundary after the stem rejects
+// the nominative outright — the commonest spelling of the word on an invoice.
 const CUSTOMER_MARKER =
-  /(?<![\p{L}\p{N}])(?:ΣΤΟΙΧΕΙΑ\s+ΠΕΛΑΤΗ|ΠΕΛΑΤΗ|ΕΠΩΝΥΜΙΑ|ΠΡΟΣ|BILL\s*TO|INVOICE\s*TO|CUSTOMER|CLIENT|NABYWCA|ODBIORCA|KUPUJACY|KUNDE|EMPFANGER|CLIENTE|DESTINATARIO|CUMPARATOR)(?![\p{L}\p{N}])/u;
+  /(?<![\p{L}\p{N}])(?:ΣΤΟΙΧΕΙΑ\s+ΠΕΛΑΤΗ|ΠΕΛΑΤΗΣ|ΠΕΛΑΤΗ|ΕΠΩΝΥΜΙΑ|ΠΡΟΣ|BILL\s*TO|INVOICE\s*TO|CUSTOMER|CLIENT|NABYWCA|ODBIORCA|KUPUJACY|KUNDE|EMPFANGER|CLIENTE|DESTINATARIO|CUMPARATOR)(?![\p{L}\p{N}])/u;
 
 const ISSUER_MARKER =
-  /(?<![\p{L}\p{N}])(?:ΣΤΟΙΧΕΙΑ\s+ΕΚΔΟΤΗ|ΕΚΔΟΤΗ|ΠΩΛΗΤΗ|SUPPLIER|SELLER|ISSUER|SPRZEDAWCA|WYSTAWCA|VERKAUFER|LIEFERANT|FOURNISSEUR|VENDEUR|FORNITORE|PROVEEDOR|FURNIZOR)(?![\p{L}\p{N}])/u;
+  /(?<![\p{L}\p{N}])(?:ΣΤΟΙΧΕΙΑ\s+ΕΚΔΟΤΗ|ΕΚΔΟΤΗΣ|ΕΚΔΟΤΗ|ΠΩΛΗΤΗΣ|ΠΩΛΗΤΗ|ΑΠΟ|SUPPLIER|SELLER|ISSUER|SPRZEDAWCA|WYSTAWCA|VERKAUFER|LIEFERANT|FOURNISSEUR|VENDEUR|FORNITORE|PROVEEDOR|FURNIZOR)(?![\p{L}\p{N}])/u;
 
+// `#` earns its place: Elorus, and most invoicing tools that grew out of one,
+// print "ΤΙΜΟΛΟΓΙΟ ΠΑΡΟΧΗΣ ΥΠΗΡΕΣΙΩΝ #10000-42" with no labelled number at all.
 const NUMBER_LABEL =
-  /(?<![\p{L}\p{N}])(?:ΑΡΙΘΜΟΣ\s+ΤΙΜΟΛΟΓΙΟΥ|ΑΡ\.?\s*ΤΙΜΟΛΟΓΙΟΥ|ΑΡ\.?\s*ΠΑΡΑΣΤΑΤΙΚΟΥ|ΑΡΙΘΜΟΣ|INVOICE\s*(?:NO|NUMBER|#)|DOCUMENT\s*(?:NO|NUMBER)|FAKTURA\s*VAT|NR\s*FAKTURY|FAKTURA|RACHUNEK|RECHNUNGSNUMMER|RECHNUNG\s*NR\.?|RECHNUNG|FACTURE\s*N|FATTURA\s*N|FATTURA|FACTURA\s*N|FACTURA)(?![\p{L}\p{N}])/u;
+  /(?<![\p{L}\p{N}])(?:ΑΡΙΘΜΟΣ\s+ΤΙΜΟΛΟΓΙΟΥ|ΑΡ\.?\s*ΤΙΜΟΛΟΓΙΟΥ|ΑΡ\.?\s*ΠΑΡΑΣΤΑΤΙΚΟΥ|ΑΡΙΘΜΟΣ|INVOICE\s*(?:NO|NUMBER|#)|DOCUMENT\s*(?:NO|NUMBER)|FAKTURA\s*VAT|NR\s*FAKTURY|FAKTURA|RACHUNEK|RECHNUNGSNUMMER|RECHNUNG\s*NR\.?|RECHNUNG|FACTURE\s*N|FATTURA\s*N|FATTURA|FACTURA\s*N|FACTURA)(?![\p{L}\p{N}])|#/u;
 
 const SERIES_LABEL = /(?<![\p{L}\p{N}])(?:ΣΕΙΡΑ|SERIES|SERIA|SERIE)(?![\p{L}\p{N}])/u;
 
-// Specific before generic: a bare DATA would otherwise swallow "Data sprzedaży"
-// on a document whose issue date sits two lines lower.
 const ISSUE_DATE_LABEL =
   /(?<![\p{L}\p{N}])(?:ΗΜΕΡΟΜΗΝΙΑ\s+ΕΚΔΟΣΗΣ|ΗΜ\/ΝΙΑ\s+ΕΚΔΟΣΗΣ|ΗΜΕΡΟΜΗΝΙΑ|ΗΜ\/ΝΙΑ|DATA\s+WYSTAWIENIA|RECHNUNGSDATUM|AUSSTELLUNGSDATUM|DATE\s+DE\s+FACTURATION|FECHA\s+DE\s+EMISION|ISSUE\s*DATE|INVOICE\s*DATE|DATA\s+SPRZEDAZY|DATA\s+FATTURA|DATE|DATA|DATUM|FECHA)(?![\p{L}\p{N}])/u;
 
+// ΕΞΟΦΛΗΣΗ ΕΩΣ is what Elorus prints. ΕΩΣ alone is deliberately last: it means
+// "until" and turns up in date ranges that are not a payment deadline.
 const DUE_DATE_LABEL =
-  /(?<![\p{L}\p{N}])(?:ΗΜΕΡΟΜΗΝΙΑ\s+ΛΗΞΗΣ|ΛΗΞΗ|ΠΡΟΘΕΣΜΙΑ(?:\s+ΠΛΗΡΩΜΗΣ)?|TERMIN\s+PLATNOSCI|TERMIN\s+ZAPLATY|FALLIGKEITSDATUM|ZAHLBAR\s+BIS|DATE\s+ECHEANCE|DUE\s*DATE|PAYMENT\s*DUE|DUE|SCADENZA|VENCIMIENTO|SCADENT)(?![\p{L}\p{N}])/u;
+  /(?<![\p{L}\p{N}])(?:ΗΜΕΡΟΜΗΝΙΑ\s+ΛΗΞΗΣ|ΕΞΟΦΛΗΣΗ\s+ΕΩΣ|ΠΛΗΡΩΜΗ\s+ΕΩΣ|ΛΗΞΗ|ΠΡΟΘΕΣΜΙΑ(?:\s+ΠΛΗΡΩΜΗΣ)?|TERMIN\s+PLATNOSCI|TERMIN\s+ZAPLATY|FALLIGKEITSDATUM|ZAHLBAR\s+BIS|DATE\s+ECHEANCE|DUE\s*DATE|PAYMENT\s*DUE|DUE|SCADENZA|VENCIMIENTO|SCADENT)(?![\p{L}\p{N}])/u;
 
 const MARK_LABEL = /(?<![\p{L}\p{N}])(?:Μ\.ΑΡ\.Κ\.?|ΜΑΡΚ|MARK)(?![\p{L}\p{N}])/u;
 
 /**
  * Total labels, most specific first.
  *
- * The order is the whole design. An invoice shows net, tax and total, often with
- * the tax line between them; matching a bare "total" first would cheerfully
- * return the net subtotal of a document whose payable amount is 23% higher, and
- * every import would under-collect by exactly the tax. What we want is what the
- * customer owes, so a label naming itself payable beats one merely naming a sum.
- *
- * `vetoComponents` is off for the specific tiers on purpose. "ΣΥΝΟΛΟ ΜΕ ΦΠΑ" and
- * "Do zapłaty (PLN)" both sit beside the word for tax, and a blanket veto would
- * throw away the exact line we came for.
+ * The order is the whole design, and a real Greek invoice shows why: it prints
+ * "Συνολική καθαρή αξία: 137,10€", then the tax, then "Τελική αξία: 170,00€".
+ * The net line is the one that reads most like a total, sits above the real one,
+ * and is 24% wrong. What we want is what the customer owes, so a label naming
+ * itself final or payable beats one merely naming a sum.
  */
 const TOTAL_LABELS: ReadonlyArray<{ pattern: RegExp; vetoComponents: boolean }> = [
   {
     pattern:
-      /(?<![\p{L}\p{N}])(?:ΠΛΗΡΩΤΕΟ(?:\s+ΠΟΣΟ)?|ΤΕΛΙΚΟ\s+ΣΥΝΟΛΟ|ΓΕΝΙΚΟ\s+ΣΥΝΟΛΟ|AMOUNT\s*DUE|BALANCE\s*DUE|TOTAL\s*DUE|GRAND\s*TOTAL|DO\s+ZAPLATY|RAZEM\s+DO\s+ZAPLATY|KWOTA\s+DO\s+ZAPLATY|ZAHLBETRAG|GESAMTBETRAG|RECHNUNGSBETRAG|NET\s*A\s*PAYER|TOTALE\s+DA\s+PAGARE|TOTAL\s+A\s+PAGAR|TOTAL\s+DE\s+PLATA)(?![\p{L}\p{N}])/u,
+      /(?<![\p{L}\p{N}])(?:ΠΛΗΡΩΤΕΟ(?:\s+ΠΟΣΟ)?|ΠΛΗΡΩΤΕΑ\s+ΑΞΙΑ|ΤΕΛΙΚΗ\s+ΑΞΙΑ|ΤΕΛΙΚΟ\s+ΣΥΝΟΛΟ|ΓΕΝΙΚΟ\s+ΣΥΝΟΛΟ|AMOUNT\s*DUE|BALANCE\s*DUE|TOTAL\s*DUE|GRAND\s*TOTAL|DO\s+ZAPLATY|RAZEM\s+DO\s+ZAPLATY|KWOTA\s+DO\s+ZAPLATY|ZAHLBETRAG|GESAMTBETRAG|RECHNUNGSBETRAG|NET\s*A\s*PAYER|TOTALE\s+DA\s+PAGARE|TOTAL\s+A\s+PAGAR|TOTAL\s+DE\s+PLATA)(?![\p{L}\p{N}])/u,
     vetoComponents: false,
   },
   {
@@ -155,7 +155,8 @@ const TOTAL_LABELS: ReadonlyArray<{ pattern: RegExp; vetoComponents: boolean }> 
  * Lines naming a component of the price rather than the price.
  *
  * Consulted only for the generic tier above, where a bare "total" really might
- * be labelling a subtotal.
+ * be labelling a subtotal. ΚΑΘΑΡΗ ΑΞΙΑ covers the Greek net line whether or not
+ * ΣΥΝΟΛΙΚΗ precedes it.
  */
 const NOT_A_TOTAL =
   /(?<![\p{L}\p{N}])(?:ΚΑΘΑΡΗ\s+ΑΞΙΑ|ΑΞΙΑ\s+ΧΩΡΙΣ|ΜΕΡΙΚΟ\s+ΣΥΝΟΛΟ|ΦΠΑ|ΕΚΠΤΩΣΗ|SUBTOTAL|NET(?:\s+AMOUNT)?|VAT|TAX|DISCOUNT|NETTO|WARTOSC\s+NETTO|PODSTAWA|RABAT|ZWISCHENSUMME|MWST|IMPONIBILE|IVA|TVA)(?![\p{L}\p{N}])/u;
@@ -290,6 +291,58 @@ function customerName(lines: string[]): string | null {
   return null;
 }
 
+/**
+ * Greek month names, by the prefix they all share across their forms.
+ *
+ * An invoice writes the month as a word far more often than as a number, and in
+ * whichever form the template felt like — Αύγ, Αυγ, Αυγούστου. Matching on the
+ * folded prefix covers all of them without listing every declension.
+ *
+ * Longest first, because ΙΟΥΝ and ΙΟΥΛ share three letters with each other.
+ */
+const GREEK_MONTHS: ReadonlyArray<[string, number]> = [
+  ['ΙΟΥΝ', 6],
+  ['ΙΟΥΛ', 7],
+  ['ΙΑΝ', 1],
+  ['ΦΕΒ', 2],
+  ['ΜΑΡ', 3],
+  ['ΑΠΡ', 4],
+  ['ΜΑΙ', 5],
+  ['ΑΥΓ', 8],
+  ['ΣΕΠ', 9],
+  ['ΟΚΤ', 10],
+  ['ΝΟΕ', 11],
+  ['ΔΕΚ', 12],
+];
+
+/**
+ * A date in any form these documents actually use.
+ *
+ * The numeric parser handles what the importer already knew about. This adds the
+ * spelled-out Greek form — "12 Αύγ 2026, 11:42" — which is what the invoicing
+ * tool this product is built around prints, and which the numeric parser reads
+ * as nothing at all. The time is ignored: a due date has no hour.
+ */
+function parseAnyDate(raw: string | null): string | null {
+  if (!raw) return null;
+
+  const numeric = parseDate(raw);
+  if (numeric) return numeric;
+
+  const match = /(\d{1,2})\s+([Α-Ω]{3,})\.?,?\s+(\d{4})/u.exec(fold(raw));
+  if (!match) return null;
+
+  const name = match[2] ?? '';
+  const month = GREEK_MONTHS.find(([prefix]) => name.startsWith(prefix))?.[1];
+  if (!month) return null;
+
+  const day = Number(match[1]);
+  const year = Number(match[3]);
+  if (!day || day > 31) return null;
+
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
 /** The payable amount, preferring labels that name themselves payable. */
 function totalCents(lines: string[]): number | null {
   for (const { pattern, vetoComponents } of TOTAL_LABELS) {
@@ -346,8 +399,8 @@ export function extractInvoiceFields(
     vatNumber: customerVat(lines, options.ownVatNumber),
     invoiceNumber: valueFor(lines, NUMBER_LABEL),
     series: valueFor(lines, SERIES_LABEL),
-    issueDate: parseDate(valueFor(lines, ISSUE_DATE_LABEL) ?? ''),
-    dueDate: dueDateRaw ? parseDate(dueDateRaw) : null,
+    issueDate: parseAnyDate(valueFor(lines, ISSUE_DATE_LABEL)),
+    dueDate: parseAnyDate(dueDateRaw),
     amountCents: totalCents(lines),
     currency: currencyIn(text),
     mark: markIn(lines),

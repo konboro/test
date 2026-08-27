@@ -1,3 +1,4 @@
+import { assistFields } from './assist';
 import { extractInvoiceFields, type ExtractedInvoice, type RequiredField } from './fields';
 
 /**
@@ -66,19 +67,74 @@ export async function pdfText(
 }
 
 /**
+ * Merges what the model supplied into what the labels found.
+ *
+ * The parser wins every contest. It read the actual document structure; the
+ * model read prose about it. Only the blanks are filled, and `missing` is
+ * recomputed from the result so the review card stops flagging a field that now
+ * has a value.
+ */
+function merge(
+  fields: ExtractedInvoice,
+  assisted: Partial<ExtractedInvoice> | null,
+): { fields: ExtractedInvoice; missing: RequiredField[] } {
+  const merged: ExtractedInvoice = { ...fields };
+
+  if (assisted) {
+    for (const [key, value] of Object.entries(assisted) as Array<
+      [keyof ExtractedInvoice, ExtractedInvoice[keyof ExtractedInvoice]]
+    >) {
+      if (merged[key] === null || merged[key] === undefined) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (merged as any)[key] = value;
+      }
+    }
+  }
+
+  const missing: RequiredField[] = [];
+  if (!merged.invoiceNumber) missing.push('invoiceNumber');
+  if (merged.amountCents === null) missing.push('amountCents');
+  if (!merged.issueDate) missing.push('issueDate');
+  if (!merged.vatNumber && !merged.debtorName) missing.push('customer');
+
+  return { fields: merged, missing };
+}
+
+/**
  * Reads one uploaded document.
  *
- * `vision` is injected rather than imported so that this stays testable without
- * a network, and so the caller decides whether a model may be used at all.
+ * `vision` and `assist` are injected rather than imported so that this stays
+ * testable without a network, and so the caller decides whether a model may be
+ * used at all.
  */
 export async function readInvoiceDocument(
   file: { bytes: Uint8Array; mimeType: string },
   options: {
     ownVatNumber?: string | null;
     vision?: (input: { bytes: Uint8Array; mimeType: string }) => Promise<string | null>;
+    assist?: (
+      text: string,
+      missing: ReadonlyArray<RequiredField>,
+    ) => Promise<Partial<ExtractedInvoice> | null>;
   } = {},
 ): Promise<ReadResult> {
   const empty = extractInvoiceFields('', options);
+
+  /**
+   * Whatever text was recovered, turned into fields.
+   *
+   * A label the parser has not been taught used to end here as a blank form for
+   * somebody to retype. Now it goes to the model instead — but only the fields
+   * that are actually still empty, and only on the documents that need it, so a
+   * known layout still costs nothing.
+   */
+  const finish = async (source: ReadSource, text: string): Promise<ReadResult> => {
+    const read = extractInvoiceFields(text, options);
+    if (read.missing.length === 0) return { source, ...read };
+
+    const assist = options.assist ?? assistFields;
+    return { source, ...merge(read.fields, await assist(text, read.missing)) };
+  };
 
   let pages = 0;
 
@@ -86,10 +142,7 @@ export async function readInvoiceDocument(
     const read = await pdfText(file.bytes);
     pages = read.pages;
 
-    if (read.text) {
-      const { fields, missing } = extractInvoiceFields(read.text, options);
-      return { source: 'pdf_text', fields, missing };
-    }
+    if (read.text) return finish('pdf_text', read.text);
 
     if (pages > MAX_VISION_PAGES) {
       return { source: 'manual', ...empty, problem: 'too_many_pages' };
@@ -110,6 +163,5 @@ export async function readInvoiceDocument(
     return { source: 'manual', ...empty, problem: 'unreadable' };
   }
 
-  const { fields, missing } = extractInvoiceFields(seen, options);
-  return { source: 'vision', fields, missing };
+  return finish('vision', seen);
 }

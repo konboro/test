@@ -177,3 +177,66 @@ describe('Greek as it is actually typeset', () => {
     expect(extractInvoiceFields('ΑΦΜ 094123456').fields.vatNumber).toBe('094123456');
   });
 });
+
+/**
+ * The layout that sent us here.
+ *
+ * A real Elorus invoice, with the customer's name and tax number replaced. It
+ * read as almost nothing: the month was a Greek abbreviation, the number came
+ * after a bare `#`, the customer sat under `ΠΕΛΑΤΗΣ`, the due date under
+ * `ΕΞΟΦΛΗΣΗ ΕΩΣ`, and the first total on the page was the net value.
+ */
+describe('a Greek services invoice', () => {
+  const text = [
+    'PENNY IKE',
+    'ΑΦΜ: 802160515',
+    'ΤΙΜΟΛΟΓΙΟ ΠΑΡΟΧΗΣ ΥΠΗΡΕΣΙΩΝ #10000-42',
+    'ΗΜΕΡΟΜΗΝΙΑ: 12 Αύγ 2026, 11:42',
+    'ΕΞΟΦΛΗΣΗ ΕΩΣ: 27 Αύγ 2026',
+    'ΠΕΛΑΤΗΣ',
+    'ΠΑΠΑΔΟΠΟΥΛΟΥ ΜΑΡΙΑ',
+    'ΑΦΜ: 156954440',
+    'Συνολική καθαρή αξία: 137,10€',
+    'ΦΠΑ (24%): 32,90€',
+    'Τελική αξία: 170,00€',
+    'MARK: 400014828080727',
+  ].join('\n');
+
+  it('reads every field', () => {
+    const { fields, missing } = extractInvoiceFields(text, { ownVatNumber: '802160515' });
+
+    expect(missing).toEqual([]);
+    expect(fields.invoiceNumber).toBe('10000-42');
+    expect(fields.debtorName).toBe('ΠΑΠΑΔΟΠΟΥΛΟΥ ΜΑΡΙΑ');
+    expect(fields.issueDate).toBe('2026-08-12');
+    expect(fields.dueDate).toBe('2026-08-27');
+    expect(fields.mark).toBe('400014828080727');
+  });
+
+  it('bills the final value, not the net one', () => {
+    const { fields } = extractInvoiceFields(text, { ownVatNumber: '802160515' });
+    expect(fields.amountCents).toBe(17000);
+  });
+
+  it('takes the customer tax number, not the issuer one', () => {
+    const { fields } = extractInvoiceFields(text, { ownVatNumber: '802160515' });
+    expect(fields.vatNumber).toBe('156954440');
+  });
+});
+
+describe('Greek month names', () => {
+  const on = (date: string) =>
+    extractInvoiceFields(`INVOICE #1\nΗΜΕΡΟΜΗΝΙΑ: ${date}\nΣΥΝΟΛΟ: 10,00€\nΑΦΜ: 156954440`, {})
+      .fields.issueDate;
+
+  it('reads the abbreviated and the full form alike', () => {
+    expect(on('12 Αύγ 2026')).toBe('2026-08-12');
+    expect(on('1 Αυγούστου 2026')).toBe('2026-08-01');
+    expect(on('9 Ιαν 2026')).toBe('2026-01-09');
+  });
+
+  it('keeps June and July apart', () => {
+    expect(on('3 Ιουν 2026')).toBe('2026-06-03');
+    expect(on('3 Ιουλ 2026')).toBe('2026-07-03');
+  });
+});
