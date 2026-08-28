@@ -6,6 +6,9 @@ import { useFormStatus } from 'react-dom';
 import { Badge, Button, Field, inputClass } from '@/components/ui';
 import { useT } from '@/lib/i18n/provider';
 
+import type { Scenario } from '@/lib/dunning/scenario';
+
+import { InvoiceScenarioEditor } from '../scenario-editor';
 import { commitUpload, discardUpload, type UploadState } from './actions';
 
 export interface Proposal {
@@ -45,7 +48,7 @@ function Commit() {
  * this" from "we guessed" at a glance, because they are about to turn it into a
  * demand for money.
  */
-export function ReviewCard({ proposal }: { proposal: Proposal }) {
+export function ReviewCard({ proposal, scenario }: { proposal: Proposal; scenario: Scenario }) {
   const t = useT();
   const [state, action] = useActionState<UploadState, FormData>(commitUpload, {});
 
@@ -164,6 +167,16 @@ export function ReviewCard({ proposal }: { proposal: Proposal }) {
             {[...missing].join(', ')}
           </p>
         ) : null}
+
+        {/* Confirming a reading is the moment this becomes a real invoice and
+            the customer starts hearing from us. The choice about what they hear
+            belongs here, not on a screen somebody has to remember to visit. */}
+        <div className="border-t border-ink-100 pt-4">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-500">
+            {t.invoiceScenario.title}
+          </p>
+          <InvoiceScenarioEditor scenario={scenario} />
+        </div>
 
         {state.error ? (
           <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">

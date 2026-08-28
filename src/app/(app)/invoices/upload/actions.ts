@@ -14,6 +14,8 @@ import { writableOrganization } from '@/lib/orgs/active';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { noticeOnIssue } from '@/lib/dunning/issue-notice';
+import { loadScenario } from '@/lib/dunning/engine';
+import { invoiceScenarioProblem, parseInvoiceScenario } from '@/lib/dunning/invoice-scenario';
 
 export interface UploadState {
   error?: string;
@@ -185,6 +187,9 @@ export async function commitUpload(_prev: UploadState, formData: FormData): Prom
 
   // `commitImport` reports in the reader's language now rather than pasting the
   // database's own words into the page, so it needs the dictionary.
+  const cadence = parseInvoiceScenario(formData, await loadScenario(org.id));
+  if (invoiceScenarioProblem(cadence)) return { error: 'scenario' };
+
   const outcome = await commitImport(org.id, [row], await getDictionary());
   if (outcome.errors.length > 0) return { error: outcome.errors[0] };
 
@@ -218,6 +223,25 @@ export async function commitUpload(_prev: UploadState, formData: FormData): Prom
       updated_at: new Date().toISOString(),
     })
     .eq('id', id);
+
+  // What the operator chose beside this reading. Applied before the notice
+  // goes out, because "no automatic reminders" has to mean the notice too — and
+  // that is the very next thing to happen.
+  if (created?.id && cadence.mode !== 'default') {
+    await admin
+      .from('invoices')
+      .update({
+        scenario_mode: cadence.mode,
+        automation_enabled: cadence.mode !== 'off',
+      })
+      .eq('id', created.id);
+
+    if (cadence.rows.length) {
+      await admin
+        .from('invoice_dunning_steps')
+        .insert(cadence.rows.map((step) => ({ ...step, invoice_id: created.id })));
+    }
+  }
 
   // Confirming the reading is the deliberate act, not dropping the file in —
   // the fields were still being checked until this point. So this is where the

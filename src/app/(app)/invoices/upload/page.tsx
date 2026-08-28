@@ -8,6 +8,8 @@ import { createClient } from '@/lib/supabase/server';
 
 import { Dropzone } from './dropzone';
 import { ReviewCard, type Proposal } from './review-card';
+import { loadScenario } from '@/lib/dunning/engine';
+import { requireOrganization } from '@/lib/orgs/active';
 
 export async function generateMetadata() {
   return { title: (await getDictionary()).upload.title };
@@ -34,6 +36,10 @@ export default async function UploadPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
+
+  // What the choice beside each reading starts from.
+  const org = await requireOrganization();
+  const scenario = await loadScenario(org.id);
 
   // RLS already confines this to the tenant; the read goes through the session
   // client precisely so that it does.
@@ -101,7 +107,7 @@ export default async function UploadPage() {
             <EmptyState title={t.upload.queueEmpty} body={t.upload.queueEmptyHint} />
           </Card>
         ) : (
-          proposals.map((proposal) => <ReviewCard key={proposal.id} proposal={proposal} />)
+          proposals.map((proposal) => <ReviewCard key={proposal.id} proposal={proposal} scenario={scenario} />)
         )}
       </section>
     </div>

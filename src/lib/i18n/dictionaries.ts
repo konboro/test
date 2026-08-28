@@ -1181,6 +1181,7 @@ const el = {
       too_many_pages: 'Το αρχείο έχει πολλές σελίδες για αυτόματη ανάγνωση. Ανεβάστε ένα τιμολόγιο τη φορά ή συμπληρώστε τα πεδία.',
     } as Record<string, string>,
     errors: {
+      scenario: 'Το σενάριο αυτού του παραστατικού δεν είναι έγκυρο — ελέγξτε τις ημέρες.',
       no_files: 'Δεν επιλέχθηκε αρχείο.',
       too_many: 'Έως 25 αρχεία τη φορά.',
       bad_type: 'Δεκτά μόνο PDF, PNG, JPG και WEBP.',
@@ -2562,6 +2563,7 @@ const en: typeof el = {
       too_many_pages: 'This file has too many pages to read automatically. Upload one invoice at a time, or fill the fields in.',
     } as Record<string, string>,
     errors: {
+      scenario: 'The scenario for this invoice is not valid — check the days.',
       no_files: 'No file chosen.',
       too_many: 'Up to 25 files at a time.',
       bad_type: 'Only PDF, PNG, JPG and WEBP are accepted.',
