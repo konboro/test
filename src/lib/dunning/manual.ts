@@ -26,12 +26,13 @@ import {
   type LanguageChoice,
 } from '@/lib/i18n/message-locale';
 import { contactLimitsDisabled } from '@/lib/limits';
-import { athensDate, formatDate } from '@/lib/money';
+import { athensDate, formatDate, zonedDate } from '@/lib/money';
 import { channelAvailable, providerStatus, type Channel } from '@/lib/providers';
 import { normalisePhone, segmentCount } from '@/lib/sms/send';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { DebtorRow, InvoiceRow, TemplateStep, UserRow } from '@/types/database';
 
+import { contactedOn, LOOKBACK_HOURS } from './already-contacted';
 import { dispatchContact, templateContext } from './dispatch';
 import { isSnoozed } from './snooze';
 import { loadTemplateOverrides } from './template-store';
@@ -322,6 +323,26 @@ export async function sendManualReminder(params: {
       providers: providerStatus(),
     });
     return fail(notes.join(' ') || t.manual.noChannel);
+  }
+
+  // Has this person already heard from us today?
+  //
+  // Asked of the send log, not of the claim, and asked whatever the testing
+  // flag says. The claim is the ledger; this is the fact. With the flag on the
+  // ledger is not written at all, which is how fifty customers were written to
+  // with nothing recorded and one of them twice — the flag was meant to skip
+  // bookkeeping and quietly removed the protection with it.
+  const dayStart = new Date(Date.now() - LOOKBACK_HOURS * 60 * 60 * 1000).toISOString();
+  const { data: alreadySent } = await supabase
+    .from('communications_log')
+    .select('sent_at')
+    .eq('user_id', userId)
+    .eq('debtor_id', debtor.id)
+    .eq('status', 'sent')
+    .gte('sent_at', dayStart);
+
+  if (contactedOn(alreadySent ?? [], tenant.timezone, zonedDate(tenant.timezone))) {
+    return fail(t.manual.dailyLimit, 'daily_limit');
   }
 
   // Claiming the row is what grants the right to contact this debtor today.
