@@ -80,12 +80,18 @@ function valueFor(lines: string[], label: RegExp): string | null {
     const line = lines[i];
     if (line === undefined || !label.test(fold(line))) continue;
 
+    // A header row answers from the line beneath, in its own column.
+    const column = columnValue(lines, i, label);
+    if (column) return column;
+
     const sameLine = tail(line, label);
-    if (sameLine) return sameLine;
+    // A value that is itself a label means the line was a heading and this is
+    // the next heading along, not an answer.
+    if (sameLine && !looksLikeLabel(cells(sameLine)[0] ?? sameLine)) return sameLine;
 
     for (let j = i + 1; j < Math.min(i + 3, lines.length); j += 1) {
       const below = lines[j]?.trim();
-      if (below) return below;
+      if (below && !looksLikeLabel(below)) return below;
     }
   }
 
@@ -111,7 +117,7 @@ const VAT_LABEL =
 // ΠΕΛΑΤΗΣ, not ΠΕΛΑΤΗ. Greek inflects, and a boundary after the stem rejects
 // the nominative outright — the commonest spelling of the word on an invoice.
 const CUSTOMER_MARKER =
-  /(?<![\p{L}\p{N}])(?:ΣΤΟΙΧΕΙΑ\s+ΠΕΛΑΤΗ|ΠΕΛΑΤΗΣ|ΠΕΛΑΤΗ|ΕΠΩΝΥΜΙΑ|ΠΡΟΣ|BILL\s*TO|INVOICE\s*TO|CUSTOMER|CLIENT|NABYWCA|ODBIORCA|KUPUJACY|KUNDE|EMPFANGER|CLIENTE|DESTINATARIO|CUMPARATOR)(?![\p{L}\p{N}])/u;
+  /(?<![\p{L}\p{N}])(?:ΣΤΟΙΧΕΙΑ\s+ΠΕΛΑΤΗ|ΣΤΟΙΧΕΙΑ\s+ΠΑΡΑΛΗΠΤΗ|ΠΑΡΑΛΗΠΤΗΣ|ΠΑΡΑΛΗΠΤΗ|ΠΕΛΑΤΗΣ|ΠΕΛΑΤΗ|ΕΠΩΝΥΜΙΑ|ΠΡΟΣ|BILL\s*TO|INVOICE\s*TO|CUSTOMER|CLIENT|NABYWCA|ODBIORCA|KUPUJACY|KUNDE|EMPFANGER|CLIENTE|DESTINATARIO|CUMPARATOR)(?![\p{L}\p{N}])/u;
 
 const ISSUER_MARKER =
   /(?<![\p{L}\p{N}])(?:ΣΤΟΙΧΕΙΑ\s+ΕΚΔΟΤΗ|ΕΚΔΟΤΗΣ|ΕΚΔΟΤΗ|ΠΩΛΗΤΗΣ|ΠΩΛΗΤΗ|ΑΠΟ|SUPPLIER|SELLER|ISSUER|SPRZEDAWCA|WYSTAWCA|VERKAUFER|LIEFERANT|FOURNISSEUR|VENDEUR|FORNITORE|PROVEEDOR|FURNIZOR)(?![\p{L}\p{N}])/u;
@@ -132,6 +138,69 @@ const DUE_DATE_LABEL =
   /(?<![\p{L}\p{N}])(?:ΗΜΕΡΟΜΗΝΙΑ\s+ΛΗΞΗΣ|ΕΞΟΦΛΗΣΗ\s+ΕΩΣ|ΠΛΗΡΩΜΗ\s+ΕΩΣ|ΛΗΞΗ|ΠΡΟΘΕΣΜΙΑ(?:\s+ΠΛΗΡΩΜΗΣ)?|TERMIN\s+PLATNOSCI|TERMIN\s+ZAPLATY|FALLIGKEITSDATUM|ZAHLBAR\s+BIS|DATE\s+ECHEANCE|DUE\s*DATE|PAYMENT\s*DUE|DUE|SCADENZA|VENCIMIENTO|SCADENT)(?![\p{L}\p{N}])/u;
 
 const MARK_LABEL = /(?<![\p{L}\p{N}])(?:Μ\.ΑΡ\.Κ\.?|ΜΑΡΚ|MARK)(?![\p{L}\p{N}])/u;
+
+/**
+ * Words that are a column heading rather than a value.
+ *
+ * Used only to recognise a header row. A line whose segments are all of these
+ * is labelling the line beneath it, not answering it.
+ */
+const HEADING_WORD =
+  /(?<![\p{L}\p{N}])(?:ΩΡΑ|ΣΕΛΙΔΑ|ΕΙΔΟΣ\s+ΠΑΡΑΣΤΑΤΙΚΟΥ|ΚΩΔΙΚΟΣ|ΠΕΡΙΓΡΑΦΗ|ΠΟΣΟΤΗΤΑ|ΜΟΝΑΔΑ|ΠΑΡΑΤΗΡΗΣΕΙΣ|ΕΠΑΓΓΕΛΜΑ|ΔΙΕΥΘΥΝΣΗ|ΠΟΛΗ|ΤΗΛΕΦΩΝΟ|PAGE|QTY|DESCRIPTION|UNIT)(?![\p{L}\p{N}])/u;
+
+/** Whether a cell is a label of some kind rather than a value. */
+function looksLikeLabel(segment: string): boolean {
+  const folded = fold(segment);
+
+  return (
+    HEADING_WORD.test(folded) ||
+    NUMBER_LABEL.test(folded) ||
+    SERIES_LABEL.test(folded) ||
+    ISSUE_DATE_LABEL.test(folded) ||
+    DUE_DATE_LABEL.test(folded) ||
+    VAT_LABEL.test(folded)
+  );
+}
+
+/** A line split into its columns, by the wide gaps the text layer preserves. */
+function cells(line: string): string[] {
+  return line.split(/\s{2,}/).map((cell) => cell.trim()).filter(Boolean);
+}
+
+/**
+ * The value under a heading, when the document is a table rather than a form.
+ *
+ * Greek invoicing systems print the document's own details as two rows: the
+ * headings, then the values beneath them.
+ *
+ *     ΕΙΔΟΣ ΠΑΡΑΣΤΑΤΙΚΟΥ    ΑΡΙΘΜΟΣ    ΣΕΙΡΑ    ΗΜΕΡΟΜΗΝΙΑ    ΩΡΑ    ΣΕΛΙΔΑ
+ *     Τιμολόγιο - Δελτίο…    42830      ΤΔΑ     25/6/2026     13:39  1 / 1
+ *
+ * Read as a form — take whatever follows the label on its line — ΑΡΙΘΜΟΣ
+ * answers "ΣΕΙΡΑ ΗΜΕΡΟΜΗΝΙΑ ΩΡΑ ΣΕΛΙΔΑ", and that is what was arriving as an
+ * invoice number.
+ *
+ * A header row is recognised by the cell after the label being another label.
+ * That is what separates it from a form line like "ΕΠΩΝΥΜΙΑ  PENNY IKE", where
+ * the next cell is the answer and reading down would be wrong.
+ */
+function columnValue(lines: string[], index: number, label: RegExp): string | null {
+  const line = lines[index];
+  if (!line) return null;
+
+  const heads = cells(line);
+  const at = heads.findIndex((cell) => label.test(fold(cell)));
+  if (at < 0) return null;
+
+  const next = heads[at + 1];
+  if (!next || !looksLikeLabel(next)) return null;
+
+  // The row beneath, in the same column.
+  const below = cells(lines[index + 1] ?? '');
+  const value = below[at];
+
+  return value && !looksLikeLabel(value) ? value : null;
+}
 
 /**
  * Total labels, most specific first.
@@ -281,7 +350,6 @@ function customerVat(lines: string[], ownVatNumber?: string | null): string | nu
   const own = ownVatNumber?.replace(/\D/g, '') ?? '';
   const candidates = vatCandidates(lines).filter((c) => c.value !== own);
   if (candidates.length === 0) return null;
-  if (candidates.length === 1) return candidates[0]?.value ?? null;
 
   // Two numbers sharing a line is the two-column layout. This has to be decided
   // before the heading rules below, which read downwards and so cannot tell two
@@ -312,8 +380,26 @@ function customerVat(lines: string[], ownVatNumber?: string | null): string | nu
   );
   if (unambiguous) return unambiguous.value;
 
+
   const underCustomer = candidates.find((c) => nearest(c.index, CUSTOMER_MARKER));
   if (underCustomer) return underCustomer.value;
+
+  /**
+   * One number left, and nothing on the page ties it to the customer.
+   *
+   * On a purchase invoice this is the trap: our own number is removed as the
+   * customer's, which leaves the supplier's letterhead as the only candidate
+   * and it is returned as the debtor. A document that names its parties and
+   * still cannot place this number has not told us it is the customer's.
+   */
+  const namesParties = lines.some((line) => {
+    const folded = fold(line);
+    return CUSTOMER_MARKER.test(folded) || ISSUER_MARKER.test(folded);
+  });
+
+  if (candidates.length === 1) {
+    return namesParties ? null : (candidates[0]?.value ?? null);
+  }
 
   // Only worth applying when the document actually marks an issuer block. With
   // no headings at all every candidate trivially satisfies "not under an issuer
@@ -439,18 +525,6 @@ function customerContact(
   const underContact = candidates.find((c) => near(c.index, CONTACT_MARKER));
   if (underContact) return underContact.value;
 
-  // The only contact on the page is the customer's — unless the page put it
-  // under the issuer and nowhere near the customer, which is a letterhead.
-  if (candidates.length === 1) {
-    const only = candidates[0];
-    if (!only) return null;
-
-    const issuerOnly =
-      near(only.index, ISSUER_MARKER) && !near(only.index, CUSTOMER_MARKER);
-
-    return issuerOnly ? null : only.value;
-  }
-
   const side = customerSide(lines);
   if (side) {
     // Both parties on one row: the columns are told apart by position, exactly
@@ -474,6 +548,32 @@ function customerContact(
     (c) => near(c.index, CUSTOMER_MARKER) && !near(c.index, ISSUER_MARKER),
   );
   if (unambiguous) return unambiguous.value;
+
+  /**
+   * Does this document say who its parties are?
+   *
+   * If it does, a contact that could not be attributed to the customer above is
+   * the issuer's — a letterhead phone, a footer address — and returning it puts
+   * the sender's details on the customer's record. That is exactly what a
+   * purchase invoice produces: the buyer's phone box is printed and empty, the
+   * seller's letterhead is not, and the only contact on the page belongs to the
+   * wrong party.
+   *
+   * A document with no headings at all is the other case: one small invoice
+   * with one address on it, and that address is the one to write to.
+   */
+  const namesParties = lines.some((line) => {
+    const folded = fold(line);
+    return CUSTOMER_MARKER.test(folded) || ISSUER_MARKER.test(folded);
+  });
+
+  if (candidates.length === 1) {
+    const only = candidates[0];
+    if (!only) return null;
+
+    return namesParties ? null : only.value;
+  }
+
 
   // Nothing on the page says whose these are, and there is no positional
   // fallback worth taking. The tax numbers can end on "the last one, because
@@ -532,6 +632,9 @@ function looksLikeName(line: string): boolean {
   // seller ends up being dunned for the buyer's debt.
   if (ISSUER_MARKER.test(folded)) return false;
   if (CUSTOMER_MARKER.test(folded)) return false;
+  // Every other column heading too. ΚΩΔΙΚΟΣ, ΔΙΕΥΘΥΝΣΗ and their neighbours sit
+  // exactly where a name would in a three-column details table.
+  if (looksLikeLabel(trimmed)) return false;
 
   return /\p{L}/u.test(trimmed);
 }
