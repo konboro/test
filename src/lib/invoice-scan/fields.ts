@@ -119,8 +119,12 @@ const VAT_LABEL =
 const CUSTOMER_MARKER =
   /(?<![\p{L}\p{N}])(?:ΣΤΟΙΧΕΙΑ\s+ΠΕΛΑΤΗ|ΣΤΟΙΧΕΙΑ\s+ΠΑΡΑΛΗΠΤΗ|ΠΑΡΑΛΗΠΤΗΣ|ΠΑΡΑΛΗΠΤΗ|ΠΕΛΑΤΗΣ|ΠΕΛΑΤΗ|ΕΠΩΝΥΜΙΑ|ΠΡΟΣ|BILL\s*TO|INVOICE\s*TO|CUSTOMER|CLIENT|NABYWCA|ODBIORCA|KUPUJACY|KUNDE|EMPFANGER|CLIENTE|DESTINATARIO|CUMPARATOR)(?![\p{L}\p{N}])/u;
 
+// FROM earns its place the same way ΑΠΟ did: it is what the English half of the
+// same invoicing tool prints over the issuer column. Without it the header row
+// has only one recognised side, the layout does not read as two columns, and
+// "Penny IKE    Jan Geesmann" comes back as one customer name.
 const ISSUER_MARKER =
-  /(?<![\p{L}\p{N}])(?:ΣΤΟΙΧΕΙΑ\s+ΕΚΔΟΤΗ|ΕΚΔΟΤΗΣ|ΕΚΔΟΤΗ|ΠΩΛΗΤΗΣ|ΠΩΛΗΤΗ|ΑΠΟ|SUPPLIER|SELLER|ISSUER|SPRZEDAWCA|WYSTAWCA|VERKAUFER|LIEFERANT|FOURNISSEUR|VENDEUR|FORNITORE|PROVEEDOR|FURNIZOR)(?![\p{L}\p{N}])/u;
+  /(?<![\p{L}\p{N}])(?:ΣΤΟΙΧΕΙΑ\s+ΕΚΔΟΤΗ|ΣΤΟΙΧΕΙΑ\s+ΑΠΟΣΤΟΛΕΑ|ΕΚΔΟΤΗΣ|ΕΚΔΟΤΗ|ΠΩΛΗΤΗΣ|ΠΩΛΗΤΗ|ΑΠΟ|BILL\s*FROM|FROM|SUPPLIER|SELLER|VENDOR|ISSUER|SPRZEDAWCA|WYSTAWCA|VERKAUFER|LIEFERANT|FOURNISSEUR|VENDEUR|FORNITORE|PROVEEDOR|FURNIZOR)(?![\p{L}\p{N}])/u;
 
 // `#` earns its place: Elorus, and most invoicing tools that grew out of one,
 // print "ΤΙΜΟΛΟΓΙΟ ΠΑΡΟΧΗΣ ΥΠΗΡΕΣΙΩΝ #10000-42" with no labelled number at all.
@@ -284,8 +288,8 @@ function currencyIn(text: string): string {
  */
 function vatCandidates(
   lines: string[],
-): Array<{ value: string; index: number; offset: number }> {
-  const found: Array<{ value: string; index: number; offset: number }> = [];
+): Array<{ value: string; index: number; offset: number; indented: boolean }> {
+  const found: Array<{ value: string; index: number; offset: number; indented: boolean }> = [];
   const label = new RegExp(VAT_LABEL.source, 'gu');
 
   lines.forEach((line, index) => {
@@ -307,7 +311,12 @@ function vatCandidates(
       const digits = /(?:EL|PL|DE|FR|IT|ES|RO|BG|CZ|HU)?(\d{8,12})(?!\d)/.exec(
         window.replace(/[\s.-]/g, ''),
       );
-      if (digits?.[1]) found.push({ value: digits[1], index, offset: start });
+      if (digits?.[1]) {
+        // Which column the line starts in, for the rows that carry only one
+        // party's number. Two on a line are told apart by offset below; one on
+        // a line has nothing else to place it.
+        found.push({ value: digits[1], index, offset: start, indented: /^s{2,}/.test(line) });
+      }
     });
   });
 
@@ -348,8 +357,24 @@ function customerSide(lines: string[]): Side | null {
  */
 function customerVat(lines: string[], ownVatNumber?: string | null): string | null {
   const own = ownVatNumber?.replace(/\D/g, '') ?? '';
-  const candidates = vatCandidates(lines).filter((c) => c.value !== own);
+  const all = vatCandidates(lines);
+  const candidates = all.filter((c) => c.value !== own);
   if (candidates.length === 0) return null;
+
+  /**
+   * Did this line carry both parties before ours was removed?
+   *
+   * It matters for what is left. A row printing the issuer's number and the
+   * customer's is a two-column row, and once our own is filtered out the
+   * survivor is the customer's — however far left it happens to sit. Judged on
+   * the unfiltered set, because after filtering it looks exactly like a line
+   * that only ever had one.
+   */
+  const sharedRow = new Set(
+    all
+      .filter((c) => all.filter((other) => other.index === c.index).length > 1)
+      .map((c) => c.index),
+  );
 
   // Two numbers sharing a line is the two-column layout. This has to be decided
   // before the heading rules below, which read downwards and so cannot tell two
@@ -374,6 +399,22 @@ function customerVat(lines: string[], ownVatNumber?: string | null): string | nu
     }
     return false;
   };
+
+  // Whatever survived a two-party row is the customer's, wherever it sits.
+  const survivor = candidates.find((c) => sharedRow.has(c.index));
+  if (survivor) return survivor.value;
+
+  // A line that only ever carried one number is placed by the column it starts
+  // in. On a two-column invoice where only the issuer has a tax number, the
+  // customer heading is still a line or two above it, so "under a customer
+  // heading" answers yes and hands back the issuer's.
+  if (side) {
+    const onSide = candidates.filter((c) => (side === 'right' ? c.indented : !c.indented));
+    if (onSide.length) return onSide[0]?.value ?? null;
+
+    const opposite = candidates.some((c) => (side === 'right' ? !c.indented : c.indented));
+    if (opposite) return null;
+  }
 
   const unambiguous = candidates.find(
     (c) => nearest(c.index, CUSTOMER_MARKER) && !nearest(c.index, ISSUER_MARKER),
@@ -695,7 +736,8 @@ function customerName(lines: string[], ownName?: string | null): string | null {
  *
  * Longest first, because ΙΟΥΝ and ΙΟΥΛ share three letters with each other.
  */
-const GREEK_MONTHS: ReadonlyArray<[string, number]> = [
+const MONTH_NAMES: ReadonlyArray<[string, number]> = [
+  // Greek. Longest first: ΙΟΥΝ and ΙΟΥΛ share three letters with each other.
   ['ΙΟΥΝ', 6],
   ['ΙΟΥΛ', 7],
   ['ΙΑΝ', 1],
@@ -708,6 +750,21 @@ const GREEK_MONTHS: ReadonlyArray<[string, number]> = [
   ['ΟΚΤ', 10],
   ['ΝΟΕ', 11],
   ['ΔΕΚ', 12],
+  // English, because the same invoicing tool prints "Jun 30, 2026" the moment a
+  // tenant switches the document language — and the date then read as nothing.
+  // JUN before JUL for the same reason as above, and MAR before MAY.
+  ['JAN', 1],
+  ['FEB', 2],
+  ['MAR', 3],
+  ['APR', 4],
+  ['MAY', 5],
+  ['JUN', 6],
+  ['JUL', 7],
+  ['AUG', 8],
+  ['SEP', 9],
+  ['OCT', 10],
+  ['NOV', 11],
+  ['DEC', 12],
 ];
 
 /**
@@ -724,15 +781,28 @@ function parseAnyDate(raw: string | null): string | null {
   const numeric = parseDate(raw);
   if (numeric) return numeric;
 
-  const match = /(\d{1,2})\s+([Α-Ω]{3,})\.?,?\s+(\d{4})/u.exec(fold(raw));
-  if (!match) return null;
+  const folded = fold(raw);
 
-  const name = match[2] ?? '';
-  const month = GREEK_MONTHS.find(([prefix]) => name.startsWith(prefix))?.[1];
+  // Both orders, because the same invoicing tool writes "12 Αύγ 2026" in Greek
+  // and "Jun 30, 2026" in English. Day-first is tried first: it is the only one
+  // that can start with a number, so the two cannot be confused.
+  const dayFirst = /(\d{1,2})\s+([\p{L}]{3,})\.?,?\s+(\d{4})/u.exec(folded);
+  const monthFirst = /([\p{L}]{3,})\.?\s+(\d{1,2}),?\s+(\d{4})/u.exec(folded);
+
+  const parts = dayFirst
+    ? { day: dayFirst[1], name: dayFirst[2], year: dayFirst[3] }
+    : monthFirst
+      ? { day: monthFirst[2], name: monthFirst[1], year: monthFirst[3] }
+      : null;
+
+  if (!parts) return null;
+
+  const name = parts.name ?? '';
+  const month = MONTH_NAMES.find(([prefix]) => name.startsWith(prefix))?.[1];
   if (!month) return null;
 
-  const day = Number(match[1]);
-  const year = Number(match[3]);
+  const day = Number(parts.day);
+  const year = Number(parts.year);
   if (!day || day > 31) return null;
 
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
