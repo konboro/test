@@ -525,6 +525,23 @@ async function deliver(
   for (const reason of sent.skipped) result.skipped.push({ invoiceId: invoice.id, reason });
   for (const error of sent.errors) result.errors.push({ invoiceId: invoice.id, error });
 
+  // Nothing left the building, so the rung was not spent. Hand the claim back.
+  //
+  // The claim is what grants the right to contact, and (invoice_id, step, cycle)
+  // is unique — so a rung consumed by a provider outage is consumed for good.
+  // Twenty minutes of a mail provider returning 500 would silently retire that
+  // step for every invoice that reached it in the window, and the debtor would
+  // never receive it: not that day, not ever. Only an unconfigured provider was
+  // guarded against, which is the case that never reaches here.
+  if (sent.emailsSent === 0 && sent.smsSent === 0) {
+    await supabase.from('dunning_contacts').delete().eq('id', contact.id);
+
+    result.contactsMade -= 1;
+    result.skipped.push({ invoiceId: invoice.id, reason: 'nothing delivered — step left unspent' });
+
+    return 'skipped';
+  }
+
   return 'contacted';
 }
 

@@ -337,7 +337,7 @@ const el = {
     repeatTitle: 'Επανάληψη τελευταίου βήματος',
     repeatEnabled: 'Επανάληψη μέχρι να εξοφληθεί',
     sendHour: 'Ώρα αποστολής',
-    sendHourHint: 'Τοπική ώρα Ελλάδας. Οι αυτόματες υπενθυμίσεις φεύγουν σε αυτήν την ώρα.',
+    sendHourHint: 'Τοπική ώρα της ζώνης της εταιρείας σας. Οι αυτόματες υπενθυμίσεις φεύγουν σε αυτήν την ώρα.',
     sendHourInactive:
       'Η ώρα αποθηκεύεται, αλλά τηρείται μόνο όταν η σάρωση τρέχει ωριαία. Μέχρι τότε οι υπενθυμίσεις φεύγουν στην ημερήσια εκτέλεση.',
     onIssueTitle: 'Κατά την έκδοση',
@@ -438,8 +438,9 @@ const el = {
     timelineNote:
       'Η προεπιλογή, ως παράδειγμα. Αλλάζετε ημέρες, κείμενα και κανάλια — ή σταματάτε τον αυτοματισμό για ένα μόνο παραστατικό.',
     timeline: [
-      { day: '−3 ημέρες', title: 'Ευγενική υπενθύμιση', channel: 'Email' },
-      { day: '+2 ημέρες', title: 'Ληξιπρόθεσμο', channel: 'Email + SMS' },
+      { day: 'Έκδοση', title: 'Το παραστατικό με σύνδεσμο πληρωμής', channel: 'Email' },
+      { day: '−1 ημέρα', title: 'Ευγενική υπενθύμιση', channel: 'Email' },
+      { day: '+3 ημέρες', title: 'Ληξιπρόθεσμο', channel: 'Email + SMS' },
       { day: '+10 ημέρες', title: 'Τελική υπενθύμιση', channel: 'Email + SMS' },
       { day: 'Εξόφληση', title: 'Η αλληλουχία σταματά', channel: 'Αυτόματα' },
     ],
@@ -1763,7 +1764,7 @@ const en: typeof el = {
     repeatTitle: 'Repeat the final step',
     repeatEnabled: 'Repeat until it is paid',
     sendHour: 'Sending hour',
-    sendHourHint: 'Greek local time. Automatic reminders go out at this hour.',
+    sendHourHint: 'Local time in your company timezone. Automatic reminders go out at this hour.',
     sendHourInactive:
       'The hour is saved, but only kept once the sweep runs hourly. Until then reminders go out on the daily run.',
     onIssueTitle: 'When the invoice is raised',
@@ -1863,8 +1864,9 @@ const en: typeof el = {
     timelineNote:
       'The default, as an example. You change the days, the wording and the channels — or switch the automation off for a single invoice.',
     timeline: [
-      { day: '−3 days', title: 'A polite nudge', channel: 'Email' },
-      { day: '+2 days', title: 'Overdue', channel: 'Email + SMS' },
+      { day: 'On issue', title: 'The invoice, with a payment link', channel: 'Email' },
+      { day: '−1 day', title: 'A polite nudge', channel: 'Email' },
+      { day: '+3 days', title: 'Overdue', channel: 'Email + SMS' },
       { day: '+10 days', title: 'Final reminder', channel: 'Email + SMS' },
       { day: 'Paid', title: 'The sequence stops', channel: 'Automatic' },
     ],

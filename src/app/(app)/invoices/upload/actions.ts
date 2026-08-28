@@ -226,6 +226,8 @@ export async function commitUpload(_prev: UploadState, formData: FormData): Prom
     phone: text('phone'),
     vatNumber: text('vatNumber'),
     amountCents: amount,
+    // What the document said, not what the account usually deals in.
+    currency: typeof upload.extracted?.currency === 'string' ? upload.extracted.currency : null,
     issueDate,
     // A due date is required downstream and drives the whole ladder. Falling
     // back to the issue date states "due on receipt" rather than inventing terms

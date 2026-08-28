@@ -363,7 +363,7 @@ export async function sendManualReminder(params: {
         // wording above does not change that.
         step: null,
         manual: true,
-        contact_on: athensDate(),
+        contact_on: zonedDate(tenant.timezone),
       })
       .select('id')
       .single();

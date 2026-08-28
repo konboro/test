@@ -578,7 +578,8 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
  * together.
  */
 export async function runScenarioForSelected(formData: FormData): Promise<void> {
-  const ids = formData.getAll('ids').map(String).filter(Boolean);
+  // Deduplicated: the same invoice arrives twice, once from each layout.
+  const ids = [...new Set(formData.getAll('ids').map(String).filter(Boolean))];
   // Same rule as sendBulkReminder: never redirect off-site on form input.
   const back = safeNextPath(formData.get('back'), '/invoices');
 
@@ -708,7 +709,8 @@ export async function runScenarioForSelected(formData: FormData): Promise<void> 
  * a different fact and does not belong behind a bulk button.
  */
 export async function markBulkPaid(formData: FormData): Promise<void> {
-  const ids = formData.getAll('ids').map(String).filter(Boolean);
+  // Deduplicated, for the same reason: fifty ids were twenty-five invoices.
+  const ids = [...new Set(formData.getAll('ids').map(String).filter(Boolean))];
   const back = safeNextPath(formData.get('back'), '/invoices');
 
   const to = (params: Record<string, string | number>) => {

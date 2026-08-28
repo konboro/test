@@ -183,7 +183,7 @@ export async function commitImport(
       debtor_id: debtorId,
       invoice_number: row.reference,
       amount_cents: row.amountCents,
-      currency: 'EUR',
+      currency: row.currency ?? 'EUR',
       issue_date: row.issueDate,
       due_date: row.dueDate,
       status: 'pending',

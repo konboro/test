@@ -318,6 +318,16 @@ export interface ImportRow {
   phone: string | null;
   vatNumber: string | null;
   amountCents: number;
+  /**
+   * ISO code, when the source says one.
+   *
+   * Null means "the account's own", which is what a spreadsheet of local
+   * invoices means by saying nothing. The scanner detects this from the
+   * document — a Polish invoice says zł — and it used to be dropped one
+   * function later, so the debt was created in euro and the payment link
+   * charged euro for a złoty amount.
+   */
+  currency: string | null;
   dueDate: string;
   issueDate: string;
   reference: string | null;
@@ -412,6 +422,9 @@ export function buildPreview(
       email,
       phone,
       vatNumber: cell(row, 'vat_number') || null,
+      // A spreadsheet of local invoices names no currency, and meaning
+      // "the account's own" is exactly right for it.
+      currency: null,
       amountCents,
       dueDate,
       issueDate,
