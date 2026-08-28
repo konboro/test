@@ -391,6 +391,13 @@ export type InvoiceUploadRow = {
   /** How the fields were obtained: the PDF's own text, a model, or nothing. */
   source: 'pdf_text' | 'vision' | 'manual';
   extracted: Record<string, unknown>;
+  /**
+   * The values the operator actually saved, written once at commit.
+   *
+   * Where this differs from `extracted` the reader was wrong, and the document
+   * it was wrong about is still in storage beside it.
+   */
+  confirmed: Record<string, unknown> | null;
   /** Required fields the reader could not find, for the review screen to flag. */
   missing: string[];
   status: 'pending' | 'committed' | 'discarded';

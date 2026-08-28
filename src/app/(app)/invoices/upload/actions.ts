@@ -16,6 +16,7 @@ import { createClient } from '@/lib/supabase/server';
 import { noticeOnIssue } from '@/lib/dunning/issue-notice';
 import { loadScenario } from '@/lib/dunning/engine';
 import { invoiceScenarioProblem, parseInvoiceScenario } from '@/lib/dunning/invoice-scenario';
+import { correctionsBetween, describeCorrections } from '@/lib/invoice-scan/corrections';
 
 export interface UploadState {
   error?: string;
@@ -165,12 +166,35 @@ export async function commitUpload(_prev: UploadState, formData: FormData): Prom
   // not apply the policy that would otherwise confine this to the tenant.
   const { data: upload } = await admin
     .from('invoice_uploads')
-    .select('id, user_id, status')
+    .select('id, user_id, status, filename, source, extracted')
     .eq('id', id)
     .maybeSingle();
 
   if (!upload || upload.user_id !== org.id) return { error: 'missing' };
   if (upload.status !== 'pending') return { error: 'already_done' };
+
+  const saved = {
+    debtorName: name,
+    vatNumber: text('vatNumber'),
+    invoiceNumber: text('invoiceNumber'),
+    issueDate,
+    dueDate,
+    amountCents: amount,
+    email: text('email'),
+    phone: text('phone'),
+  };
+
+  // Said out loud as well as stored. A correction in the log is how a fault in
+  // the reader gets noticed within the hour rather than on the day somebody
+  // thinks to go looking for it.
+  const corrections = correctionsBetween(upload.extracted, saved);
+  if (corrections.length) {
+    console.info('[invoice-scan] corrected', {
+      file: upload.filename,
+      source: upload.source,
+      changes: describeCorrections(corrections),
+    });
+  }
 
   const row: ImportRow = {
     line: 1,
@@ -225,6 +249,11 @@ export async function commitUpload(_prev: UploadState, formData: FormData): Prom
     .update({
       status: 'committed',
       invoice_id: created?.id ?? null,
+      // What was actually saved, beside what the reader proposed. Where the two
+      // differ is a defect in the reader, recorded with the document still in
+      // storage next to it — which is the difference between "the scanning is
+      // bad" and a named template with a failing case somebody can fix.
+      confirmed: saved,
       updated_at: new Date().toISOString(),
     })
     .eq('id', id);
