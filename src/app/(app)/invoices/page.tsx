@@ -312,7 +312,7 @@ export default async function InvoicesPage({
           <a
             key={key}
             href={`/invoices?filter=${key}`}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+            className={`inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium transition sm:min-h-0 sm:py-1.5 ${
               filter === key
                 ? 'bg-ink-900 text-white'
                 : 'border border-ink-300 bg-white text-ink-600 hover:bg-ink-50'
@@ -333,7 +333,7 @@ export default async function InvoicesPage({
             defaultValue={q}
             placeholder={t.invoices.search}
             aria-label={t.invoices.search}
-            className="w-full rounded-lg border border-ink-300 bg-white px-3 py-1.5 text-sm text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            className="min-h-11 w-full rounded-lg border border-ink-300 bg-white px-3 text-base text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:min-h-0 sm:py-1.5 sm:text-sm"
           />
         </form>
       </div>
@@ -393,7 +393,7 @@ export default async function InvoicesPage({
               <select
                 name="choice"
                 defaultValue="manual"
-                className="rounded-lg border border-ink-300 bg-white px-3 py-1.5 text-sm text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                className="min-h-11 rounded-lg border border-ink-300 bg-white px-3 text-base text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:min-h-0 sm:py-1.5 sm:text-sm"
               >
                 {REMINDER_CHOICES.map((choice) => (
                   <option key={choice.value} value={choice.value}>
@@ -409,7 +409,7 @@ export default async function InvoicesPage({
                 name="only"
                 defaultValue="both"
                 aria-label={t.reminder.channelLabel}
-                className="rounded-lg border border-ink-300 bg-white px-3 py-1.5 text-sm text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                className="min-h-11 rounded-lg border border-ink-300 bg-white px-3 text-base text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:min-h-0 sm:py-1.5 sm:text-sm"
               >
                 <option value="both">{t.reminder.channelBoth}</option>
                 <option value="email">{t.reminder.channelEmail}</option>
@@ -425,7 +425,7 @@ export default async function InvoicesPage({
                 name="lang"
                 defaultValue="auto"
                 aria-label={t.reminder.languageLabel}
-                className="rounded-lg border border-ink-300 bg-white px-3 py-1.5 text-sm text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                className="min-h-11 rounded-lg border border-ink-300 bg-white px-3 text-base text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:min-h-0 sm:py-1.5 sm:text-sm"
               >
                 <option value="auto">{t.fields.localeAuto}</option>
                 <option value="el">{t.fields.localeEl}</option>
@@ -469,11 +469,11 @@ export default async function InvoicesPage({
                 <Link
                   key={key}
                   href={sortHref(key)}
-                  className={
+                  className={`inline-flex min-h-11 items-center px-1 sm:min-h-0 ${
                     sort === key
                       ? 'font-semibold text-ink-900 underline underline-offset-2'
                       : 'text-ink-500 underline-offset-2 hover:underline'
-                  }
+                  }`}
                 >
                   {label}
                   {sort === key ? (descending ? ' ↓' : ' ↑') : ''}
@@ -516,6 +516,12 @@ export default async function InvoicesPage({
                               {t.debtors.nameMissing}
                             </span>
                           )}
+                          {debtor?.vat_number ? (
+                            <p className="tabular mt-0.5 truncate text-xs text-ink-500">
+                              <span className="text-ink-400">{t.debtors.vat}</span>{' '}
+                              {debtor.vat_number}
+                            </p>
+                          ) : null}
                           {/* The number opens the invoice rather than the scan
                               behind it: the scan is one of the things the
                               invoice shows, along with what was sent and what
@@ -527,6 +533,13 @@ export default async function InvoicesPage({
                             >
                               {number ?? t.invoices.noNumber}
                             </Link>
+                            {invoice.mark ? (
+                              <>
+                                <span className="px-1.5 text-ink-300">·</span>
+                                <span className="text-ink-400">{t.invoices.markLabel}</span>{' '}
+                                {invoice.mark}
+                              </>
+                            ) : null}
                             {withDocument.has(invoice.id) ? (
                               <>
                                 <span className="px-1.5 text-ink-300">·</span>
@@ -584,6 +597,10 @@ export default async function InvoicesPage({
                       ) : null}
 
                       <p className="tabular mt-2 text-xs text-ink-500">
+                        {t.invoices.colIssue}: {formatDate(invoice.issue_date)}
+                      </p>
+
+                      <p className="tabular mt-1 text-xs text-ink-500">
                         {t.invoices.colDue}:{' '}
                         <DueDateButton
                           invoiceId={invoice.id}
@@ -829,6 +846,16 @@ export default async function InvoicesPage({
                       ) : null}
                       <td className="px-5 py-3">
                         <div className="flex items-center justify-end gap-3">
+                          {withDocument.has(invoice.id) ? (
+                            <a
+                              href={`/api/invoices/${invoice.id}/document`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={`text-sm ${subtleLinkClass}`}
+                            >
+                              {t.invoices.openDocument}
+                            </a>
+                          ) : null}
                           {invoice.status === 'pending' ? (
                             <>
                               <RemindButton invoiceId={invoice.id} label={label} />

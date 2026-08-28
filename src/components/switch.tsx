@@ -11,7 +11,7 @@
 
 const SIZES = {
   lg: { track: 'h-9 w-16', thumb: 'h-7 w-7', on: 'translate-x-8', off: 'translate-x-1' },
-  sm: { track: 'h-6 w-11', thumb: 'h-4 w-4', on: 'translate-x-6', off: 'translate-x-1' },
+  sm: { track: 'h-7 w-12', thumb: 'h-5 w-5', on: 'translate-x-6', off: 'translate-x-1' },
 } as const;
 
 export function Switch({

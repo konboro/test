@@ -90,7 +90,7 @@ export function ReportReview({ t, reports }: { t: Dictionary; reports: Reviewabl
                     <input type="hidden" name="id" value={report.id} />
                     <button
                       type="submit"
-                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-700"
+                      className="inline-flex min-h-11 items-center rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white transition hover:bg-emerald-700 sm:min-h-0 sm:py-1.5"
                     >
                       {t.reports.confirmPaid}
                     </button>
@@ -100,7 +100,7 @@ export function ReportReview({ t, reports }: { t: Dictionary; reports: Reviewabl
                     <input type="hidden" name="id" value={report.id} />
                     <button
                       type="submit"
-                      className="rounded-lg bg-ink-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-ink-700"
+                      className="inline-flex min-h-11 items-center rounded-lg bg-ink-900 px-3 text-sm font-medium text-white transition hover:bg-ink-700 sm:min-h-0 sm:py-1.5"
                     >
                       {t.reports.markResolved}
                     </button>

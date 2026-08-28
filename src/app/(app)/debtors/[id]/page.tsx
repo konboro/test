@@ -248,6 +248,19 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
                             <span className="italic text-ink-400">{t.invoices.noNumber}</span>
                           )}
                         </p>
+                        <p className="tabular mt-0.5 truncate text-xs text-ink-500">
+                          {invoice.mark ? (
+                            <>
+                              <span className="text-ink-400">{t.invoices.markLabel}</span>{' '}
+                              {invoice.mark}
+                            </>
+                          ) : (
+                            t.invoices.manualSource
+                          )}
+                        </p>
+                        <p className="tabular mt-0.5 text-xs text-ink-500">
+                          {t.invoices.colIssue}: {formatDate(invoice.issue_date)}
+                        </p>
                         <p className="tabular mt-0.5 text-xs text-ink-500">
                           {t.invoices.colDue}:{' '}
                           <DueDateButton

@@ -108,7 +108,16 @@ export default async function LeasesPage() {
                     <div className="min-w-0">
                       <p className="truncate font-medium text-ink-900">{lease.property}</p>
                       <p className="mt-0.5 truncate text-xs text-ink-500">
-                        {tenant ?? t.debtors.nameMissing}
+                        {lease.debtor_id ? (
+                          <Link href={`/debtors/${lease.debtor_id}`} className={subtleLinkClass}>
+                            {tenant ?? t.debtors.nameMissing}
+                          </Link>
+                        ) : (
+                          (tenant ?? t.debtors.nameMissing)
+                        )}
+                      </p>
+                      <p className="tabular mt-0.5 text-xs text-ink-500">
+                        {t.leases.monthly('', lease.due_day).trim()}
                       </p>
                     </div>
                     <span className="tabular shrink-0 text-base font-semibold text-ink-900">
@@ -136,7 +145,7 @@ export default async function LeasesPage() {
                     <input type="hidden" name="active" value={String(lease.active)} />
                     <button
                       type="submit"
-                      className={`text-sm ${subtleLinkClass}`}
+                      className={`inline-flex min-h-11 items-center sm:min-h-0 text-sm ${subtleLinkClass}`}
                       title={lease.active ? t.leases.pauseHint : t.leases.resumeHint}
                     >
                       {lease.active ? t.leases.pause : t.leases.resume}
@@ -189,7 +198,7 @@ export default async function LeasesPage() {
                           <input type="hidden" name="active" value={String(lease.active)} />
                           <button
                             type="submit"
-                            className={`text-sm ${subtleLinkClass}`}
+                            className={`inline-flex min-h-11 items-center sm:min-h-0 text-sm ${subtleLinkClass}`}
                             title={lease.active ? t.leases.pauseHint : t.leases.resumeHint}
                           >
                             {lease.active ? t.leases.pause : t.leases.resume}

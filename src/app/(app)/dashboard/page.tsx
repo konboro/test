@@ -639,7 +639,7 @@ export default async function DashboardPage() {
                       <p className="tabular mt-0.5 truncate text-xs text-ink-500">
                         {number}
                         {payment.paid_at
-                          ? ` · ${new Date(payment.paid_at).toLocaleDateString(t.dateTimeTag)}`
+                          ? ` · ${new Date(payment.paid_at).toLocaleString(t.dateTimeTag)}`
                           : ''}
                       </p>
                     </div>

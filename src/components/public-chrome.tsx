@@ -17,6 +17,10 @@ import type { Dictionary } from '@/lib/i18n';
 const navLinkClass = 'text-sm font-medium text-ink-600 transition hover:text-ink-900';
 const footerLinkClass = 'text-sm text-ink-500 transition hover:text-ink-900';
 
+/** Wide enough for a thumb, and it does not wrap the row it sits in. */
+const mobileNavLinkClass =
+  'inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-2.5 text-sm font-medium text-ink-600 transition hover:text-ink-900';
+
 export function PublicHeader({ t }: { t: Dictionary }) {
   return (
     <header className="sticky top-0 z-40 border-b border-ink-200/80 bg-white/85 backdrop-blur">
@@ -57,6 +61,25 @@ export function PublicHeader({ t }: { t: Dictionary }) {
           </ButtonLink>
         </div>
       </div>
+
+      {/* The same three destinations, on the screens the desktop nav is hidden
+          on. They were reachable only by scrolling to the footer, which is to
+          say: not reachable. A scrolling strip rather than a menu, because
+          three links do not need a button to open them. */}
+      <nav className="flex items-center gap-1 overflow-x-auto border-t border-ink-200/80 px-4 pb-2 md:hidden">
+        <Link href="/pricing" className={`${mobileNavLinkClass}`}>
+          {t.pricing.metaTitle}
+        </Link>
+        <Link href="/faq" className={mobileNavLinkClass}>
+          {t.faq.metaTitle}
+        </Link>
+        <Link href="/odigos" className={mobileNavLinkClass}>
+          {t.common.guides}
+        </Link>
+        <Link href="/login" className={`ml-auto ${mobileNavLinkClass}`}>
+          {t.landing.signIn}
+        </Link>
+      </nav>
     </header>
   );
 }

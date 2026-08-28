@@ -119,7 +119,7 @@ export default async function CompaniesPage({
             defaultValue={q}
             placeholder={t.companies.searchPlaceholder}
             aria-label={t.companies.searchPlaceholder}
-            className="w-full rounded-lg border border-ink-300 bg-white px-3 py-1.5 text-sm text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            className="min-h-11 w-full rounded-lg border border-ink-300 bg-white px-3 text-base text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:min-h-0 sm:py-1.5 sm:text-sm"
           />
         </form>
       </div>
@@ -167,7 +167,7 @@ export default async function CompaniesPage({
                   {row.organization_id === active?.id ? (
                     <Link
                       href="/dashboard"
-                      className="rounded-lg border border-ink-300 px-3 py-1.5 text-sm text-ink-700 transition hover:bg-ink-50"
+                      className="inline-flex rounded-lg border border-ink-300 min-h-11 px-3 sm:min-h-0 sm:py-1.5 items-center text-sm text-ink-700 transition hover:bg-ink-50"
                     >
                       {t.companies.openDashboard}
                     </Link>
@@ -177,7 +177,7 @@ export default async function CompaniesPage({
                       <input type="hidden" name="next" value="/dashboard" />
                       <button
                         type="submit"
-                        className="rounded-lg border border-ink-300 px-3 py-1.5 text-sm text-ink-700 transition hover:bg-ink-50"
+                        className="inline-flex rounded-lg border border-ink-300 min-h-11 px-3 sm:min-h-0 sm:py-1.5 items-center text-sm text-ink-700 transition hover:bg-ink-50"
                       >
                         {t.companies.open}
                       </button>

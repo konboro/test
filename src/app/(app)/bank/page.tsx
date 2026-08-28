@@ -199,7 +199,7 @@ export default async function BankPage({
           <a
             key={key}
             href={`/bank?filter=${key}`}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+            className={`inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium transition sm:min-h-0 sm:py-1.5 ${
               filter === key
                 ? 'bg-ink-900 text-white'
                 : 'border border-ink-300 bg-white text-ink-600 hover:bg-ink-50'

@@ -145,7 +145,7 @@ export default async function DebtorsPage({
             <a
               key={option.key}
               href={link({ show: option.key })}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+              className={`inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium transition sm:min-h-0 sm:py-1.5 ${
                 show === option.key
                   ? 'bg-ink-900 text-white'
                   : 'border border-ink-300 bg-white text-ink-600 hover:bg-ink-50'
@@ -184,7 +184,7 @@ export default async function DebtorsPage({
             defaultValue={q}
             placeholder={t.debtors.search}
             aria-label={t.debtors.search}
-            className="w-full rounded-lg border border-ink-300 bg-white px-3 py-1.5 text-sm text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            className="min-h-11 w-full rounded-lg border border-ink-300 bg-white px-3 text-base text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:min-h-0 sm:py-1.5 sm:text-sm"
           />
         </form>
       </div>

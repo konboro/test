@@ -174,7 +174,7 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`text-sm ${linkClass}`}
+        className={`inline-flex min-h-11 items-center sm:min-h-0 text-sm ${linkClass}`}
         title={t.invoices.remindHint}
       >
         {t.invoices.remind}
@@ -424,7 +424,7 @@ export function DueDateButton({
         type="button"
         onClick={() => setOpen(true)}
         title={t.invoices.editDueDate}
-        className="tabular underline-offset-2 transition hover:text-brand-600 hover:underline"
+        className="tabular inline-flex min-h-11 items-center sm:min-h-0 underline-offset-2 transition hover:text-brand-600 hover:underline"
       >
         {display}
       </button>
@@ -486,7 +486,7 @@ export function CopyPayLink({ code }: { code: string }) {
   }
 
   return (
-    <button type="button" onClick={copy} className={`text-sm ${subtleLinkClass}`}>
+    <button type="button" onClick={copy} className={`inline-flex min-h-11 items-center sm:min-h-0 text-sm ${subtleLinkClass}`}>
       {copied ? t.invoices.payLinkCopied : t.invoices.payLink}
     </button>
   );

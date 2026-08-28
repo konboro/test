@@ -71,7 +71,7 @@ export function DeleteButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-sm text-ink-500 underline-offset-2 transition hover:text-red-600 hover:underline"
+        className="inline-flex min-h-11 items-center sm:min-h-0 text-sm text-ink-500 underline-offset-2 transition hover:text-red-600 hover:underline"
       >
         {trigger}
       </button>
