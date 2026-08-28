@@ -63,8 +63,10 @@ export default async function LogsPage() {
     month: sent.length,
     customers: new Set(sent.map((row) => row.debtor_id)).size,
     failed: rows.filter((row) => row.status === 'failed').length,
-    email: sent.filter((row) => row.channel === 'email').length,
-    sms: sent.filter((row) => row.channel === 'sms').length,
+    // Split for today, because that is the figure it sits under. Taken from
+    // the whole period it would read as today's and be wrong by a month.
+    email: sentToday.filter((row) => row.channel === 'email').length,
+    sms: sentToday.filter((row) => row.channel === 'sms').length,
   };
 
   const tile = (label: string, value: number, hint?: string) => (
