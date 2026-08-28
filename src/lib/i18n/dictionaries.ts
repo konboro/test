@@ -946,9 +946,9 @@ const el = {
     colLastContact: 'Τελευταία επαφή',
     funnel: 'Απόδοση υπενθυμίσεων',
     funnelHint:
-      'Τελευταίες 30 ημέρες, ανά κανάλι· μονάδα το παραστατικό. Εξόφληση = πληρωμή έως 7 ημέρες μετά την υπενθύμιση — ένα έμβασμα μετά από SMS μετράει, ας μην πατήθηκε ποτέ ο σύνδεσμος.',
+      'Τελευταίες 30 ημέρες, ανά κανάλι. Μετράει παραστατικά, όχι μηνύματα: ένα παραστατικό που υπενθυμίστηκε τρεις φορές μετράει μία. Ο αριθμός των μηνυμάτων είναι στο ιστορικό επικοινωνίας. Εξόφληση = πληρωμή έως 7 ημέρες μετά την υπενθύμιση — ένα έμβασμα μετά από SMS μετράει, ας μην πατήθηκε ποτέ ο σύνδεσμος.',
     funnelChannel: 'Κανάλι',
-    funnelSent: 'Στάλθηκαν',
+    funnelSent: 'Παραστατικά με υπενθύμιση',
     funnelOpened: 'Άνοιξαν τον σύνδεσμο',
     funnelCheckout: 'Ξεκίνησαν πληρωμή',
     funnelPaid: 'Εξοφλήθηκαν ≤7 ημ.',
@@ -2335,9 +2335,9 @@ const en: typeof el = {
     colLastContact: 'Last contact',
     funnel: 'Reminder performance',
     funnelHint:
-      'Last 30 days, per channel; the unit is the invoice. Paid = settled within 7 days of a reminder — a transfer after an SMS counts, even though no link was ever clicked.',
+      'Last 30 days, per channel. It counts invoices, not messages: an invoice reminded three times counts once. For the number of messages, see the message history. Paid = settled within 7 days of a reminder — a transfer after an SMS counts, even though no link was ever clicked.',
     funnelChannel: 'Channel',
-    funnelSent: 'Sent',
+    funnelSent: 'Invoices reminded',
     funnelOpened: 'Opened the link',
     funnelCheckout: 'Started paying',
     funnelPaid: 'Paid ≤7 d',
