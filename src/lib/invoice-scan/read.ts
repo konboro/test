@@ -1,5 +1,6 @@
 import { assistFields } from './assist';
 import { extractInvoiceFields, type ExtractedInvoice, type RequiredField } from './fields';
+import type { ExamplePayload } from './rules';
 
 /**
  * Turning an uploaded file into invoice fields.
@@ -19,6 +20,14 @@ export interface ReadResult {
   missing: RequiredField[];
   /** Set when nothing could be read at all, for the review screen to explain. */
   problem?: 'no_text_layer' | 'vision_unavailable' | 'unreadable' | 'too_many_pages';
+  /**
+   * The words the fields were read from.
+   *
+   * Kept because a correction cannot be explained, and a rule cannot be proposed
+   * from it, without knowing what the reader actually saw. Absent when there was
+   * nothing to read.
+   */
+  text?: string;
 }
 
 /** Enough characters that this is a document rather than a stray label. */
@@ -239,7 +248,15 @@ export async function readInvoiceDocument(
     assist?: (
       text: string,
       missing: ReadonlyArray<RequiredField>,
+      examples?: ReadonlyArray<ExamplePayload>,
     ) => Promise<Partial<ExtractedInvoice> | null>;
+    /**
+     * What has been approved for documents of this shape.
+     *
+     * Injected rather than looked up here, so this module still reads a document
+     * without a database — and so that only approved rules can ever arrive.
+     */
+    examples?: (text: string) => Promise<ReadonlyArray<ExamplePayload>>;
   } = {},
 ): Promise<ReadResult> {
   const empty = extractInvoiceFields('', options);
@@ -262,10 +279,12 @@ export async function readInvoiceDocument(
       ? read.missing
       : [...new Set<RequiredField>([...read.missing, 'customer'])];
 
-    if (gaps.length === 0) return { source, ...read };
+    if (gaps.length === 0) return { source, ...read, text };
 
     const assist = options.assist ?? assistFields;
-    return { source, ...merge(read.fields, await assist(text, gaps)) };
+    const examples = options.examples ? await options.examples(text) : [];
+
+    return { source, ...merge(read.fields, await assist(text, gaps, examples)), text };
   };
 
   let pages = 0;

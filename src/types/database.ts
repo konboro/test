@@ -398,11 +398,42 @@ export type InvoiceUploadRow = {
    * it was wrong about is still in storage beside it.
    */
   confirmed: Record<string, unknown> | null;
+  /** The text the fields were read from, kept so a correction can be explained. */
+  source_text: string | null;
   /** Required fields the reader could not find, for the review screen to flag. */
   missing: string[];
   status: 'pending' | 'committed' | 'discarded';
   invoice_id: string | null;
   created_at: string;
+  updated_at: string;
+}
+
+/** How far a proposed reading rule has got. */
+export type ScanRuleStatus = 'proposed' | 'approved' | 'rejected' | 'withdrawn';
+
+/**
+ * Something the reader has been taught, or is asking to be taught.
+ *
+ * Never reaches a document until `status` is 'approved'. The chain from a
+ * correction to a rule runs through a person on purpose: a reader that rewrites
+ * its own rules cannot be predicted or tested, and this one decides who is
+ * asked for money.
+ */
+export type ScanRuleRow = {
+  id: string;
+  user_id: string;
+  /** The layout it is true about, not the supplier. */
+  signature: string;
+  signature_parts: string[];
+  kind: string;
+  payload: Record<string, unknown>;
+  status: ScanRuleStatus;
+  /** How many times the same correction was seen before it was believed. */
+  seen_count: number;
+  evidence: unknown[];
+  created_at: string;
+  decided_at: string | null;
+  decided_by: string | null;
   updated_at: string;
 }
 
@@ -641,6 +672,12 @@ export interface Database {
           'user_id' | 'connection_id' | 'provider_tx_id' | 'booked_on' | 'amount_cents' | 'currency'
         >;
         Update: Partial<BankTransactionRow>;
+        Relationships: NoRelationships;
+      };
+      scan_rules: {
+        Row: ScanRuleRow;
+        Insert: InsertOf<ScanRuleRow, 'user_id' | 'signature' | 'kind' | 'payload'>;
+        Update: Partial<ScanRuleRow>;
         Relationships: NoRelationships;
       };
       invoice_uploads: {

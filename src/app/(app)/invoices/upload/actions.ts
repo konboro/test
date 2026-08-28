@@ -17,6 +17,10 @@ import { noticeOnIssue } from '@/lib/dunning/issue-notice';
 import { loadScenario } from '@/lib/dunning/engine';
 import { invoiceScenarioProblem, parseInvoiceScenario } from '@/lib/dunning/invoice-scenario';
 import { correctionsBetween, describeCorrections } from '@/lib/invoice-scan/corrections';
+import { proposalsFrom } from '@/lib/invoice-scan/rules';
+import { proposeRules } from '@/lib/invoice-scan/rule-store';
+import { fingerprintOf } from '@/lib/invoice-scan/fingerprint';
+import { approvedExamples } from '@/lib/invoice-scan/rule-store';
 
 export interface UploadState {
   error?: string;
@@ -35,6 +39,8 @@ const ACCEPTED: Record<string, string> = {
 };
 
 const MAX_BYTES = 20 * 1024 * 1024;
+/** As much of a reading as is worth keeping to explain a correction later. */
+const MAX_TEXT = 20_000;
 /** One drop, not a migration. The CSV importer is the tool for a whole book. */
 const MAX_FILES = 25;
 
@@ -102,6 +108,9 @@ export async function uploadInvoiceDocuments(
         ownEmail: profile?.email ?? null,
         ownPhone: profile?.phone ?? null,
         vision: visionReader() ?? undefined,
+        // Only what a person approved for this exact layout. A proposal waiting
+        // for review has no effect on any reading.
+        examples: (text) => approvedExamples(admin, org.id, fingerprintOf(text).signature),
       },
     );
 
@@ -113,6 +122,9 @@ export async function uploadInvoiceDocuments(
       size_bytes: file.size,
       source: result.source,
       extracted: { ...result.fields, problem: result.problem ?? null },
+      // Capped: an invoice is a page, and anything much larger is a batch scan
+      // whose text nobody is going to read back.
+      source_text: result.text?.slice(0, MAX_TEXT) ?? null,
       missing: result.missing,
     });
 
@@ -166,7 +178,7 @@ export async function commitUpload(_prev: UploadState, formData: FormData): Prom
   // not apply the policy that would otherwise confine this to the tenant.
   const { data: upload } = await admin
     .from('invoice_uploads')
-    .select('id, user_id, status, filename, source, extracted')
+    .select('id, user_id, status, filename, source, extracted, source_text')
     .eq('id', id)
     .maybeSingle();
 
@@ -194,6 +206,17 @@ export async function commitUpload(_prev: UploadState, formData: FormData): Prom
       source: upload.source,
       changes: describeCorrections(corrections),
     });
+
+    // A correction that can be explained by the document becomes a proposal —
+    // something to put in front of a person, never something that takes effect
+    // on its own. Failing here must not cost the operator their invoice.
+    if (upload.source_text) {
+      try {
+        await proposeRules(admin, org.id, proposalsFrom(corrections, upload.source_text), upload.id);
+      } catch (cause) {
+        console.error('[invoice-scan] proposal', String(cause));
+      }
+    }
   }
 
   const row: ImportRow = {

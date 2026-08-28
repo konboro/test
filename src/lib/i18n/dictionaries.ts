@@ -301,6 +301,24 @@ const el = {
     issueNoticePending: 'Η ειδοποίηση έκδοσης δεν έχει σταλεί.',
   },
 
+  scanRules: {
+    title: 'Τι έμαθε η ανάγνωση',
+    hint: 'Οι διορθώσεις σας γίνονται προτάσεις. Καμία δεν ισχύει πριν την εγκρίνετε.',
+    empty: 'Καμία πρόταση ακόμη. Εμφανίζονται εδώ όταν διορθώσετε μια ανάγνωση.',
+    waiting: 'Περιμένουν έγκριση',
+    inForce: 'Σε ισχύ',
+    field: (name: string) => `Πεδίο: ${name}`,
+    seen: (n: number) => (n === 1 ? 'Εμφανίστηκε 1 φορά' : `Εμφανίστηκε ${n} φορές`),
+    appliesTo: (parts: string) => `Ισχύει για παραστατικά αυτής της μορφής: ${parts}`,
+    approve: 'Έγκριση',
+    reject: 'Απόρριψη',
+    withdraw: 'Ανάκληση',
+    approved: 'Εγκρίθηκε. Θα χρησιμοποιείται στα επόμενα παραστατικά αυτής της μορφής.',
+    rejected: 'Απορρίφθηκε. Δεν θα χρησιμοποιηθεί.',
+    withdrawn: 'Ανακλήθηκε. Δεν χρησιμοποιείται πλέον.',
+    alreadyDecided: 'Έχει ήδη κριθεί.',
+  },
+
   scenario: {
     title: 'Σενάριο υπενθυμίσεων',
     hint: 'Πότε φεύγει κάθε βήμα, από ποιο κανάλι, και αν επαναλαμβάνεται.',
@@ -1707,6 +1725,24 @@ const en: typeof el = {
     nextNone: 'No further reminder is scheduled.',
     issueNoticeSent: 'Notice on issue sent',
     issueNoticePending: 'The notice on issue has not been sent.',
+  },
+
+  scanRules: {
+    title: 'What the reader has learned',
+    hint: 'Your corrections become proposals. None of them takes effect until you approve it.',
+    empty: 'Nothing proposed yet. Corrections you make to a reading show up here.',
+    waiting: 'Waiting for approval',
+    inForce: 'In force',
+    field: (name: string) => `Field: ${name}`,
+    seen: (n: number) => (n === 1 ? 'Seen once' : `Seen ${n} times`),
+    appliesTo: (parts: string) => `Applies to invoices of this shape: ${parts}`,
+    approve: 'Approve',
+    reject: 'Reject',
+    withdraw: 'Withdraw',
+    approved: 'Approved. It will be used on the next invoices of this shape.',
+    rejected: 'Rejected. It will not be used.',
+    withdrawn: 'Withdrawn. No longer in use.',
+    alreadyDecided: 'This has already been decided.',
   },
 
   scenario: {

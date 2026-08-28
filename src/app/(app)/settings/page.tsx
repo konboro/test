@@ -16,6 +16,7 @@ import { createClient } from '@/lib/supabase/server';
 
 import { ElorusForm } from './elorus-forms';
 import { BankConnect } from './bank-forms';
+import { ScanRules, type ScanRuleView } from './scan-rules';
 import { ScenarioForm } from './scenario-forms';
 import { AutomationSwitch } from './automation-switch';
 import { PaymentNoticeSwitch } from './payment-notice-switch';
@@ -209,6 +210,36 @@ export default async function SettingsPage({
     .eq('status', 'pending');
   const stripeMessage = stripeNotice(t, stripe);
   const scenario = await loadScenario(org.id);
+
+  // Everything still to be decided, and everything decided in favour. Rejected
+  // and withdrawn rules stay in the table as the record and are not listed.
+  const { data: scanRules } = await supabase
+    .from('scan_rules')
+    .select('id, status, signature_parts, payload, seen_count')
+    .in('status', ['proposed', 'approved'])
+    .order('status', { ascending: true })
+    .order('updated_at', { ascending: false })
+    .limit(50);
+
+  const scanRuleViews: ScanRuleView[] = (scanRules ?? []).map((rule) => {
+    const payload = rule.payload as {
+      field?: string;
+      wrong?: string | null;
+      right?: string | null;
+      context?: string[];
+    };
+
+    return {
+      id: rule.id,
+      status: rule.status === 'approved' ? 'approved' : 'proposed',
+      parts: rule.signature_parts ?? [],
+      field: payload.field ?? '—',
+      wrong: payload.wrong ?? null,
+      right: payload.right ?? null,
+      context: payload.context ?? [],
+      seenCount: rule.seen_count,
+    };
+  });
   const bankOutcome = bankNotice(t, bank, { seen, settled, queued, reason, fetched, accounts });
 
   const { data: bankConnections } = await supabase
@@ -354,6 +385,16 @@ export default async function SettingsPage({
             enabled={profile.automation_enabled}
             openInvoices={openInvoices ?? 0}
           />
+        </div>
+      </Card>
+
+      {/* What the reader is asking to be taught. Above the scenario because a
+          proposal waits on a person, and a thing waiting on you belongs where
+          you will see it. */}
+      <Card>
+        <div id="scan-rules" className="scroll-mt-20">
+          <CardHeader title={t.scanRules.title} subtitle={t.scanRules.hint} />
+          <ScanRules rules={scanRuleViews} />
         </div>
       </Card>
 

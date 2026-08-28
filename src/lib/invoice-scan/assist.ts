@@ -1,4 +1,5 @@
 import type { ExtractedInvoice, RequiredField } from './fields';
+import { examplesForPrompt, type ExamplePayload } from './rules';
 
 /**
  * Filling the gaps the label reader left.
@@ -106,6 +107,14 @@ export function assistConfigured(): boolean {
 export async function assistFields(
   text: string,
   missing: ReadonlyArray<RequiredField>,
+  /**
+   * Corrections a person approved for this exact layout.
+   *
+   * Shown, not described: the model is told where a field sat on a document of
+   * this shape, which is the one thing it cannot work out and a person already
+   * has. Nothing reaches here that was not reviewed and accepted.
+   */
+  examples: ReadonlyArray<ExamplePayload> = [],
 ): Promise<Partial<ExtractedInvoice> | null> {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key || missing.length === 0 || text.trim() === '') return null;
@@ -122,7 +131,10 @@ export async function assistFields(
         model: MODEL,
         max_tokens: MAX_TOKENS,
         messages: [
-          { role: 'user', content: `${PROMPT}\n\n---\n${text.slice(0, MAX_CHARS)}` },
+          {
+            role: 'user',
+            content: `${PROMPT}${examplesForPrompt(examples)}\n\n---\n${text.slice(0, MAX_CHARS)}`,
+          },
         ],
       }),
     });
