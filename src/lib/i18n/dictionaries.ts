@@ -1149,6 +1149,16 @@ const el = {
     statusSent: 'Στάλθηκε',
     statusFailed: 'Απέτυχε',
     statusSkipped: 'Παραλείφθηκε',
+    overviewTitle: 'Σύνοψη',
+    overviewHint: 'Τελευταίες 30 ημέρες. Μετράει μηνύματα, ένα ανά γραμμή παρακάτω.',
+    overviewToday: 'Σήμερα',
+    overviewMonth: 'Τελευταίες 30 ημέρες',
+    overviewCustomers: 'Πελάτες που ειδοποιήθηκαν',
+    overviewCustomersHint: 'Διαφορετικοί παραλήπτες, όχι μηνύματα.',
+    overviewFailed: 'Απέτυχαν',
+    overviewFailedHint: 'Προσπάθειες που δεν έφυγαν. Παραμένουν εδώ ως αρχείο.',
+    overviewChannels: (email: number, sms: number) => `${email} email · ${sms} SMS`,
+    overviewCapped: 'Εμφανίζονται τα πρώτα 5.000 μηνύματα της περιόδου.',
   },
 
   upload: {
@@ -2531,6 +2541,16 @@ const en: typeof el = {
     statusSent: 'Sent',
     statusFailed: 'Failed',
     statusSkipped: 'Skipped',
+    overviewTitle: 'Overview',
+    overviewHint: 'Last 30 days. Counts messages — one per row below.',
+    overviewToday: 'Today',
+    overviewMonth: 'Last 30 days',
+    overviewCustomers: 'Customers reached',
+    overviewCustomersHint: 'Distinct recipients, not messages.',
+    overviewFailed: 'Failed',
+    overviewFailedHint: 'Attempts that did not leave. Kept here as the record.',
+    overviewChannels: (email: number, sms: number) => `${email} email · ${sms} SMS`,
+    overviewCapped: 'Showing the first 5,000 messages in the period.',
   },
 
   upload: {
