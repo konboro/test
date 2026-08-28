@@ -156,7 +156,13 @@ export async function pdfText(
 ): Promise<{ text: string | null; pages: number }> {
   try {
     const { extractText, getDocumentProxy } = await import('unpdf');
-    const pdf = await getDocumentProxy(bytes);
+
+    // A copy, because pdf.js takes ownership of what it is given and leaves the
+    // caller holding a detached, empty array. The caller needs those bytes
+    // afterwards: a PDF with no text layer goes on to the model, and it was
+    // being sent zero bytes — "PDF cannot be empty", every scan, silently
+    // reported to the operator as unreadable.
+    const pdf = await getDocumentProxy(bytes.slice());
 
     // Positions first, because they are what keeps two columns apart. The plain
     // extraction stays as the fallback: it is what every other layout has been

@@ -151,3 +151,34 @@ describe('a single-column PDF', () => {
     expect(fields.amountCents).toBe(430500);
   });
 });
+
+/**
+ * Reading the text layer must not consume the document.
+ *
+ * pdf.js takes ownership of the array it is handed and leaves the caller with a
+ * detached, empty one. A PDF with no text layer goes on to the model next, and
+ * it was being sent zero bytes — the provider answered "PDF cannot be empty"
+ * and every scan was reported to the operator as unreadable, with the model
+ * blamed for a document it never received.
+ */
+describe('reading a PDF twice', () => {
+  it('leaves the bytes intact for whatever comes next', async () => {
+    const bytes = invoicePdf(TWO_COLUMN);
+    const before = bytes.byteLength;
+
+    await pdfText(bytes);
+
+    expect(bytes.byteLength).toBe(before);
+    expect(bytes.byteLength).toBeGreaterThan(0);
+  });
+
+  it('can be read again from the same array', async () => {
+    const bytes = invoicePdf(TWO_COLUMN);
+
+    const first = await pdfText(bytes);
+    const second = await pdfText(bytes);
+
+    expect(first.text).toBeTruthy();
+    expect(second.text).toBe(first.text);
+  });
+});
