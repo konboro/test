@@ -100,10 +100,23 @@ async function positionedText(pdf: {
       rows.set(y, row);
     }
 
+    // The left edge of the page, as this document actually uses it. A row that
+    // starts well to the right of it is in a second column, and that is the only
+    // thing left to say so once the row is flattened into a line — a phone
+    // number on its own line is otherwise indistinguishable from the issuer's.
+    const leftEdge = Math.min(
+      ...[...rows.values()].map((row) =>
+        Math.min(...row.filter((piece) => piece.text.trim() !== '').map((piece) => piece.x)),
+      ),
+    );
+
     const lines = [...rows.entries()]
       .sort(([a], [b]) => b - a)
       .map(([, row]) => {
         const sorted = row.sort((a, b) => a.x - b.x);
+
+        const first = sorted.find((piece) => piece.text.trim() !== '');
+        const indent = first && first.x - leftEdge >= COLUMN_GAP ? '    ' : '';
 
         return sorted.reduce((line, piece, i) => {
           // pdf.js represents a run of empty page as an item whose text is one
@@ -121,7 +134,7 @@ async function positionedText(pdf: {
           const spacing = gap >= COLUMN_GAP ? '    ' : gap >= WORD_GAP ? ' ' : '';
 
           return line + spacing + piece.text;
-        }, '');
+        }, indent);
       });
 
     pages.push(lines.join('\n'));
@@ -214,6 +227,8 @@ export async function readInvoiceDocument(
   options: {
     ownVatNumber?: string | null;
     ownName?: string | null;
+    ownEmail?: string | null;
+    ownPhone?: string | null;
     vision?: (input: { bytes: Uint8Array; mimeType: string }) => Promise<string | null>;
     assist?: (
       text: string,

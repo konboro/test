@@ -76,6 +76,11 @@ export default async function UploadPage() {
           issueDate: text(extracted.issueDate),
           dueDate: text(extracted.dueDate),
           amount: decimal(extracted.amountCents),
+          // Read off the document like everything else. Without one of these
+          // nothing can ever be sent about the invoice, so making somebody
+          // retype what the page already says is the worst kind of blank.
+          email: text(extracted.email),
+          phone: text(extracted.phone),
         },
       };
     }),

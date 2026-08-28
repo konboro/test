@@ -25,6 +25,8 @@ export interface Proposal {
     issueDate: string | null;
     dueDate: string | null;
     amount: string | null;
+    email: string | null;
+    phone: string | null;
   };
 }
 
@@ -154,10 +156,15 @@ export function ReviewCard({ proposal, scenario }: { proposal: Proposal; scenari
             />
           </Field>
           <Field label={t.fields.email} hint={t.fields.emailHint}>
-            <input name="email" type="email" className={inputClass} />
+            <input
+              name="email"
+              type="email"
+              defaultValue={proposal.fields.email ?? ''}
+              className={inputClass}
+            />
           </Field>
           <Field label={t.fields.mobile} hint={t.fields.mobileHint}>
-            <input name="phone" className={inputClass} />
+            <input name="phone" defaultValue={proposal.fields.phone ?? ''} className={inputClass} />
           </Field>
         </div>
 

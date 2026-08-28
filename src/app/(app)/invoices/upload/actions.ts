@@ -61,7 +61,7 @@ export async function uploadInvoiceDocuments(
 
   const { data: profile } = await supabase
     .from('users')
-    .select('vat_number, company_name')
+    .select('vat_number, company_name, email, phone')
     .eq('id', org.id)
     .maybeSingle();
 
@@ -95,6 +95,11 @@ export async function uploadInvoiceDocuments(
       {
         ownVatNumber: profile?.vat_number ?? null,
         ownName: profile?.company_name ?? null,
+        // So the reader cannot hand back the tenant's own letterhead details as
+        // the customer's, which on an invoice with no other contact on it is
+        // exactly what it would otherwise do.
+        ownEmail: profile?.email ?? null,
+        ownPhone: profile?.phone ?? null,
         vision: visionReader() ?? undefined,
       },
     );

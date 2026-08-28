@@ -19,6 +19,15 @@ export interface ExtractedInvoice {
   currency: string;
   /** The myDATA MARK, when the document carries one. */
   mark: string | null;
+  /**
+   * How to reach the customer.
+   *
+   * Not required to raise an invoice, which is why they are not in `missing`,
+   * but without one of them nothing can ever be sent about it — so a document
+   * that carries them should not make somebody type them in again.
+   */
+  email: string | null;
+  phone: string | null;
 }
 
 /**
@@ -319,6 +328,169 @@ function customerVat(lines: string[], ownVatNumber?: string | null): string | nu
   return candidates[candidates.length - 1]?.value ?? null;
 }
 
+/**
+ * Where a document says it is listing somebody's contact details.
+ *
+ * Invoicing tools print this as its own section rather than inside either
+ * party's block, and when they do it is the customer's — the issuer's details
+ * are already in the letterhead.
+ */
+const CONTACT_MARKER =
+  /(?<![\p{L}\p{N}])(?:ΠΛΗΡΟΦΟΡΙΕΣ\s+ΕΠΙΚΟΙΝΩΝΙΑΣ|ΣΤΟΙΧΕΙΑ\s+ΕΠΙΚΟΙΝΩΝΙΑΣ|ΕΠΙΚΟΙΝΩΝΙΑ|CONTACT\s+(?:DETAILS|INFORMATION)|CONTACT|DANE\s+KONTAKTOWE|KONTAKT|KONTAKTDATEN)(?![\p{L}\p{N}])/u;
+
+/**
+ * A phone number is only read where the document says it is one.
+ *
+ * Every invoice is full of long digit strings — a VAT number, an IBAN, a MARK,
+ * an authentication hash — and a pattern loose enough to catch a phone catches
+ * all of them. Requiring the label costs the occasional number printed bare and
+ * buys never sending an SMS to the first sixteen digits of an IBAN.
+ */
+const PHONE_LABEL =
+  /(?<![\p{L}\p{N}])(?:ΤΗΛΕΦΩΝΟ|ΤΗΛ|ΚΙΝΗΤΟ|MOBILE|PHONE|TEL(?:EFON)?|KOM|MOB)\.?(?![\p{L}\p{N}])/u;
+
+const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/u;
+
+/** Digits only, so two spellings of one number compare equal. */
+function digitsOf(value: string | null | undefined): string {
+  return (value ?? '').replace(/\D/g, '');
+}
+
+/**
+ * A phone reduced to what identifies it.
+ *
+ * The last nine digits. "+48 22 123 45 67" and "221234567" are one number
+ * written two ways, and comparing them whole says they are different — which is
+ * how a tenant's own letterhead number survived the filter meant to remove it.
+ */
+function phoneKey(value: string | null | undefined): string {
+  const digits = digitsOf(value);
+  return digits.length > 9 ? digits.slice(-9) : digits;
+}
+
+/**
+ * A contact found on the page, with enough context to say whose it is.
+ *
+ * `indented` is the column the line starts in — the text layer keeps that, and
+ * it is the only thing distinguishing the customer's phone from the issuer's
+ * once a two-column row has been flattened into one line.
+ */
+interface ContactCandidate {
+  value: string;
+  index: number;
+  /** Character position on the line, for a row that carries both parties. */
+  offset: number;
+  indented: boolean;
+}
+
+function contactCandidates(
+  lines: string[],
+  find: (line: string) => Array<{ value: string; offset: number }>,
+): ContactCandidate[] {
+  const found: ContactCandidate[] = [];
+
+  lines.forEach((line, index) => {
+    const indented = /^\s{2,}/.test(line);
+    for (const hit of find(line)) found.push({ ...hit, index, indented });
+  });
+
+  return found;
+}
+
+/**
+ * The customer's contact detail, out of however many the page carries.
+ *
+ * Ordered by how much each signal actually tells us: never the tenant's own,
+ * then one the document filed under a contact heading, then the customer's
+ * column of a two-column layout, then one under a customer heading and no
+ * issuer heading, then the last on the page — because the letterhead comes
+ * first, and the letterhead is the one party we know is not the customer.
+ */
+function customerContact(
+  lines: string[],
+  find: (line: string) => Array<{ value: string; offset: number }>,
+  own: string | null | undefined,
+  compare: (value: string) => string,
+): string | null {
+  const ownKey = own ? compare(own) : '';
+  const candidates = contactCandidates(lines, find).filter(
+    (c) => !ownKey || compare(c.value) !== ownKey,
+  );
+
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0]?.value ?? null;
+
+  const near = (index: number, marker: RegExp) => {
+    for (let i = index; i >= Math.max(0, index - 6); i -= 1) {
+      const line = lines[i];
+      if (line && marker.test(fold(line))) return true;
+    }
+    return false;
+  };
+
+  const underContact = candidates.find((c) => near(c.index, CONTACT_MARKER));
+  if (underContact) return underContact.value;
+
+  const side = customerSide(lines);
+  if (side) {
+    // Both parties on one row: the columns are told apart by position, exactly
+    // as the tax numbers are. Reading only the first match per line is what
+    // once returned the seller as the debtor.
+    for (const candidate of candidates) {
+      const row = candidates
+        .filter((other) => other.index === candidate.index)
+        .sort((a, b) => a.offset - b.offset);
+      if (row.length < 2) continue;
+
+      const pick = side === 'right' ? row[row.length - 1] : row[0];
+      if (pick) return pick.value;
+    }
+
+    const onSide = candidates.find((c) => (side === 'right' ? c.indented : !c.indented));
+    if (onSide) return onSide.value;
+  }
+
+  const unambiguous = candidates.find(
+    (c) => near(c.index, CUSTOMER_MARKER) && !near(c.index, ISSUER_MARKER),
+  );
+  if (unambiguous) return unambiguous.value;
+
+  return candidates[candidates.length - 1]?.value ?? null;
+}
+
+/** The phone on a line, if the line says it is one. */
+function phonesOn(line: string): Array<{ value: string; offset: number }> {
+  const labels = [...fold(line).matchAll(new RegExp(PHONE_LABEL.source, 'gu'))];
+  const found: Array<{ value: string; offset: number }> = [];
+
+  labels.forEach((label, k) => {
+    const start = (label.index ?? 0) + label[0].length;
+    // Stop at the next label, so a number is never read out of the neighbouring
+    // column — which belongs to the other party.
+    const stop = labels[k + 1]?.index ?? line.length;
+
+    const match = /\+?\d[\d\s().-]{6,}\d/.exec(line.slice(start, stop));
+    if (!match) return;
+
+    const value = match[0].trim().replace(/\s{2,}.*$/, '');
+    // Eight digits is the shortest real subscriber number; below that it is a
+    // date, a room number, or the tail of something else.
+    if (digitsOf(value).length >= 8) found.push({ value, offset: start });
+  });
+
+  return found;
+}
+
+function emailsOn(line: string): Array<{ value: string; offset: number }> {
+  const found: Array<{ value: string; offset: number }> = [];
+
+  for (const match of line.matchAll(new RegExp(EMAIL.source, 'gu'))) {
+    found.push({ value: match[0], offset: match.index ?? 0 });
+  }
+
+  return found;
+}
+
 /** A line that is a name rather than a label, a number or a heading. */
 function looksLikeName(line: string): boolean {
   const trimmed = line.trim();
@@ -497,7 +669,13 @@ function documentNumber(raw: string | null): string | null {
  */
 export function extractInvoiceFields(
   text: string,
-  options: { ownVatNumber?: string | null; ownName?: string | null } = {},
+  options: {
+    ownVatNumber?: string | null;
+    ownName?: string | null;
+    /** The tenant's own contact details, so the reader cannot return them. */
+    ownEmail?: string | null;
+    ownPhone?: string | null;
+  } = {},
 ): { fields: ExtractedInvoice; missing: RequiredField[] } {
   const lines = text
     .split(/\r?\n/)
@@ -516,6 +694,8 @@ export function extractInvoiceFields(
     amountCents: totalCents(lines),
     currency: currencyIn(text),
     mark: markIn(lines),
+    email: customerContact(lines, emailsOn, options.ownEmail, (v) => v.trim().toLowerCase()),
+    phone: customerContact(lines, phonesOn, options.ownPhone, phoneKey),
   };
 
   const missing: RequiredField[] = [];
