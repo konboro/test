@@ -418,18 +418,38 @@ function customerContact(
   );
 
   if (candidates.length === 0) return null;
-  if (candidates.length === 1) return candidates[0]?.value ?? null;
 
+  /**
+   * Whether a heading of this kind stands over the line.
+   *
+   * Addresses are removed before looking, because an address contains words.
+   * `kontakt@acme.pl` folds to KONTAKT@ACME.PL and satisfies a contact heading
+   * that is only asking for KONTAKT — so the address declared itself to be its
+   * own heading and was returned as the customer's. The same trap is waiting in
+   * `klient@`, `biuro@` and `sprzedawca@`.
+   */
   const near = (index: number, marker: RegExp) => {
     for (let i = index; i >= Math.max(0, index - 6); i -= 1) {
       const line = lines[i];
-      if (line && marker.test(fold(line))) return true;
+      if (line && marker.test(fold(line.replace(new RegExp(EMAIL.source, 'gu'), ' ')))) return true;
     }
     return false;
   };
 
   const underContact = candidates.find((c) => near(c.index, CONTACT_MARKER));
   if (underContact) return underContact.value;
+
+  // The only contact on the page is the customer's — unless the page put it
+  // under the issuer and nowhere near the customer, which is a letterhead.
+  if (candidates.length === 1) {
+    const only = candidates[0];
+    if (!only) return null;
+
+    const issuerOnly =
+      near(only.index, ISSUER_MARKER) && !near(only.index, CUSTOMER_MARKER);
+
+    return issuerOnly ? null : only.value;
+  }
 
   const side = customerSide(lines);
   if (side) {
@@ -455,7 +475,14 @@ function customerContact(
   );
   if (unambiguous) return unambiguous.value;
 
-  return candidates[candidates.length - 1]?.value ?? null;
+  // Nothing on the page says whose these are, and there is no positional
+  // fallback worth taking. The tax numbers can end on "the last one, because
+  // the letterhead comes first"; a contact cannot, because an issuer prints
+  // their address in the footer — last is exactly where the wrong answer sits.
+  //
+  // So ambiguity ends as a blank. Somebody fills a blank in; nobody notices a
+  // reminder that went to the wrong person.
+  return null;
 }
 
 /** The phone on a line, if the line says it is one. */

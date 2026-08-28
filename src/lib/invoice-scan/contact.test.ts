@@ -92,3 +92,87 @@ describe('whose contact it is', () => {
     expect(extractInvoiceFields(text, {}).fields.email).toBe('jan@kowalski.pl');
   });
 });
+
+/**
+ * An address is easier to find than a phone and harder to attribute.
+ *
+ * A phone is only read where a label says it is one. An email needs no label —
+ * the @ is unambiguous — so every address on the page is a candidate, including
+ * the issuer's. And unlike a tax number, an issuer's address is usually in the
+ * footer, which is to say last: the one position a "take the last one" rule
+ * would hand back.
+ */
+describe('an email that might belong to either party', () => {
+  it('takes the one under a contact heading', () => {
+    const text = [
+      'ΤΙΜΟΛΟΓΙΟ #7',
+      'ΑΠΟ    ΠΕΛΑΤΗΣ',
+      'Penny IKE    ΠΑΠΑΔΟΠΟΥΛΟΥ ΜΑΡΙΑ',
+      'Πληροφορίες επικοινωνίας',
+      'Email: maria@example.gr',
+      'ΣΥΝΟΛΟ: 10,00€',
+      'accounts@penny.gr',
+    ].join('\n');
+
+    expect(extractInvoiceFields(text, {}).fields.email).toBe('maria@example.gr');
+  });
+
+  it('refuses to guess when two addresses have nothing to tell them apart', () => {
+    // This is the case that used to return the footer, which is the issuer's.
+    // A blank gets typed in; a reminder sent to the wrong person does not get
+    // noticed at all.
+    const text = [
+      'FAKTURA nr 1/2026',
+      'ACME Sp. z o.o.',
+      'biuro@acme.pl',
+      'Do zapłaty: 100,00 zł',
+      'kontakt@acme.pl',
+    ].join('\n');
+
+    expect(extractInvoiceFields(text, {}).fields.email).toBeNull();
+  });
+
+  it('refuses a lone address that sits under the issuer and nowhere near the customer', () => {
+    const text = [
+      'FAKTURA nr 1/2026',
+      'Sprzedawca',
+      'ACME Sp. z o.o.',
+      'biuro@acme.pl',
+      'Do zapłaty: 100,00 zł',
+    ].join('\n');
+
+    expect(extractInvoiceFields(text, {}).fields.email).toBeNull();
+  });
+
+  it('still takes a lone address on a document that names nobody', () => {
+    // No headings at all is the common small-business invoice, and the only
+    // address on it is the one to write to.
+    const text = ['FAKTURA nr 1/2026', 'jan@kowalski.pl', 'Do zapłaty: 100,00 zł'].join('\n');
+
+    expect(extractInvoiceFields(text, {}).fields.email).toBe('jan@kowalski.pl');
+  });
+
+  it('takes the customer column when both parties print one', () => {
+    const text = [
+      'FAKTURA nr 1/2026',
+      'Sprzedawca    Nabywca',
+      'ACME Sp. z o.o.    Kowalski Transport',
+      'biuro@acme.pl    jan@kowalski.pl',
+      'Do zapłaty: 100,00 zł',
+    ].join('\n');
+
+    expect(extractInvoiceFields(text, {}).fields.email).toBe('jan@kowalski.pl');
+  });
+
+  it('applies the same caution to a phone', () => {
+    const text = [
+      'FAKTURA nr 1/2026',
+      'Sprzedawca',
+      'ACME Sp. z o.o.',
+      'Tel: 221234567',
+      'Do zapłaty: 100,00 zł',
+    ].join('\n');
+
+    expect(extractInvoiceFields(text, {}).fields.phone).toBeNull();
+  });
+});
