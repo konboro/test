@@ -65,13 +65,59 @@ function resend(): Resend {
 }
 
 /**
+ * Whether the provider refused because we asked too quickly.
+ *
+ * Worth telling apart from every other failure: a rejected address is final and
+ * a rate limit is a timing problem that will not exist a second from now. A
+ * batch of eighty-seven reminders lost thirty-six of them to this, all reported
+ * as failures, all perfectly deliverable.
+ */
+export function isRateLimited(error: string | null | undefined): boolean {
+  const text = (error ?? '').toLowerCase();
+  return text.includes('too many requests') || text.includes('rate limit') || text.includes('429');
+}
+
+/** Waits, so a retry is not the same burst again. */
+const pause = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
+
+/**
+ * How long to wait before each retry.
+ *
+ * Growing, with a little scatter: a batch that hits the limit hits it on many
+ * sends at once, and retrying all of them on the same schedule reproduces the
+ * burst that caused it.
+ */
+function backoffMs(attempt: number): number {
+  return attempt * 400 + Math.floor(Math.random() * 250);
+}
+
+/** Attempts after the first. Three covers a burst; more would just be slower. */
+const RETRIES = 3;
+
+/**
  * Sends one transactional email.
  *
  * Never throws: the dunning engine records the outcome of every attempt in the
  * audit log, so a provider failure must come back as data, not an exception that
  * aborts the rest of the run.
+ *
+ * A rate limit is retried here rather than by the caller. The caller has already
+ * claimed the customer's one contact for the day before it gets a result, so a
+ * retry from up there would either be refused by its own guarantee or would have
+ * to reach around it — and the honest reading is that nothing was sent yet.
  */
 export async function sendEmail(message: EmailMessage): Promise<SendResult> {
+  let result = await attemptSend(message);
+
+  for (let attempt = 1; attempt <= RETRIES && !result.ok && isRateLimited(result.error); attempt += 1) {
+    await pause(backoffMs(attempt));
+    result = await attemptSend(message);
+  }
+
+  return result;
+}
+
+async function attemptSend(message: EmailMessage): Promise<SendResult> {
   const from = fromHeader(optionalEnv('EMAIL_FROM'), message.fromName);
 
   // Local development without a provider key: log and report success so the

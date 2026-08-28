@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { fromHeader } from './send';
+import { fromHeader, isRateLimited } from './send';
 
 describe('the From header', () => {
   const ADDRESS = 'noreply@lefta.app';
@@ -46,5 +46,39 @@ describe('the From header', () => {
   it('ignores a name that is only punctuation once stripped', () => {
     expect(fromHeader(ANGLED, '""')).toBe(ANGLED);
     expect(fromHeader(ANGLED, '   ')).toBe(ANGLED);
+  });
+});
+
+/**
+ * A rate limit is not a delivery failure.
+ *
+ * Eighty-seven reminders went out in one press and thirty-six came back
+ * "Too many requests. You can only make 10 requests per second." — all of them
+ * to good addresses, all recorded as failed. Telling that apart from a real
+ * rejection is what makes it worth retrying rather than reporting.
+ */
+describe('recognising a rate limit', () => {
+  it('recognises what the provider actually said', () => {
+    expect(
+      isRateLimited(
+        'Too many requests. You can only make 10 requests per second. See rate limit response headers for more information.',
+      ),
+    ).toBe(true);
+  });
+
+  it('recognises the other spellings of it', () => {
+    expect(isRateLimited('rate limit exceeded')).toBe(true);
+    expect(isRateLimited('HTTP 429')).toBe(true);
+  });
+
+  it('does not treat a real rejection as one', () => {
+    // These do not get better by waiting, and retrying them would send nothing
+    // while making the batch slower.
+    expect(isRateLimited('Invalid `to` field: not an email address')).toBe(false);
+    expect(isRateLimited('The domain is not verified')).toBe(false);
+    expect(isRateLimited('RESEND_API_KEY is not configured')).toBe(false);
+    expect(isRateLimited(null)).toBe(false);
+    expect(isRateLimited(undefined)).toBe(false);
+    expect(isRateLimited('')).toBe(false);
   });
 });

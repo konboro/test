@@ -424,8 +424,17 @@ const MAX_SENDS = 200;
  */
 const BULK_LIMIT = 50;
 
-/** Sends in flight at once. Enough to be quick, short of anything's rate limit. */
-const CONCURRENCY = 6;
+/**
+ * Sends in flight at once, and the floor on how long a round may take.
+ *
+ * The mail provider allows ten requests a second. Six in flight with nothing
+ * pacing them is well past that — a run of eighty-seven reminders lost
+ * thirty-six to a rate limit that way. Four per round, each round no shorter
+ * than half a second, keeps the whole batch under eight a second with room to
+ * spare, and the retry inside the sender covers whatever still slips through.
+ */
+const CONCURRENCY = 4;
+const MIN_ROUND_MS = 500;
 
 /**
  * Sends the same reminder to every selected invoice.
@@ -504,6 +513,7 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
   // into the unique index behind the daily guarantee. There is now at most one
   // invoice per customer in the batch, so nothing in it can collide.
   for (let i = 0; i < batch.length; i += CONCURRENCY) {
+    const startedAt = Date.now();
     const results = await Promise.all(
       batch.slice(i, i + CONCURRENCY).map((id) =>
         sendManualReminder({
@@ -526,6 +536,13 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
 
       if (result.emailsSent + result.smsSent > 0) sent += 1;
       else skipped += 1;
+    }
+
+    // Pace the next round rather than racing into the provider's limit. Only
+    // waits for the remainder, so a slow round costs nothing extra.
+    const elapsed = Date.now() - startedAt;
+    if (i + CONCURRENCY < batch.length && elapsed < MIN_ROUND_MS) {
+      await new Promise((done) => setTimeout(done, MIN_ROUND_MS - elapsed));
     }
   }
 
