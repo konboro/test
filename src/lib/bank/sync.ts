@@ -153,11 +153,22 @@ async function syncConnection(
     creditsHere += batch.credits.length;
 
     for (const credit of batch.credits) {
-      const inserted = await ingest(connection, credit);
-      if (!inserted) continue;
+      const outcome = await ingest(connection, credit);
+
+      if (outcome.kind === 'failed') {
+        // Loud, and counted. A credit we could not store is exactly the thing
+        // the operator needs to hear about: the bank has money we cannot see.
+        result.errors.push({
+          connectionId: connection.id,
+          error: `Storing a credit: ${outcome.error}`,
+        });
+        continue;
+      }
+
+      if (outcome.kind === 'duplicate') continue;
 
       result.creditsNew += 1;
-      await reconcile(connection.user_id, inserted, credit, result);
+      await reconcile(connection.user_id, outcome.id, credit, result);
     }
 
     continuationKey = batch.continuationKey;
@@ -196,12 +207,51 @@ function windowStart(lastSyncedAt: string | null): string {
 }
 
 /**
+ * What storing one credit did.
+ *
+ * Three outcomes, not two. The old code returned an id or null and treated
+ * every failure as "seen this already", so a credit that failed to store for
+ * any other reason — a dropped connection, a column constraint, a permissions
+ * change — was skipped in silence. That is money that arrived in the bank and
+ * never reached the review queue, and the run reported a clean result.
+ */
+export type IngestOutcome =
+  | { kind: 'new'; id: string }
+  | { kind: 'duplicate' }
+  | { kind: 'failed'; error: string };
+
+/** Postgres unique-violation: the statement was fetched again, as designed. */
+const UNIQUE_VIOLATION = '23505';
+
+/**
+ * Reads the insert's answer.
+ *
+ * Separate from the call so the one judgement that matters — "already have it"
+ * against "could not store it" — can be pinned down without a database.
+ */
+export function ingestOutcome(
+  error: { code?: string | null; message: string } | null,
+  id: string | null | undefined,
+): IngestOutcome {
+  if (error) {
+    // The unique index on (connection_id, provider_tx_id) doing its job.
+    if (error.code === UNIQUE_VIOLATION) return { kind: 'duplicate' };
+    return { kind: 'failed', error: error.message };
+  }
+
+  if (!id) return { kind: 'failed', error: 'the insert returned no row' };
+
+  return { kind: 'new', id };
+}
+
+/**
  * Store the credit, or recognise it as one we already have.
  *
- * Returns the row id only when this is genuinely new, so the same statement
- * fetched every morning is matched once and never re-settles anything.
+ * Reports a genuine failure as a failure, so an unexplained credit is never
+ * dropped quietly — the whole point of the feed is that money arriving gets
+ * seen by somebody.
  */
-async function ingest(connection: ConnectionRow, credit: IncomingCredit): Promise<string | null> {
+async function ingest(connection: ConnectionRow, credit: IncomingCredit): Promise<IngestOutcome> {
   const { data, error } = await createAdminClient()
     .from('bank_transactions')
     .insert({
@@ -219,9 +269,7 @@ async function ingest(connection: ConnectionRow, credit: IncomingCredit): Promis
     .select('id')
     .maybeSingle();
 
-  // 23505 is the unique index on (connection_id, provider_tx_id) doing its job.
-  if (error) return null;
-  return data?.id ?? null;
+  return ingestOutcome(error, data?.id);
 }
 
 async function reconcile(

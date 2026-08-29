@@ -76,6 +76,8 @@ export function settlementFor(
 export interface ReconcileResult {
   checked: number;
   settled: number;
+  /** Which ones closed, so a caller can drop them without asking again. */
+  settledIds: string[];
   stillOpen: number;
   /** Captured, but less than the invoice asks for. Needs a person. */
   underCaptured: { invoiceId: string; capturedCents: number; owedCents: number }[];
@@ -117,6 +119,7 @@ export async function reconcileCheckouts(scope: ReconcileScope = {}): Promise<Re
   const result: ReconcileResult = {
     checked: 0,
     settled: 0,
+    settledIds: [],
     stillOpen: 0,
     underCaptured: [],
     mismatched: [],
@@ -232,6 +235,7 @@ export async function reconcileCheckouts(scope: ReconcileScope = {}): Promise<Re
 
     if (settled?.length) {
       result.settled += 1;
+      result.settledIds.push(invoice.id);
       await notifyPaymentReceived(invoice.id);
     }
   }

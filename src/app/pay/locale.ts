@@ -1,6 +1,6 @@
 import { cache } from 'react';
 
-import { dictionaryFor, type Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n';
 import { resolveDebtorLocale, tenantLocale } from '@/lib/i18n/message-locale';
 import { isPayCode, payCredentialColumn, PAY_CODE_LENGTH } from '@/lib/pay-code';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -49,11 +49,6 @@ export const payLocaleFor = cache(async (credential: string): Promise<Locale> =>
     return DEFAULT_PAY_LOCALE;
   }
 });
-
-/** The payment page's words, in that language. */
-export async function payCopy(credential: string) {
-  return dictionaryFor(await payLocaleFor(credential)).pay;
-}
 
 /**
  * The payment credential a request path carries, if it is a payment page.

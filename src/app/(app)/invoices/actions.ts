@@ -517,8 +517,11 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
   // emailing somebody a reminder for money they have already handed over is the
   // worst thing this screen can do. Only rows that ever started a checkout cost
   // a call, which is a handful of the book.
+  let closed = new Set<string>();
+
   try {
     const reconciled = await reconcileCheckouts({ invoiceIds: eligible.map((row) => row.id) });
+    closed = new Set(reconciled.settledIds);
     if (reconciled.settled) console.info('[bulk] settled before sending', reconciled);
   } catch (cause) {
     // Never fatal: the operator asked to send, and a provider having a bad
@@ -526,18 +529,8 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
     console.error('[bulk] reconcile failed', String(cause));
   }
 
-  const { data: openNow } = await admin
-    .from('invoices')
-    .select('id')
-    .eq('status', 'pending')
-    .in(
-      'id',
-      eligible.map((row) => row.id),
-    );
-
-  const stillOpen = new Set((openNow ?? []).map((row) => row.id));
-  const settledJustNow = eligible.filter((row) => !stillOpen.has(row.id)).length;
-  const open = eligible.filter((row) => stillOpen.has(row.id));
+  const open = eligible.filter((row) => !closed.has(row.id));
+  const settledJustNow = closed.size;
 
   // One invoice per customer, and none for a customer who has already heard
   // from us today.

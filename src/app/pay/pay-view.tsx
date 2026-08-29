@@ -2,12 +2,13 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { LeftaLogo, LeftaWordmark } from '@/components/logo';
+import { dictionaryFor } from '@/lib/i18n';
 import { formatDate, formatMoney } from '@/lib/money';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 import { FunnelBeacon } from './beacon';
 import { clientCopy } from './copy';
-import { payCopy, payLocaleFor } from './locale';
+import { payLocaleFor } from './locale';
 import { PayButton } from './pay-button';
 import { ReportLinks } from './report-links';
 
@@ -43,8 +44,14 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
   // message and the page it links to speak to the customer alike. An English
   // reminder landing on a Greek-only page was the one place in the product
   // where the language setting stopped short of the person it is for.
-  const t = await payCopy(credential);
   const locale = await payLocaleFor(credential);
+  const dictionary = dictionaryFor(locale);
+  const t = dictionary.pay;
+
+  // The amount and the dates in the reader's own convention. Everything on this
+  // page spoke English to an English customer except the one number they came
+  // here about, which still read "455,00 €".
+  const tag = dictionary.dateTimeTag;
 
   // Strings only past this line. The block holds two templates, and a function
   // handed to a client component is a 500 after the page has already rendered.
@@ -92,7 +99,7 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
               {t.amountDue}
             </p>
             <p className="mt-2 text-5xl font-semibold leading-none tracking-tight text-ink-900">
-              {formatMoney(invoice.amount_cents, invoice.currency)}
+              {formatMoney(invoice.amount_cents, invoice.currency, tag)}
             </p>
           </div>
 
@@ -103,8 +110,8 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
               href={invoice.invoice_number ? (documentUrl ?? undefined) : undefined}
             />
             <Row label={t.company} value={invoice.debtor_name} />
-            <Row label={t.issueDate} value={formatDate(invoice.issue_date)} />
-            <Row label={t.dueDate} value={formatDate(invoice.due_date)} />
+            <Row label={t.issueDate} value={formatDate(invoice.issue_date, tag)} />
+            <Row label={t.dueDate} value={formatDate(invoice.due_date, tag)} />
           </dl>
 
           <div className="border-t border-ink-200 bg-ink-50/50 px-6 py-6">
@@ -172,7 +179,7 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
  * with the layout and the page body rather than asking a third time.
  */
 export async function payMetadata(credential: string): Promise<Metadata> {
-  const t = await payCopy(credential);
+  const t = dictionaryFor(await payLocaleFor(credential)).pay;
 
   return {
     title: t.metaTitle,

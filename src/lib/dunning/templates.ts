@@ -1,4 +1,4 @@
-import type { Locale } from '@/lib/i18n/dictionaries';
+import { DICTIONARIES, type Locale } from '@/lib/i18n/dictionaries';
 import { formatDate, formatMoney } from '@/lib/money';
 import type { CommChannel, DunningStep, TemplateStep } from '@/types/database';
 
@@ -189,13 +189,23 @@ export const PLACEHOLDERS: ReadonlyArray<PlaceholderInfo> = [
  * than blanked, so a typo is visible in the preview instead of silently eating
  * part of the sentence.
  */
-export function applyPlaceholders(template: string, ctx: TemplateContext): string {
+export function applyPlaceholders(
+  template: string,
+  ctx: TemplateContext,
+  locale: Locale = 'el',
+): string {
+  // An amount and a date are copy too. Written in the recipient's language
+  // everywhere else in the message and then formatted Greek regardless, an
+  // English reminder read "455,00 €" — which is not how the person being asked
+  // for the money writes it, and this is the sentence doing the asking.
+  const tag = DICTIONARIES[locale].dateTimeTag;
+
   const values: Record<string, string> = {
     debtor_name: ctx.debtorName,
     creditor_name: ctx.creditorName,
     invoice: ctx.invoiceLabel,
-    amount: formatMoney(ctx.amountCents, ctx.currency),
-    due_date: formatDate(ctx.dueDate),
+    amount: formatMoney(ctx.amountCents, ctx.currency, tag),
+    due_date: formatDate(ctx.dueDate, tag),
     pay_url: ctx.payUrl,
   };
 
@@ -604,7 +614,13 @@ function toParagraphs(text: string): string {
  * scannable place, the way a receipt would — and it is part of the frame, so a
  * template override cannot remove or forge it.
  */
-function factsBlock(ctx: TemplateContext, frame: (typeof FRAME)[Locale]): string {
+function factsBlock(
+  ctx: TemplateContext,
+  frame: (typeof FRAME)[Locale],
+  locale: Locale,
+): string {
+  const tag = DICTIONARIES[locale].dateTimeTag;
+
   const row = (label: string, value: string, emphasis = false) => `
                         <tr>
                           <td style="padding:4px 0;font-size:13px;color:#64748b;${emphasis ? 'border-top:1px solid #e2e8f0;padding-top:9px;' : ''}">${label}</td>
@@ -619,8 +635,8 @@ function factsBlock(ctx: TemplateContext, frame: (typeof FRAME)[Locale]): string
                           <td style="padding:12px 18px;">
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                               ${row(frame.invoice, escapeHtml(ctx.invoiceLabel))}
-                              ${row(frame.dueDate, escapeHtml(formatDate(ctx.dueDate)))}
-                              ${row(frame.amountDue, escapeHtml(formatMoney(ctx.amountCents, ctx.currency)), true)}
+                              ${row(frame.dueDate, escapeHtml(formatDate(ctx.dueDate, tag)))}
+                              ${row(frame.amountDue, escapeHtml(formatMoney(ctx.amountCents, ctx.currency, tag)), true)}
                             </table>
                           </td>
                         </tr>
@@ -738,8 +754,9 @@ export function renderEmail(
       builtIn(slotKey(step, 'email'), locale)?.subject ??
       '',
     ctx,
+    locale,
   );
-  const text = withPayUrl(applyPlaceholders(template.body, ctx), ctx.payUrl);
+  const text = withPayUrl(applyPlaceholders(template.body, ctx, locale), ctx.payUrl);
 
   // The inbox preview line. The greeting is the same on every reminder, so the
   // second paragraph carries the actual news and makes the more useful preview.
@@ -758,7 +775,7 @@ export function renderEmail(
       ctx.creditorName,
       preheader,
       locale,
-      factsBlock(ctx, FRAME[locale]),
+      factsBlock(ctx, FRAME[locale], locale),
     ),
   };
 }
@@ -775,7 +792,7 @@ export function renderSms(
   locale: Locale = 'el',
 ): string {
   return withPayUrl(
-    applyPlaceholders(templateFor(step, 'sms', overrides, variant, locale).body, ctx),
+    applyPlaceholders(templateFor(step, 'sms', overrides, variant, locale).body, ctx, locale),
     ctx.payUrl,
     ' ',
   );
