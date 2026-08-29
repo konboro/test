@@ -476,7 +476,7 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
   const [{ data: rows }, { data: alreadySent }, { data: tenant }] = await Promise.all([
     admin
       .from('invoices')
-      .select('id, debtor_id')
+      .select('id, debtor_id, automation_enabled')
       .eq('user_id', org.id)
       .eq('status', 'pending')
       .in('id', ids.slice(0, 1000)),
@@ -498,9 +498,19 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
       .map((row) => row.debtor_id),
   );
 
+  // An invoice whose automation is switched off stays out of a bulk press.
+  //
+  // The single-row button deliberately still works on a paused invoice —
+  // pausing says "stop chasing this on your own", not "refuse me when I ask".
+  // Behind select-all that reading inverts: one press would contact every
+  // customer the operator had explicitly excluded, which is the opposite of
+  // what switching them off meant.
+  const eligible = (rows ?? []).filter((row) => row.automation_enabled !== false);
+  const paused = (rows ?? []).length - eligible.length;
+
   // One invoice per customer, and none for a customer who has already heard
   // from us today.
-  const plan = planBulkSend(rows ?? [], contacted, MAX_SENDS);
+  const plan = planBulkSend(eligible, contacted, MAX_SENDS);
   const batch = plan.work;
   let limited = plan.limited;
 
@@ -556,6 +566,7 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
       limited,
       skipped,
       failed,
+      paused,
       // What is genuinely still owed a message, which is customers rather than
       // rows. Zero unless the selection was larger than one press can carry.
       left: plan.left,

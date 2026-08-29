@@ -24,15 +24,24 @@ export interface LeaseSchedule {
 }
 
 /**
- * How many charges one run may create for a single lease.
+ * How far back a lease will ever reach for unbilled rent.
  *
  * `generate_from` defaults to the month the lease was entered, so reaching this
  * means somebody deliberately backdated — or mistyped — a date. Two years of
- * arrears is a lot to bill at once; two hundred is a typo, and the cap is what
- * stops a slipped keystroke from opening a hundred dunning ladders against one
- * tenant.
+ * arrears is a lot to bill at once; two hundred is a typo, and this is what
+ * stops a slipped keystroke from opening a hundred ladders against one tenant.
+ *
+ * It is a WINDOW, not a count, and that distinction is the whole of a bug this
+ * had. Capping the count truncated from the oldest period, so once the first
+ * twenty-four existed every later run returned the same twenty-four, all of
+ * them already billed — and the lease silently stopped producing rent forever.
+ * A window ending at today always contains today, so the current month is
+ * always offered however far back the start was set.
  */
-export const MAX_PERIODS_PER_RUN = 24;
+export const MAX_BACKFILL_MONTHS = 24;
+
+/** @deprecated The cap is a window now. Kept so an old import still compiles. */
+export const MAX_PERIODS_PER_RUN = MAX_BACKFILL_MONTHS;
 
 /** `YYYY-MM` for a date string. */
 export function periodOf(date: string): string {
@@ -60,6 +69,15 @@ function addMonth(period: string): string {
   const month = monthOf(period);
 
   return month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, '0')}`;
+}
+
+/** `period` moved by `months`, which may be negative. */
+function shiftMonths(period: string, months: number): string {
+  const index = yearOf(period) * 12 + (monthOf(period) - 1) + months;
+  const year = Math.floor(index / 12);
+  const month = (index % 12) + 1;
+
+  return `${year}-${String(month).padStart(2, '0')}`;
 }
 
 /**
@@ -91,8 +109,13 @@ export function chargeDate(period: string, dueDay: number): string {
 export function periodsDue(lease: LeaseSchedule, today: string): string[] {
   if (!lease.active) return [];
 
-  const first = periodOf(lease.startsOn > lease.generateFrom ? lease.startsOn : lease.generateFrom);
+  const asked = periodOf(lease.startsOn > lease.generateFrom ? lease.startsOn : lease.generateFrom);
   const last = periodOf(today);
+
+  // The window, anchored on today rather than on the lease. Anchoring it on the
+  // lease is what used to make a backdated one stop billing altogether.
+  const earliest = shiftMonths(last, -(MAX_BACKFILL_MONTHS - 1));
+  const first = asked > earliest ? asked : earliest;
 
   const periods: string[] = [];
 
@@ -105,7 +128,6 @@ export function periodsDue(lease: LeaseSchedule, today: string): string[] {
     if (lease.endsOn && due > lease.endsOn) break;
 
     periods.push(period);
-    if (periods.length >= MAX_PERIODS_PER_RUN) break;
   }
 
   return periods;

@@ -272,7 +272,12 @@ async function processTenant(
 
   const debtorIds = [...new Set(invoices.map((i) => i.debtor_id))];
   const [{ data: debtors }, { data: openReports }] = await Promise.all([
-    supabase.from('debtors').select('*').in('id', debtorIds),
+    // Scoped, like the report query beside it. This one trusted `debtor_id` to
+    // imply the tenant, which is the assumption the whole organizations
+    // refactor removed: a planted id had the nightly sweep load another
+    // company's customer, message them, and file the rendered message in a log
+    // the wrong company reads.
+    supabase.from('debtors').select('*').eq('user_id', tenant.id).in('id', debtorIds),
     // "I already paid" / "this document is wrong", said on the payment page.
     // While one is open the invoice is contested, and chasing a contested
     // debt is the exact mistake the report feature exists to prevent.

@@ -1,3 +1,4 @@
+import { escapeHtml } from '@/lib/html';
 import { sendEmail } from '@/lib/email/send';
 import { appUrl } from '@/lib/env';
 import { formatDate, formatMoney } from '@/lib/money';
@@ -131,7 +132,7 @@ async function notifyCreditor(
         ? '<br>'
         : line.startsWith('Εξέταση:')
           ? `<p><a href="${appUrl()}/invoices" style="display:inline-block;background:#4c6ef5;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Εξέταση στο lefta.app</a></p>`
-          : `<p style="margin:2px 0">${line}</p>`,
+          : `<p style="margin:2px 0">${escapeHtml(line)}</p>`,
     )
     .join('')}</div>`;
 

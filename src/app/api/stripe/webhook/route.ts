@@ -141,19 +141,64 @@ async function handleCompletedSession(session: Stripe.Checkout.Session, account:
       return;
     }
 
-    // The event must come from the account that tenant actually connected.
-    // Metadata is attacker-controllable on any connected account, so without
-    // this check one connected account could settle another tenant's invoice.
+    // Who owns this invoice is a question for the invoice, not for the payload.
+    //
+    // This used to look the tenant up by `session.metadata.lefta_user_id` and
+    // compare that tenant's connected account against the event — both sides of
+    // a comparison the sender controls. Any connected account could mint a
+    // fifty-cent session naming somebody else's invoice, pay it, and close a
+    // debt of any size on books they have never seen. The comment claimed to
+    // prevent exactly that.
+    //
+    // Reading the invoice first takes the attacker out of the comparison: the
+    // event's account must match the account of whoever actually owns the row.
+    const { data: invoice } = await admin
+      .from('invoices')
+      .select('id, user_id, amount_cents')
+      .eq('id', invoiceId)
+      .maybeSingle();
+
+    if (!invoice) {
+      console.error('[stripe:webhook] session names an invoice that does not exist', invoiceId);
+      return;
+    }
+
+    if (invoice.user_id !== tenantId) {
+      console.error('[stripe:webhook] session metadata claims the wrong owner', {
+        invoiceId,
+        claimed: tenantId,
+      });
+      return;
+    }
+
     const { data: creditor } = await admin
       .from('users')
       .select('stripe_account_id')
-      .eq('id', tenantId)
+      .eq('id', invoice.user_id)
       .maybeSingle();
 
     if (!account || !creditor?.stripe_account_id || creditor.stripe_account_id !== account) {
       console.error('[stripe:webhook] account mismatch for invoice', {
         invoiceId,
         account,
+      });
+      return;
+    }
+
+    // A capture that does not cover the debt does not close it.
+    //
+    // An invoice can legitimately change while a checkout sits open — an
+    // accounting correction raising it, say — and the old behaviour marked it
+    // settled in full for whatever the stale session happened to capture.
+    // Money that was never collected stopped being chased, silently. An
+    // under-payment is now refused and logged instead of forgiven.
+    const captured = session.amount_total ?? 0;
+
+    if (captured < invoice.amount_cents) {
+      console.error('[stripe:webhook] capture does not cover the invoice', {
+        invoiceId,
+        captured,
+        owed: invoice.amount_cents,
       });
       return;
     }

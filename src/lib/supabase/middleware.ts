@@ -13,6 +13,10 @@ const PUBLIC_PREFIXES = [
   // index that instead.
   '/pricing',
   '/faq',
+  // The share card. It has no file extension, so the matcher does not treat
+  // it as an asset — and every link preview of the public site was being
+  // answered with a redirect to the login page instead of a picture.
+  '/opengraph-image',
   // The guides, and the reason they exist. The sitemap advertises every one of
   // them; without this a crawler that follows the sitemap is answered with a
   // redirect to the login page, and the article it came for is never read.

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   chargeDate,
   chargeReference,
-  MAX_PERIODS_PER_RUN,
+  MAX_BACKFILL_MONTHS,
   nextChargeDate,
   periodsDue,
   type LeaseSchedule,
@@ -77,9 +77,29 @@ describe('periodsDue', () => {
     expect(periodsDue(lease({ active: false }), '2026-06-10')).toEqual([]);
   });
 
-  it('refuses to open more ladders than a mistyped date deserves', () => {
+  it('refuses to reach further back than a mistyped date deserves', () => {
     const ancient = lease({ startsOn: '2000-01-01', generateFrom: '2000-01-01' });
-    expect(periodsDue(ancient, '2026-08-10')).toHaveLength(MAX_PERIODS_PER_RUN);
+    expect(periodsDue(ancient, '2026-08-10')).toHaveLength(MAX_BACKFILL_MONTHS);
+  });
+
+  it('still bills the current month once the window is full', () => {
+    // The bug this pins: the cap used to truncate from the oldest period, so
+    // after the first run every later run returned the same already-billed
+    // months and the lease stopped producing rent for good.
+    const ancient = lease({ startsOn: '2000-01-01', generateFrom: '2000-01-01' });
+
+    expect(periodsDue(ancient, '2026-08-10')).toContain('2026-08');
+    expect(periodsDue(ancient, '2026-09-10')).toContain('2026-09');
+  });
+
+  it('moves its window forward rather than repeating the same months', () => {
+    const ancient = lease({ startsOn: '2000-01-01', generateFrom: '2000-01-01' });
+
+    const august = periodsDue(ancient, '2026-08-10');
+    const september = periodsDue(ancient, '2026-09-10');
+
+    expect(september).not.toEqual(august);
+    expect(september.at(-1)).toBe('2026-09');
   });
 });
 

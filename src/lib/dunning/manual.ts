@@ -119,8 +119,19 @@ export async function loadTarget(
     return { ok: false, error: t.manual.invoiceNotOpen };
   }
 
+  // Scoped to the tenant as well as the id. The invoice above is scoped, but
+  // this read was not, and `invoices.debtor_id` was writable — so a member of
+  // one company could repoint their own invoice at another company's customer
+  // and have the preview hand back that person's name, email and phone. The
+  // schema now forbids the mismatch; asking correctly costs nothing and does
+  // not depend on the migration having been applied.
   const [{ data: debtor }, { data: tenant }] = await Promise.all([
-    supabase.from('debtors').select('*').eq('id', invoice.debtor_id).maybeSingle(),
+    supabase
+      .from('debtors')
+      .select('*')
+      .eq('id', invoice.debtor_id)
+      .eq('user_id', userId)
+      .maybeSingle(),
     supabase.from('users').select('*').eq('id', userId).maybeSingle(),
   ]);
 
@@ -139,7 +150,10 @@ export async function loadTarget(
   // said "I'll pay on the 15th", and a reminder sent by hand on the 12th breaks
   // that just as surely as the sweep would. Lifting it is one click away and
   // says what it is doing, which is the honest way to change your mind.
-  if (isSnoozed(debtor, athensDate())) {
+  // The tenant's day, not Athens's. The sweep already does this; the manual
+  // path was left behind, so at 20:00 in New York on the day a debtor was
+  // promised silence, Athens had already turned the page and the send went out.
+  if (isSnoozed(debtor, zonedDate(tenant.timezone))) {
     return {
       ok: false,
       error: t.manual.debtorSnoozed(formatDate(debtor.snoozed_until as string)),

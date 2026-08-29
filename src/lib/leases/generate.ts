@@ -85,7 +85,7 @@ export async function generateRentCharges(
   for (let at = 0; at < references.length; at += 200) {
     const { data: seen, error: seenError } = await admin
       .from('invoices')
-      .select('external_ref')
+      .select('user_id, external_ref')
       .in('external_ref', references.slice(at, at + 200));
 
     if (seenError) {
@@ -95,11 +95,11 @@ export async function generateRentCharges(
     }
 
     for (const row of seen ?? []) {
-      if (row.external_ref) known.add(row.external_ref);
+      if (row.external_ref) known.add(`${row.user_id}|${row.external_ref}`);
     }
   }
 
-  const fresh = candidates.filter((c) => !known.has(c.reference));
+  const fresh = candidates.filter((c) => !known.has(`${c.lease.user_id}|${c.reference}`));
   result.existing = candidates.length - fresh.length;
 
   if (!fresh.length) return result;

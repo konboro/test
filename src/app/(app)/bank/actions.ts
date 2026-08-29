@@ -34,7 +34,7 @@ async function ownedTransaction(transactionId: string) {
 
   const { data } = await createAdminClient()
     .from('bank_transactions')
-    .select('id, user_id, amount_cents, matched_invoice_id, rejected_invoice_ids')
+    .select('id, user_id, amount_cents, currency, state, matched_invoice_id, rejected_invoice_ids')
     .eq('id', transactionId)
     .maybeSingle();
 
@@ -53,8 +53,46 @@ export async function confirmMatch(formData: FormData): Promise<void> {
 
   const admin = createAdminClient();
 
-  // The invoice has to belong to the same tenant, and still be open. Anything
-  // else and this is either a stale page or an id that was never theirs.
+  // What the credit is being applied to. The ambiguous review lists one Confirm
+  // button per candidate, so the invoice is read and checked rather than
+  // trusted: a stale tab is the ordinary way somebody arrives here twice.
+  const { data: invoice } = await admin
+    .from('invoices')
+    .select('id, amount_cents, currency')
+    .eq('id', invoiceId)
+    .eq('user_id', owned.org.id)
+    .eq('status', 'pending')
+    .maybeSingle();
+
+  if (!invoice) return;
+
+  // Neither of these was checked on this path, though the automatic matcher
+  // checks both. A 500,00 PLN invoice could be closed by a €500.00 credit worth
+  // a quarter of it, and a €50 credit could close a €10,000 debt.
+  if (invoice.currency !== owned.transaction.currency) return;
+  if (owned.transaction.amount_cents < invoice.amount_cents) return;
+
+  // Claim the credit before spending it.
+  //
+  // The credit is the scarce thing — one transfer, one invoice — so it is what
+  // has to be claimed atomically. Confirming the same €480 against two €480
+  // invoices used to close both, because nothing checked the transaction was
+  // still unapplied: €960 of debt settled by €480 of money, with
+  // `matched_invoice_id` quietly overwritten to whichever was clicked last.
+  const { data: claimed } = await admin
+    .from('bank_transactions')
+    .update({
+      state: 'settled',
+      matched_invoice_id: invoiceId,
+      matched_at: new Date().toISOString(),
+      matched_by: owned.user.id,
+    })
+    .eq('id', transactionId)
+    .neq('state', 'settled')
+    .select('id');
+
+  if (!claimed?.length) return;
+
   const { data: settled } = await admin
     .from('invoices')
     .update({
@@ -67,17 +105,21 @@ export async function confirmMatch(formData: FormData): Promise<void> {
     .eq('status', 'pending')
     .select('id');
 
-  if (!settled?.length) return;
-
-  await admin
-    .from('bank_transactions')
-    .update({
-      state: 'settled',
-      matched_invoice_id: invoiceId,
-      matched_at: new Date().toISOString(),
-      matched_by: owned.user.id,
-    })
-    .eq('id', transactionId);
+  // The invoice was settled by something else between the two statements. Give
+  // the credit back rather than consuming it against nothing — it is still
+  // unexplained money and belongs in the review queue.
+  if (!settled?.length) {
+    await admin
+      .from('bank_transactions')
+      .update({
+        state: owned.transaction.state,
+        matched_invoice_id: owned.transaction.matched_invoice_id,
+        matched_at: null,
+        matched_by: null,
+      })
+      .eq('id', transactionId);
+    return;
+  }
 
   revalidatePath('/bank');
   revalidatePath('/invoices');

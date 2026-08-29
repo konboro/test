@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { parseSlotKey } from '@/lib/dunning/templates';
 import { saveFailed } from '@/lib/errors';
 import { formError, getDictionary } from '@/lib/i18n';
-import { activeOrganization } from '@/lib/orgs/active';
+import { writableOrganization } from '@/lib/orgs/active';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { DEFAULT_TIMEZONE, isTimezone } from '@/lib/money';
@@ -64,7 +64,7 @@ export async function updateProfile(
   const supabase = await createClient();
   // The company being worked in. Null covers both "not signed in" and "member
   // of nothing", which are the same answer here.
-  const org = await activeOrganization();
+  const org = await writableOrganization();
   if (!org) return { error: t.forms.errors.unauthorized };
 
   // Only the columns granted to `authenticated` are touched here; credentials
@@ -99,7 +99,7 @@ export async function setAutomation(
   const enabled = formData.get('enabled') === 'on';
 
   const supabase = await createClient();
-  const org = await activeOrganization();
+  const org = await writableOrganization();
   if (!org) return { error: t.forms.errors.unauthorized };
 
   const { error } = await supabase
@@ -132,11 +132,12 @@ export async function setAutomation(
  */
 export async function updatePaymentProvider(formData: FormData): Promise<void> {
   const raw = String(formData.get('payment_provider') ?? '');
-  const provider = raw === 'stripe' || raw === 'viva' ? raw : null;
+  const provider =
+    raw === 'stripe' || raw === 'viva' || raw === 'revolut' ? raw : null;
 
   // Verified against the membership list rather than taken from the cookie:
   // this writes with the service role, which has no policy behind it.
-  const org = await activeOrganization();
+  const org = await writableOrganization();
   if (!org) return;
 
   const { error } = await createAdminClient()
@@ -194,7 +195,7 @@ export async function saveTemplate(
   if (!slot) return { error: t.forms.errors.unknownTemplate };
 
   const supabase = await createClient();
-  const org = await activeOrganization();
+  const org = await writableOrganization();
   if (!org) return { error: t.forms.errors.unauthorized };
 
   // The variant has to narrow the lookup as well as the step: two manual slots
@@ -279,7 +280,7 @@ export async function setPaymentNotice(
   const enabled = formData.get('enabled') === 'on';
 
   const supabase = await createClient();
-  const org = await activeOrganization();
+  const org = await writableOrganization();
   if (!org) return { error: t.forms.errors.unauthorized };
   const { error } = await supabase
     .from('users')

@@ -121,15 +121,31 @@ export async function updateDebtor(
   const parsed = debtorSchema.safeParse(read(formData));
   if (!parsed.success) return { error: formError(t, parsed.error.issues[0]?.message) };
 
+  // A write that changes nothing must not report success.
+  //
+  // Row-level security refuses a viewer's update by matching no rows, and
+  // PostgREST answers that with 204 and no error — so this returned "saved"
+  // having saved nothing, and the operator went away believing the opposite of
+  // what happened. Asking for the affected row turns a silent refusal into an
+  // answer, whether the cause is permission or an id that was never theirs.
+  const org = await writableOrganization();
+  if (!org) return { error: t.forms.errors.unauthorized };
+
   const supabase = await createClient();
   const phone = parsed.data.phone ? normalisePhone(parsed.data.phone) : null;
 
-  const { error } = await supabase
+  const { data: changed, error } = await supabase
     .from('debtors')
     .update({ ...parsed.data, phone })
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
 
   if (error) return { error: saveFailed(t, 'debtors', error) };
+
+  // No error and no row is the refusal case: the policy declined it, or the id
+  // belongs to another company. Either way nothing was written, so nothing is
+  // reported as written.
+  if (!changed?.length) return { error: t.forms.errors.debtorNotFound };
 
   revalidatePath('/debtors');
   revalidatePath('/dashboard');
@@ -190,6 +206,12 @@ export async function toggleMute(formData: FormData) {
   const muted = String(formData.get('muted') ?? '') === 'true';
   if (!id) return;
 
+  // Muting decides whether a customer is chased at all, so it is a write and
+  // needs write access — not the read-role check it had, which let the policy
+  // refuse the row silently instead.
+  const org = await writableOrganization();
+  if (!org) return;
+
   const supabase = await createClient();
   await supabase.from('debtors').update({ muted: !muted }).eq('id', id);
 
@@ -212,6 +234,9 @@ export async function toggleMute(formData: FormData) {
 export async function snoozeDebtor(formData: FormData) {
   const id = String(formData.get('id') ?? '');
   if (!id) return;
+
+  const org = await writableOrganization();
+  if (!org) return;
 
   const today = athensDate();
 

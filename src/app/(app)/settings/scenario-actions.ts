@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { DEFAULT_SCENARIO, EXTRA_STEP_OFFSETS, LADDER_STEPS } from '@/lib/dunning/scenario';
 import { saveFailed } from '@/lib/errors';
 import { getDictionary } from '@/lib/i18n';
-import { activeOrganization } from '@/lib/orgs/active';
+import { writableOrganization } from '@/lib/orgs/active';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { CommChannel, DunningStep } from '@/types/database';
 
@@ -46,7 +46,11 @@ export async function saveScenario(
   // Verified membership, not the cookie: the ladder is written with the service
   // role, and a company id taken on trust would let a hand-edited cookie
   // rewrite someone else's reminder schedule.
-  const org = await activeOrganization();
+  // Writing, not reading. `activeOrganization` admits a viewer, and this action
+  // rewrites every rung of the ladder — the one table that decides what every
+  // debtor receives — through the service role, which bypasses the policy that
+  // would otherwise have refused them.
+  const org = await writableOrganization();
   if (!org) return { error: t.forms.errors.unauthorized };
 
   const rows = STEPS.map((step) => {

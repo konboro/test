@@ -34,19 +34,24 @@ export function contactLimitsDisabled(): boolean {
  * Whether the internal SMS credit meter governs anything.
  *
  * Credits record what a tenant has pre-paid lefta for. Nobody can buy any yet —
- * selling packs needs a platform Stripe account, and lefta is not a company
- * today — so enforcing the meter would block messages the SMS provider itself
- * would deliver, which from the panel is indistinguishable from a broken
- * integration.
+ * selling packs needs a platform Stripe account — so enforcing the meter would
+ * block messages the SMS provider itself would happily deliver, which from the
+ * panel is indistinguishable from a broken integration. Off is the correct
+ * default until packs can be bought.
  *
- * Tied to the same switch as the contact limit so testing has one thing to turn
- * off. While it is off the balance is not merely ignored, it is hidden: a
- * prominent "0 credits, running low" on the overview describes a constraint
- * that is not in force, and a number that governs nothing teaches the operator
- * to distrust the ones that do.
+ * It used to read `!contactLimitsDisabled()`, which tied it to the testing
+ * escape hatch. That coupling made the hatch impossible to remove: switching it
+ * off to restore the daily contact guarantee would have switched the credit
+ * meter ON at the same moment, and with no way to buy credits every SMS would
+ * have stopped. Two unrelated decisions sharing one switch is how a safety
+ * control ends up load-bearing for something else.
+ *
+ * While it is off the balance is not merely ignored, it is hidden: a prominent
+ * "0 credits, running low" describes a constraint that is not in force, and a
+ * number that governs nothing teaches the operator to distrust the ones that do.
  */
 export function smsCreditsEnforced(): boolean {
-  return !contactLimitsDisabled();
+  return optionalEnv('ENFORCE_SMS_CREDITS') === '1';
 }
 
 /**
