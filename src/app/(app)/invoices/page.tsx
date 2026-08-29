@@ -59,6 +59,8 @@ export default async function InvoicesPage({
     failed?: string;
     notDue?: string;
     paused?: string;
+    /** Paid at the provider, discovered when the press asked. */
+    settled?: string;
     left?: string;
   }>;
 }) {
@@ -228,6 +230,7 @@ export default async function InvoicesPage({
   const bulkLeft = Number(params.left ?? 0);
   const bulkNotDue = Number(params.notDue ?? 0);
   const bulkPaused = Number(params.paused ?? 0);
+  const bulkSettled = Number(params.settled ?? 0);
 
   // When and how a document was settled. Only worth a column on views that can
   // contain paid rows — the default "open" view would render a column of dashes.
@@ -359,6 +362,9 @@ export default async function InvoicesPage({
           {bulkSkipped ? <p className="mt-1 text-xs">{t.invoices.bulk.skipped(bulkSkipped)}</p> : null}
           {bulkNotDue ? <p className="mt-1 text-xs">{t.invoices.bulk.notDue(bulkNotDue)}</p> : null}
           {bulkPaused ? <p className="mt-1 text-xs">{t.invoices.bulk.paused(bulkPaused)}</p> : null}
+          {bulkSettled ? (
+            <p className="mt-1 text-xs">{t.invoices.bulk.settled(bulkSettled)}</p>
+          ) : null}
           {bulkFailed ? <p className="mt-1 text-xs">{t.invoices.bulk.failed(bulkFailed)}</p> : null}
           {bulkLeft ? <p className="mt-1 text-xs">{t.invoices.bulk.capped(bulkLeft)}</p> : null}
         </div>

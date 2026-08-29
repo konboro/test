@@ -1058,6 +1058,8 @@ const el = {
       sending: 'Αποστολή…',
       notDue: (n: number) => `${n} δεν έχουν φτάσει ακόμη σε βήμα του σεναρίου.`,
       paused: (n: number) => `${n} σε παύση — ο αυτοματισμός τα αφήνει εκτός.`,
+      settled: (n: number) =>
+        `${n} είχαν ήδη εξοφληθεί με κάρτα — καταχωρήθηκαν και δεν στάλθηκε υπενθύμιση.`,
       selected: (n: number) => `${n} επιλεγμένα`,
       selectAll: 'Επιλογή όλων',
       send: 'Αποστολή υπενθύμισης',
@@ -2529,6 +2531,8 @@ const en: typeof el = {
       sending: 'Sending…',
       notDue: (n: number) => `${n} have not reached a step of the scenario yet.`,
       paused: (n: number) => `${n} are paused — the automation leaves them alone.`,
+      settled: (n: number) =>
+        `${n} had already been paid by card — recorded, and no reminder was sent.`,
       selected: (n: number) => `${n} selected`,
       selectAll: 'Select all',
       send: 'Send reminder',

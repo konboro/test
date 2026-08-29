@@ -14,6 +14,7 @@ import { parseLanguageChoice } from '@/lib/i18n/message-locale';
 import { athensDate, toCents } from '@/lib/money';
 import { safeNextPath } from '@/lib/redirects';
 import { activeOrganization, writableOrganization } from '@/lib/orgs/active';
+import { reconcileCheckouts } from '@/lib/payments/reconcile';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { saveFailed } from '@/lib/errors';
@@ -508,9 +509,39 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
   const eligible = (rows ?? []).filter((row) => row.automation_enabled !== false);
   const paused = (rows ?? []).length - eligible.length;
 
+  // Anyone who has already paid drops out before a word is written.
+  //
+  // A card payment is only recorded when the debtor's browser returns from the
+  // checkout, so an invoice can be settled in fact and open here. The nightly
+  // cron asks the providers, but a bulk press does not wait for the cron — and
+  // emailing somebody a reminder for money they have already handed over is the
+  // worst thing this screen can do. Only rows that ever started a checkout cost
+  // a call, which is a handful of the book.
+  try {
+    const reconciled = await reconcileCheckouts({ invoiceIds: eligible.map((row) => row.id) });
+    if (reconciled.settled) console.info('[bulk] settled before sending', reconciled);
+  } catch (cause) {
+    // Never fatal: the operator asked to send, and a provider having a bad
+    // moment must not swallow the press.
+    console.error('[bulk] reconcile failed', String(cause));
+  }
+
+  const { data: openNow } = await admin
+    .from('invoices')
+    .select('id')
+    .eq('status', 'pending')
+    .in(
+      'id',
+      eligible.map((row) => row.id),
+    );
+
+  const stillOpen = new Set((openNow ?? []).map((row) => row.id));
+  const settledJustNow = eligible.filter((row) => !stillOpen.has(row.id)).length;
+  const open = eligible.filter((row) => stillOpen.has(row.id));
+
   // One invoice per customer, and none for a customer who has already heard
   // from us today.
-  const plan = planBulkSend(eligible, contacted, MAX_SENDS);
+  const plan = planBulkSend(open, contacted, MAX_SENDS);
   const batch = plan.work;
   let limited = plan.limited;
 
@@ -567,6 +598,7 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
       skipped,
       failed,
       paused,
+      settled: settledJustNow,
       // What is genuinely still owed a message, which is customers rather than
       // rows. Zero unless the selection was larger than one press can carry.
       left: plan.left,
