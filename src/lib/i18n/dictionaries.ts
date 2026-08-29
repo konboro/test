@@ -329,6 +329,7 @@ const el = {
    */
   pay: {
     metaTitle: 'Εξόφληση παραστατικού',
+    metaDescription: 'Ασφαλής σελίδα εξόφλησης παραστατικού.',
     payTo: 'Εξόφληση προς',
     amountDue: 'Οφειλόμενο ποσό',
     invoice: 'Παραστατικό',
@@ -1810,6 +1811,7 @@ const en: typeof el = {
 
   pay: {
     metaTitle: 'Pay your invoice',
+    metaDescription: 'Secure page for settling an invoice.',
     payTo: 'Payment to',
     amountDue: 'Amount due',
     invoice: 'Invoice',

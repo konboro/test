@@ -1,13 +1,13 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { LeftaLogo, LeftaWordmark } from '@/components/logo';
-import { dictionaryFor, type Dictionary } from '@/lib/i18n';
-import { resolveDebtorLocale, tenantLocale } from '@/lib/i18n/message-locale';
 import { formatDate, formatMoney } from '@/lib/money';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 import { FunnelBeacon } from './beacon';
 import { clientCopy } from './copy';
+import { payCopy, payLocaleFor } from './locale';
 import { PayButton } from './pay-button';
 import { ReportLinks } from './report-links';
 
@@ -43,7 +43,8 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
   // message and the page it links to speak to the customer alike. An English
   // reminder landing on a Greek-only page was the one place in the product
   // where the language setting stopped short of the person it is for.
-  const t = (await payLocale(invoice.invoice_id)).pay;
+  const t = await payCopy(credential);
+  const locale = await payLocaleFor(credential);
 
   // Strings only past this line. The block holds two templates, and a function
   // handed to a client component is a 500 after the page has already rendered.
@@ -55,6 +56,21 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-12">
       <FunnelBeacon credential={credential} />
+
+      {/* The document language, corrected to the reader.
+          `<html lang>` belongs to the root layout, which sets it from the
+          operator's session — and a debtor has none, so an English page
+          announced itself as Greek. That attribute is what a screen reader
+          pronounces from and what a browser offers to translate by.
+          Corrected here rather than in the layout on purpose: reading the
+          request path up there opts the entire site into dynamic rendering,
+          and it costs the guide pages, robots.txt and sitemap.xml their
+          prerendering to fix one attribute on this page. */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `document.documentElement.lang=${JSON.stringify(locale)}`,
+        }}
+      />
       <div className="w-full max-w-md">
         {/* The mark, not just the word. This is the most-branded surface the
             product has — a debtor arriving from an email needs to recognise
@@ -149,75 +165,40 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
   );
 }
 
-/** Greek, because that is the market the product sells into. */
-const DEFAULT_PAY_LOCALE = 'el' as const;
-
-/**
- * The dictionary this page should speak in.
- *
- * The customer's own language where they have one, otherwise whatever their
- * phone number implies, otherwise the creditor's — the same three steps, in the
- * same order, that decide the language of the reminder. Falls back rather than
- * failing: a page that cannot be read is bad, and a page that 500s is worse.
- */
-export async function payLocale(invoiceId: string): Promise<Dictionary> {
-  const admin = createAdminClient();
-
-  try {
-    const { data: row } = await admin
-      .from('invoices')
-      .select('debtor_id, user_id')
-      .eq('id', invoiceId)
-      .maybeSingle();
-
-    if (!row) return dictionaryFor(DEFAULT_PAY_LOCALE);
-
-    const [{ data: debtor }, { data: tenant }] = await Promise.all([
-      admin.from('debtors').select('locale, phone').eq('id', row.debtor_id).maybeSingle(),
-      admin.from('users').select('locale').eq('id', row.user_id).maybeSingle(),
-    ]);
-
-    const creditorLocale = tenantLocale({ locale: tenant?.locale ?? null });
-
-    return dictionaryFor(
-      debtor ? resolveDebtorLocale(debtor, creditorLocale) : creditorLocale,
-    );
-  } catch {
-    return dictionaryFor(DEFAULT_PAY_LOCALE);
-  }
-}
-
 /**
  * The metadata for both entry points.
  *
- * `generateMetadata` runs before the body and holds only the credential, so the
- * invoice is resolved once more here. Two small reads on a page a debtor opens
- * from an email is a fair price for a tab title they can read — and a failure
- * falls back to the default rather than taking the page down with it.
+ * The locale resolution is memoised for the request, so this shares its answer
+ * with the layout and the page body rather than asking a third time.
  */
-export async function payMetadata(credential: string) {
+export async function payMetadata(credential: string): Promise<Metadata> {
+  const t = await payCopy(credential);
+
   return {
-    title: (await payCopyFor(credential)).metaTitle,
+    title: t.metaTitle,
+
+    // The root layout's description and social cards are the marketing copy for
+    // the product, in the operator's language. Inherited here they described
+    // lefta to a customer who was sent a link to settle a debt — and did it in
+    // Greek to an English reader. This page is not an advertisement.
+    description: t.metaDescription,
+    openGraph: {
+      title: t.metaTitle,
+      description: t.metaDescription,
+      siteName: 'lefta.app',
+      type: 'website',
+    },
+    twitter: { card: 'summary', title: t.metaTitle, description: t.metaDescription },
+
+    // Nor is it a page with a canonical elsewhere: the root sets one pointing at
+    // the home page, which would be a lie about what this URL is.
+    alternates: { canonical: null },
+
     // This page names a debtor and what they owe. Indexed, it would publish a
     // private debt to anyone searching that person's name — and `nocache` keeps
     // it out of the cached copy a delisting would otherwise leave behind.
     robots: { index: false, follow: false, nocache: true },
   };
-}
-
-async function payCopyFor(credential: string) {
-  try {
-    const { data } = await createAdminClient().rpc('get_invoice_for_payment', {
-      p_token: credential,
-    });
-
-    const invoiceId = data?.[0]?.invoice_id;
-    if (!invoiceId) return dictionaryFor(DEFAULT_PAY_LOCALE).pay;
-
-    return (await payLocale(invoiceId)).pay;
-  } catch {
-    return dictionaryFor(DEFAULT_PAY_LOCALE).pay;
-  }
 }
 
 function Row({ label, value, href }: { label: string; value: string; href?: string }) {
