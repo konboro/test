@@ -319,6 +319,68 @@ const el = {
     alreadyDecided: 'Έχει ήδη κριθεί.',
   },
 
+  /**
+   * The page a debtor lands on from a reminder.
+   *
+   * Rendered in the debtor's own language, resolved exactly as the reminder
+   * that linked here was — otherwise an English customer reads an English
+   * email and arrives somewhere they cannot read, which is the one screen in
+   * the product where that matters most.
+   */
+  pay: {
+    metaTitle: 'Εξόφληση παραστατικού',
+    payTo: 'Εξόφληση προς',
+    amountDue: 'Οφειλόμενο ποσό',
+    invoice: 'Παραστατικό',
+    company: 'Επωνυμία',
+    issueDate: 'Ημ. έκδοσης',
+    dueDate: 'Ημ. λήξης',
+    settledTitle: 'Το παραστατικό έχει εξοφληθεί.',
+    settledBody: 'Ευχαριστούμε.',
+    recordingTitle: 'Η πληρωμή σας καταχωρείται.',
+    recordingBody:
+      'Η επιβεβαίωση ολοκληρώνεται σε λίγα δευτερόλεπτα. Μπορείτε να κλείσετε αυτή τη σελίδα.',
+    secure: 'Ασφαλής πληρωμή με κάρτα. Το lefta.app δεν αποθηκεύει στοιχεία κάρτας.',
+    noOnlinePayment:
+      'Η ηλεκτρονική πληρωμή δεν είναι προς το παρόν διαθέσιμη. Επικοινωνήστε με τον εκδότη για την εξόφληση.',
+    notPayable:
+      'Το παραστατικό δεν είναι διαθέσιμο για ηλεκτρονική πληρωμή. Επικοινωνήστε με τον εκδότη.',
+    footerBefore: 'Η σελίδα παρέχεται από την πλατφόρμα',
+    footerAfter: (creditor: string) =>
+      `για λογαριασμό της ${creditor}. Για ερωτήματα σχετικά με το παραστατικό, απευθυνθείτε απευθείας στον εκδότη.`,
+    payNow: 'Πληρωμή τώρα',
+    redirecting: 'Ανακατεύθυνση…',
+    startFailed: 'Δεν ήταν δυνατή η έναρξη της πληρωμής. Δοκιμάστε ξανά.',
+    alreadyPaid: 'Το παραστατικό έχει ήδη εξοφληθεί.',
+    notPayableNow: 'Το παραστατικό δεν είναι πλέον πληρωτέο.',
+    providerMissing: 'Ο εκδότης δεν δέχεται προς το παρόν ηλεκτρονικές πληρωμές.',
+    paidClaim: 'Έχω ήδη πληρώσει',
+    dispute: 'Υπάρχει πρόβλημα με το παραστατικό',
+    close: 'Κλείσιμο',
+    reportSent: 'Η δήλωσή σας καταχωρήθηκε. Ο εκδότης ενημερώθηκε.',
+    writeHere: 'Γράψτε εδώ…',
+    yourMessage: 'Το μήνυμά σας',
+    send: 'Αποστολή',
+    howAndWhen: 'Πώς και πότε πληρώσατε;',
+    whatIsWrong: 'Τι δεν συμφωνεί;',
+    paidOn: 'Ημερομηνία πληρωμής',
+    amount: 'Ποσό',
+    amountPlaceholder: 'π.χ. 455,00',
+    referenceOptional: 'Αιτιολογία ή τράπεζα (προαιρετικά)',
+    contactOptional: 'Τρόπος επικοινωνίας για την απάντηση (προαιρετικά)',
+    submitFailed: 'Η καταχώρηση δεν ολοκληρώθηκε. Δοκιμάστε ξανά.',
+    submitting: 'Καταχώρηση…',
+    submit: 'Καταχώρηση',
+    greetPaid:
+      'Χαίρετε! Θα καταγράψω την πληρωμή σας για τον εκδότη. Πότε περίπου πληρώσατε, και με ποιον τρόπο (έμβασμα, μετρητά, κάρτα);',
+    greetDispute:
+      'Χαίρετε! Θα καταγράψω το πρόβλημα για τον εκδότη. Τι δεν συμφωνεί στο παραστατικό;',
+    filed: 'Καταγράφηκε — ο εκδότης ενημερώθηκε και θα το δει άμεσα. Ευχαριστούμε.',
+    alreadyFiled:
+      'Η δήλωσή σας είναι ήδη καταχωρημένη και ο εκδότης έχει ενημερωθεί. Δεν χρειάζεται κάτι άλλο.',
+    orderDescription: (label: string) => `Παραστατικό ${label}`,
+  },
+
   scenario: {
     title: 'Σενάριο υπενθυμίσεων',
     hint: 'Πότε φεύγει κάθε βήμα, από ποιο κανάλι, και αν επαναλαμβάνεται.',
@@ -1744,6 +1806,58 @@ const en: typeof el = {
     rejected: 'Rejected. It will not be used.',
     withdrawn: 'Withdrawn. No longer in use.',
     alreadyDecided: 'This has already been decided.',
+  },
+
+  pay: {
+    metaTitle: 'Pay your invoice',
+    payTo: 'Payment to',
+    amountDue: 'Amount due',
+    invoice: 'Invoice',
+    company: 'Name',
+    issueDate: 'Issued',
+    dueDate: 'Due',
+    settledTitle: 'This invoice has been paid.',
+    settledBody: 'Thank you.',
+    recordingTitle: 'Your payment is being recorded.',
+    recordingBody: 'Confirmation takes a few seconds. You can close this page.',
+    secure: 'Secure card payment. lefta.app does not store card details.',
+    noOnlinePayment:
+      'Online payment is not available at the moment. Please contact the issuer to settle this invoice.',
+    notPayable: 'This invoice is not available for online payment. Please contact the issuer.',
+    footerBefore: 'This page is provided by the',
+    footerAfter: (creditor: string) =>
+      `platform on behalf of ${creditor}. For questions about the invoice itself, please contact the issuer directly.`,
+    payNow: 'Pay now',
+    redirecting: 'Redirecting…',
+    startFailed: 'The payment could not be started. Please try again.',
+    alreadyPaid: 'This invoice has already been paid.',
+    notPayableNow: 'This invoice is no longer payable.',
+    providerMissing: 'The issuer is not accepting online payments at the moment.',
+    paidClaim: 'I have already paid',
+    dispute: 'Something is wrong with this invoice',
+    close: 'Close',
+    reportSent: 'Your message has been recorded. The issuer has been notified.',
+    writeHere: 'Write here…',
+    yourMessage: 'Your message',
+    send: 'Send',
+    howAndWhen: 'How and when did you pay?',
+    whatIsWrong: 'What does not add up?',
+    paidOn: 'Date of payment',
+    amount: 'Amount',
+    amountPlaceholder: 'e.g. 455.00',
+    referenceOptional: 'Reference or bank (optional)',
+    contactOptional: 'How to reach you with a reply (optional)',
+    submitFailed: 'That did not go through. Please try again.',
+    submitting: 'Sending…',
+    submit: 'Send',
+    greetPaid:
+      'Hello! I will record your payment for the issuer. Roughly when did you pay, and how — bank transfer, cash or card?',
+    greetDispute:
+      'Hello! I will record the problem for the issuer. What does not add up on this invoice?',
+    filed: 'Recorded — the issuer has been notified and will see it shortly. Thank you.',
+    alreadyFiled:
+      'Your statement is already on file and the issuer has been notified. Nothing further is needed.',
+    orderDescription: (label: string) => `Invoice ${label}`,
   },
 
   scenario: {

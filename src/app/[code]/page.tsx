@@ -2,15 +2,16 @@ import { notFound } from 'next/navigation';
 
 import { isPayCode } from '@/lib/pay-code';
 
-import { PayView } from '../pay/pay-view';
+import { PayView, payMetadata } from '../pay/pay-view';
 
-export const metadata = {
-  title: 'Εξόφληση παραστατικού',
-  // This page names a debtor and what they owe. Indexed, it would publish a
-  // private debt to anyone searching that person's name — and `nocache` keeps
-  // it out of the cached copy a delisting would otherwise leave behind.
-  robots: { index: false, follow: false, nocache: true },
-};
+// Code-shaped or not, the title is resolved the same way — but a mistyped URL
+// must not reach the database, so the shape is checked here as well as in the
+// page below.
+export async function generateMetadata({ params }: { params: Promise<{ code: string }> }) {
+  const { code } = await params;
+  return payMetadata(isPayCode(code) ? code : '');
+}
+
 export const dynamic = 'force-dynamic';
 
 /**

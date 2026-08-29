@@ -3,6 +3,8 @@ import type Stripe from 'stripe';
 import { z } from 'zod';
 
 import { appUrl } from '@/lib/env';
+import { dictionaryFor } from '@/lib/i18n';
+import { resolveDebtorLocale, tenantLocale } from '@/lib/i18n/message-locale';
 import { channelFromTag, recordFunnelEvent } from '@/lib/funnel/events';
 import { PAY_CODE_LENGTH, payCredentialColumn, payPath } from '@/lib/pay-code';
 import {
@@ -59,16 +61,32 @@ export async function POST(request: Request) {
   if (!invoice) return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
 
   if (invoice.status === 'paid') {
-    return NextResponse.json({ error: 'This invoice has already been paid.' }, { status: 409 });
+    return NextResponse.json({ error: 'already_paid' }, { status: 409 });
   }
   if (invoice.status !== 'pending') {
-    return NextResponse.json({ error: 'This invoice is no longer payable.' }, { status: 409 });
+    return NextResponse.json({ error: 'not_payable' }, { status: 409 });
   }
 
   const [{ data: debtor }, { data: creditor }] = await Promise.all([
-    admin.from('debtors').select('email, name').eq('id', invoice.debtor_id).maybeSingle(),
-    admin.from('users').select(PAYMENT_COLUMNS).eq('id', invoice.user_id).maybeSingle(),
+    admin
+      .from('debtors')
+      .select('email, name, locale, phone')
+      .eq('id', invoice.debtor_id)
+      .maybeSingle(),
+    admin
+      .from('users')
+      .select(`${PAYMENT_COLUMNS}, locale`)
+      .eq('id', invoice.user_id)
+      .maybeSingle(),
   ]);
+
+  // What the debtor reads on the provider's checkout, and afterwards on their
+  // card statement: their own language, resolved the same way the reminder that
+  // brought them here was.
+  const creditorLocale = tenantLocale({ locale: creditor?.locale ?? null });
+  const t = dictionaryFor(
+    debtor ? resolveDebtorLocale(debtor, creditorLocale) : creditorLocale,
+  ).pay;
 
   // Whatever the arrangement, the money lands on the creditor's own account and
   // nothing settles to lefta. Without one there is nobody to pay — and lefta
@@ -77,7 +95,7 @@ export async function POST(request: Request) {
 
   if (!provider) {
     return NextResponse.json(
-      { error: 'Ο εκδότης δεν δέχεται προς το παρόν ηλεκτρονικές πληρωμές.' },
+      { error: 'provider_missing' },
       { status: 409 },
     );
   }
@@ -90,7 +108,7 @@ export async function POST(request: Request) {
   if (provider === 'revolut') {
     const credentials = revolutCredentialsFor(creditor!);
     if (!credentials) {
-      return NextResponse.json({ error: 'Revolut is not configured.' }, { status: 409 });
+      return NextResponse.json({ error: 'provider_missing' }, { status: 409 });
     }
 
     let order;
@@ -98,7 +116,7 @@ export async function POST(request: Request) {
       order = await createRevolutOrder(credentials, {
         amountCents: invoice.amount_cents,
         currency: invoice.currency,
-        description: `Παραστατικό ${label}`,
+        description: t.orderDescription(label),
         // Ours, and the whole binding: the return route settles only an order
         // whose reference names this invoice.
         reference: invoice.id,
@@ -110,7 +128,7 @@ export async function POST(request: Request) {
     } catch (cause) {
       console.error('[pay:start] Revolut refused the order', String(cause));
       return NextResponse.json(
-        { error: 'Δεν ήταν δυνατή η έναρξη της πληρωμής. Δοκιμάστε ξανά.' },
+        { error: 'start_failed' },
         { status: 502 },
       );
     }
@@ -118,7 +136,7 @@ export async function POST(request: Request) {
     if (!order.checkoutUrl) {
       console.error('[pay:start] Revolut order without a checkout url', order.id);
       return NextResponse.json(
-        { error: 'Δεν ήταν δυνατή η έναρξη της πληρωμής. Δοκιμάστε ξανά.' },
+        { error: 'start_failed' },
         { status: 502 },
       );
     }
@@ -137,7 +155,7 @@ export async function POST(request: Request) {
     if (recordError) {
       console.error('[pay:start] revolut_orders write failed', recordError.message);
       return NextResponse.json(
-        { error: 'Δεν ήταν δυνατή η έναρξη της πληρωμής. Δοκιμάστε ξανά.' },
+        { error: 'start_failed' },
         { status: 502 },
       );
     }
@@ -159,21 +177,21 @@ export async function POST(request: Request) {
     // as face-value euros and then marked fully paid. Refuse instead.
     if (invoice.currency.toUpperCase() !== 'EUR') {
       return NextResponse.json(
-        { error: 'Ο εκδότης δεν δέχεται προς το παρόν ηλεκτρονικές πληρωμές.' },
+        { error: 'provider_missing' },
         { status: 409 },
       );
     }
 
     const credentials = vivaCredentialsFor(creditor!);
     if (!credentials) {
-      return NextResponse.json({ error: 'Viva is not configured.' }, { status: 409 });
+      return NextResponse.json({ error: 'provider_missing' }, { status: 409 });
     }
 
     let orderCode: string;
     try {
       orderCode = await createOrder(credentials, {
         amountCents: invoice.amount_cents,
-        customerTrns: `Παραστατικό ${label}`,
+        customerTrns: t.orderDescription(label),
         customerEmail: debtor?.email ?? null,
         merchantTrns: `lefta ${label}`,
       });
@@ -182,7 +200,7 @@ export async function POST(request: Request) {
       // first press — as a message the debtor can act on, not a bare 500.
       console.error('[pay:start] Viva refused the order', String(cause));
       return NextResponse.json(
-        { error: 'Δεν ήταν δυνατή η έναρξη της πληρωμής. Δοκιμάστε ξανά.' },
+        { error: 'start_failed' },
         { status: 502 },
       );
     }
@@ -211,7 +229,7 @@ export async function POST(request: Request) {
     // and nothing would ever settle — so they must not be sent there.
     if (recordError && pointerError) {
       return NextResponse.json(
-        { error: 'Δεν ήταν δυνατή η έναρξη της πληρωμής. Δοκιμάστε ξανά.' },
+        { error: 'start_failed' },
         { status: 502 },
       );
     }
@@ -230,7 +248,7 @@ export async function POST(request: Request) {
   const payments = paymentsFor(creditor!);
   if (payments.kind === 'none') {
     return NextResponse.json(
-      { error: 'Ο εκδότης δεν δέχεται προς το παρόν ηλεκτρονικές πληρωμές.' },
+      { error: 'provider_missing' },
       { status: 409 },
     );
   }
@@ -246,7 +264,7 @@ export async function POST(request: Request) {
         price_data: {
           currency: invoice.currency.toLowerCase(),
           unit_amount: invoice.amount_cents,
-          product_data: { name: `Παραστατικό ${label}` },
+          product_data: { name: t.orderDescription(label) },
         },
       },
     ],
@@ -276,7 +294,7 @@ export async function POST(request: Request) {
     // they can retry on rather than a bare 500.
     console.error('[pay:start] Stripe refused the session', String(cause));
     return NextResponse.json(
-      { error: 'Δεν ήταν δυνατή η έναρξη της πληρωμής. Δοκιμάστε ξανά.' },
+      { error: 'start_failed' },
       { status: 502 },
     );
   }
