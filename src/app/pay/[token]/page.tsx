@@ -1,12 +1,9 @@
-import { PayView } from '../pay-view';
+import { PayView, payMetadata } from '../pay-view';
 
-export const metadata = {
-  title: 'Εξόφληση παραστατικού',
-  // This page names a debtor and what they owe. Indexed, it would publish a
-  // private debt to anyone searching that person's name — and `nocache` keeps
-  // it out of the cached copy a delisting would otherwise leave behind.
-  robots: { index: false, follow: false, nocache: true },
-};
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }) {
+  return payMetadata((await params).token);
+}
+
 export const dynamic = 'force-dynamic';
 
 /**

@@ -1,13 +1,16 @@
 import { NextResponse } from 'next/server';
 
+import { dictionaryFor } from '@/lib/i18n';
+import { resolveDebtorLocale, tenantLocale } from '@/lib/i18n/message-locale';
 import { payCredentialColumn } from '@/lib/pay-code';
 import {
   chatConfigured,
   chatTurn,
+  closingFor,
   closingTurn,
-  FALLBACK_CLOSING,
   greetingFor,
   type ChatInvoice,
+  type ChatLocales,
 } from '@/lib/reports/chat';
 import { fileReport, type ReportTarget } from '@/lib/reports/submit';
 import {
@@ -21,10 +24,6 @@ import { createAdminClient } from '@/lib/supabase/admin';
 export const runtime = 'nodejs';
 // Two model calls on the filing turn; comfortably inside this, never inside 10s.
 export const maxDuration = 60;
-
-/** What the visitor already had filled in when the chat could not run. */
-const ALREADY_OPEN_REPLY =
-  'Η δήλωσή σας είναι ήδη καταχωρημένη και ο εκδότης έχει ενημερωθεί. Δεν χρειάζεται κάτι άλλο.';
 
 /**
  * The "I already paid / something is wrong" endpoint of the payment page.
@@ -66,8 +65,12 @@ export async function POST(request: Request) {
   }
 
   const [{ data: debtor }, { data: creditor }, { data: existing }] = await Promise.all([
-    admin.from('debtors').select('name').eq('id', invoice.debtor_id).maybeSingle(),
-    admin.from('users').select('company_name, email').eq('id', invoice.user_id).maybeSingle(),
+    admin.from('debtors').select('name, locale, phone').eq('id', invoice.debtor_id).maybeSingle(),
+    admin
+      .from('users')
+      .select('company_name, email, locale')
+      .eq('id', invoice.user_id)
+      .maybeSingle(),
     admin
       .from('invoice_reports')
       .select('id')
@@ -77,9 +80,20 @@ export async function POST(request: Request) {
       .maybeSingle(),
   ]);
 
+  // The languages this exchange runs in: the visitor is answered in the one
+  // their reminder was written in, the creditor reads the filed summary in
+  // their own. Resolved here rather than in the chat module so the plain form,
+  // the canned greeting and the model all agree on them.
+  const writer = tenantLocale({ locale: creditor?.locale ?? null });
+  const locales: ChatLocales = {
+    reader: debtor ? resolveDebtorLocale(debtor, writer) : writer,
+    writer,
+  };
+  const t = dictionaryFor(locales.reader).pay;
+
   // Their statement is already on file — that is success, said plainly, and it
   // also means the anonymous endpoint cannot be farmed for rows or model calls.
-  if (existing) return NextResponse.json({ done: true, reply: ALREADY_OPEN_REPLY });
+  if (existing) return NextResponse.json({ done: true, reply: t.alreadyFiled });
 
   const label =
     [invoice.series, invoice.invoice_number].filter(Boolean).join(' ') || invoice.mark || '—';
@@ -114,13 +128,13 @@ export async function POST(request: Request) {
     if (outcome === 'failed') {
       return NextResponse.json({ error: 'Could not record the report.' }, { status: 500 });
     }
-    return NextResponse.json({ done: true, reply: FALLBACK_CLOSING });
+    return NextResponse.json({ done: true, reply: closingFor(locales.reader) });
   }
 
   // Opening the panel: a canned greeting, instant and free of model calls.
   if (messages.length === 0) {
     return NextResponse.json(
-      chatConfigured() ? { reply: greetingFor(kind) } : { mode: 'form' },
+      chatConfigured() ? { reply: greetingFor(kind, locales.reader) } : { mode: 'form' },
     );
   }
 
@@ -137,7 +151,7 @@ export async function POST(request: Request) {
   };
 
   try {
-    const turn = await chatTurn(kind, chatInvoice, messages);
+    const turn = await chatTurn(kind, chatInvoice, messages, locales);
 
     if (!turn.submitted) return NextResponse.json({ reply: turn.reply });
 
@@ -158,10 +172,10 @@ export async function POST(request: Request) {
 
     if (outcome === 'failed') return NextResponse.json({ mode: 'form' });
     if (outcome === 'already_open') {
-      return NextResponse.json({ done: true, reply: ALREADY_OPEN_REPLY });
+      return NextResponse.json({ done: true, reply: t.alreadyFiled });
     }
 
-    const closing = await closingTurn(kind, chatInvoice, messages, turn.assistantContent);
+    const closing = await closingTurn(kind, chatInvoice, messages, turn.assistantContent, locales);
     return NextResponse.json({ done: true, reply: closing });
   } catch (cause) {
     // Any model failure degrades to the form. The feature's availability must

@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import type { PayCopy } from './copy';
+
 /**
  * The two quiet exits from the payment page.
  *
@@ -15,22 +17,20 @@ import { useEffect, useRef, useState } from 'react';
  *
  * The panel is a chat when the server offers one and a plain form when it does
  * not (no model configured, or a call failed) — the server decides, this
- * component follows. Greek hardcoded, like every other string on this page.
+ * component follows. Every word comes from `t`, resolved on the server to the
+ * language the reminder that linked here was written in.
  */
 
 type Kind = 'paid_claim' | 'dispute';
 type Msg = { role: 'user' | 'assistant'; content: string };
 type Phase = 'chat' | 'form' | 'done' | 'failed';
 
-const TITLES: Record<Kind, string> = {
-  paid_claim: 'Έχω ήδη πληρώσει',
-  dispute: 'Υπάρχει πρόβλημα με το παραστατικό',
-};
+const titleFor = (t: PayCopy, kind: Kind) => (kind === 'paid_claim' ? t.paidClaim : t.dispute);
 
 const linkClass =
   'text-ink-500 underline decoration-ink-300 underline-offset-2 transition hover:text-ink-800';
 
-export function ReportLinks({ token }: { token: string }) {
+export function ReportLinks({ token, t }: { token: string; t: PayCopy }) {
   const [kind, setKind] = useState<Kind | null>(null);
 
   return (
@@ -45,7 +45,7 @@ export function ReportLinks({ token }: { token: string }) {
             onClick={() => setKind('paid_claim')}
             className={`inline-flex min-h-11 items-center px-2 ${linkClass}`}
           >
-            {TITLES.paid_claim}
+            {t.paidClaim}
           </button>
           <span aria-hidden className="hidden text-ink-300 sm:inline">
             ·
@@ -55,11 +55,11 @@ export function ReportLinks({ token }: { token: string }) {
             onClick={() => setKind('dispute')}
             className={`inline-flex min-h-11 items-center px-2 ${linkClass}`}
           >
-            {TITLES.dispute}
+            {t.dispute}
           </button>
         </div>
       ) : (
-        <ReportPanel token={token} kind={kind} onClose={() => setKind(null)} />
+        <ReportPanel token={token} kind={kind} t={t} onClose={() => setKind(null)} />
       )}
     </div>
   );
@@ -68,10 +68,12 @@ export function ReportLinks({ token }: { token: string }) {
 function ReportPanel({
   token,
   kind,
+  t,
   onClose,
 }: {
   token: string;
   kind: Kind;
+  t: PayCopy;
   onClose: () => void;
 }) {
   const [phase, setPhase] = useState<Phase>('chat');
@@ -151,11 +153,11 @@ function ReportPanel({
   return (
     <div className="rounded-xl border border-ink-200 bg-white p-4 text-left">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium text-ink-900">{TITLES[kind]}</p>
+        <p className="text-sm font-medium text-ink-900">{titleFor(t, kind)}</p>
         <button
           type="button"
           onClick={onClose}
-          aria-label="Κλείσιμο"
+          aria-label={t.close}
           className="-mr-2 inline-flex h-11 w-11 items-center justify-center text-ink-400 transition hover:text-ink-700"
         >
           ✕
@@ -163,7 +165,7 @@ function ReportPanel({
       </div>
 
       {phase === 'form' ? (
-        <ReportForm token={token} kind={kind} onDone={() => setPhase('done')} />
+        <ReportForm token={token} kind={kind} t={t} onDone={() => setPhase('done')} />
       ) : (
         <>
           <div ref={scroller} className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
@@ -184,7 +186,7 @@ function ReportPanel({
 
           {phase === 'done' ? (
             <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-center text-xs text-emerald-800">
-              Η δήλωσή σας καταχωρήθηκε και ο εκδότης ενημερώθηκε.
+              {t.reportSent}
             </p>
           ) : (
             <form
@@ -194,21 +196,23 @@ function ReportPanel({
                 void send();
               }}
             >
+              {/* 16px on a phone, or iOS zooms the whole page in on focus and
+                  the visitor has to pinch back out to read their own answer. */}
               <input
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 maxLength={1200}
                 autoFocus
-                placeholder="Γράψτε εδώ…"
-                aria-label="Το μήνυμά σας"
-                className="min-w-0 flex-1 rounded-lg border border-ink-300 px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                placeholder={t.writeHere}
+                aria-label={t.yourMessage}
+                className="min-w-0 flex-1 rounded-lg border border-ink-300 px-3 py-2 text-base outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:text-sm"
               />
               <button
                 type="submit"
                 disabled={busy || !draft.trim()}
                 className="rounded-lg bg-ink-900 px-3.5 py-2 text-sm font-medium text-white transition enabled:hover:bg-ink-700 disabled:opacity-40"
               >
-                Αποστολή
+                {t.send}
               </button>
             </form>
           )}
@@ -226,10 +230,12 @@ function ReportPanel({
 function ReportForm({
   token,
   kind,
+  t,
   onDone,
 }: {
   token: string;
   kind: Kind;
+  t: PayCopy;
   onDone: () => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -270,13 +276,13 @@ function ReportForm({
   return (
     <form onSubmit={submit} className="mt-3 space-y-3">
       <label className="block text-xs text-ink-500">
-        {kind === 'paid_claim' ? 'Πώς και πότε πληρώσατε;' : 'Τι δεν συμφωνεί;'}
+        {kind === 'paid_claim' ? t.howAndWhen : t.whatIsWrong}
         <textarea
           name="message"
           required
           rows={3}
           maxLength={2000}
-          className="mt-1 w-full rounded-lg border border-ink-300 px-3 py-2 text-sm text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+          className="mt-1 w-full rounded-lg border border-ink-300 px-3 py-2 text-base text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:text-sm"
         />
       </label>
 
@@ -285,7 +291,7 @@ function ReportForm({
       {kind === 'paid_claim' ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block text-xs text-ink-500">
-            Ημερομηνία πληρωμής
+            {t.paidOn}
             <input
               type="date"
               name="paid_on"
@@ -293,16 +299,18 @@ function ReportForm({
             />
           </label>
           <label className="block text-xs text-ink-500">
-            Ποσό
+            {t.amount}
             <input
               name="amount"
               inputMode="decimal"
-              placeholder="π.χ. 455,00"
+              placeholder={t.amountPlaceholder}
               className="mt-1 min-h-11 w-full rounded-lg border border-ink-300 px-3 py-2 text-base outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:min-h-0 sm:text-sm"
             />
           </label>
-          <label className="col-span-2 block text-xs text-ink-500">
-            Αιτιολογία ή τράπεζα (προαιρετικά)
+          {/* `col-span-2` in a one-column grid spanned a column that is not
+              there, and the field went missing on a phone. */}
+          <label className="block text-xs text-ink-500 sm:col-span-2">
+            {t.referenceOptional}
             <input
               name="reference"
               maxLength={200}
@@ -312,7 +320,7 @@ function ReportForm({
         </div>
       ) : (
         <label className="block text-xs text-ink-500">
-          Τρόπος επικοινωνίας για την απάντηση (προαιρετικά)
+          {t.contactOptional}
           <input
             name="contact"
             maxLength={200}
@@ -322,17 +330,15 @@ function ReportForm({
       )}
 
       {failed ? (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
-          Η καταχώρηση δεν ολοκληρώθηκε. Δοκιμάστε ξανά.
-        </p>
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{t.submitFailed}</p>
       ) : null}
 
       <button
         type="submit"
         disabled={busy}
-        className="w-full rounded-lg bg-ink-900 px-3.5 py-2 text-sm font-medium text-white transition enabled:hover:bg-ink-700 disabled:opacity-40"
+        className="min-h-11 w-full rounded-lg bg-ink-900 px-3.5 py-2 text-sm font-medium text-white transition enabled:hover:bg-ink-700 disabled:opacity-40"
       >
-        {busy ? 'Καταχώρηση…' : 'Καταχώρηση'}
+        {busy ? t.submitting : t.submit}
       </button>
     </form>
   );

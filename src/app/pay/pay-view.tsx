@@ -1,10 +1,13 @@
 import { notFound } from 'next/navigation';
 
 import { LeftaLogo, LeftaWordmark } from '@/components/logo';
+import { dictionaryFor, type Dictionary } from '@/lib/i18n';
+import { resolveDebtorLocale, tenantLocale } from '@/lib/i18n/message-locale';
 import { formatDate, formatMoney } from '@/lib/money';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 import { FunnelBeacon } from './beacon';
+import { clientCopy } from './copy';
 import { PayButton } from './pay-button';
 import { ReportLinks } from './report-links';
 
@@ -36,6 +39,16 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
   // the demand is based on. The URL expires; the bucket stays private.
   const documentUrl = await payableDocumentUrl(invoice.invoice_id);
 
+  // The language the reminder was written in, resolved the same way, so the
+  // message and the page it links to speak to the customer alike. An English
+  // reminder landing on a Greek-only page was the one place in the product
+  // where the language setting stopped short of the person it is for.
+  const t = (await payLocale(invoice.invoice_id)).pay;
+
+  // Strings only past this line. The block holds two templates, and a function
+  // handed to a client component is a 500 after the page has already rendered.
+  const copy = clientCopy(t);
+
   const settled = invoice.status === 'paid';
   const payable = invoice.status === 'pending';
 
@@ -50,7 +63,7 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
           <LeftaLogo />
         </div>
         <p className="mt-3 text-center text-sm text-ink-500">
-          Εξόφληση προς <span className="font-medium text-ink-800">{invoice.creditor_name}</span>
+          {t.payTo} <span className="font-medium text-ink-800">{invoice.creditor_name}</span>
         </p>
 
         <div className="mt-4 overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-lg shadow-ink-900/5">
@@ -60,7 +73,7 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
 
           <div className="border-b border-ink-200 px-6 pb-6 pt-7 text-center">
             <p className="text-xs font-medium uppercase tracking-wide text-ink-500">
-              Οφειλόμενο ποσό
+              {t.amountDue}
             </p>
             <p className="mt-2 text-5xl font-semibold leading-none tracking-tight text-ink-900">
               {formatMoney(invoice.amount_cents, invoice.currency)}
@@ -69,13 +82,13 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
 
           <dl className="divide-y divide-ink-100 text-sm">
             <Row
-              label="Παραστατικό"
+              label={t.invoice}
               value={invoice.invoice_number ?? '—'}
               href={invoice.invoice_number ? (documentUrl ?? undefined) : undefined}
             />
-            <Row label="Επωνυμία" value={invoice.debtor_name} />
-            <Row label="Ημ. έκδοσης" value={formatDate(invoice.issue_date)} />
-            <Row label="Ημ. λήξης" value={formatDate(invoice.due_date)} />
+            <Row label={t.company} value={invoice.debtor_name} />
+            <Row label={t.issueDate} value={formatDate(invoice.issue_date)} />
+            <Row label={t.dueDate} value={formatDate(invoice.due_date)} />
           </dl>
 
           <div className="border-t border-ink-200 bg-ink-50/50 px-6 py-6">
@@ -84,30 +97,27 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
                 <CheckIcon />
                 {settled ? (
                   <>
-                    <p className="mt-2 font-medium">Το παραστατικό έχει εξοφληθεί.</p>
-                    <p className="mt-1 text-xs">Ευχαριστούμε.</p>
+                    <p className="mt-2 font-medium">{t.settledTitle}</p>
+                    <p className="mt-1 text-xs">{t.settledBody}</p>
                   </>
                 ) : (
                   <>
-                    <p className="mt-2 font-medium">Η πληρωμή σας καταχωρείται.</p>
-                    <p className="mt-1 text-xs">
-                      Η επιβεβαίωση ολοκληρώνεται σε λίγα δευτερόλεπτα. Μπορείτε να κλείσετε αυτή τη
-                      σελίδα.
-                    </p>
+                    <p className="mt-2 font-medium">{t.recordingTitle}</p>
+                    <p className="mt-1 text-xs">{t.recordingBody}</p>
                   </>
                 )}
               </div>
             ) : payable && invoice.payments_enabled ? (
               <>
-                <PayButton token={credential} />
+                <PayButton token={credential} t={copy} />
                 <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-ink-500">
                   <LockIcon />
-                  Ασφαλής πληρωμή με κάρτα. Το lefta.app δεν αποθηκεύει στοιχεία κάρτας.
+                  {t.secure}
                 </p>
                 {/* The exits for whoever is NOT paying right now: already paid
                     by transfer, or the document is wrong. Both used to be dead
                     ends that earned the visitor another reminder. */}
-                <ReportLinks token={credential} />
+                <ReportLinks token={credential} t={copy} />
               </>
             ) : payable ? (
               // The creditor has neither a connected account nor their own key.
@@ -117,29 +127,97 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
               // transfer" is the page's most likely true story.
               <>
                 <div className="rounded-xl bg-ink-100 px-4 py-3 text-center text-sm text-ink-600">
-                  Η ηλεκτρονική πληρωμή δεν είναι προς το παρόν διαθέσιμη. Επικοινωνήστε με τον
-                  εκδότη για την εξόφληση.
+                  {t.noOnlinePayment}
                 </div>
-                <ReportLinks token={credential} />
+                <ReportLinks token={credential} t={copy} />
               </>
             ) : (
               <div className="rounded-xl bg-ink-100 px-4 py-3 text-center text-sm text-ink-600">
-                Το παραστατικό δεν είναι διαθέσιμο για ηλεκτρονική πληρωμή. Επικοινωνήστε με τον
-                εκδότη.
+                {t.notPayable}
               </div>
             )}
           </div>
         </div>
 
         <p className="mt-6 text-center text-xs leading-relaxed text-ink-500">
-          Η σελίδα παρέχεται από την πλατφόρμα{' '}
+          {t.footerBefore}{' '}
           <LeftaWordmark className="text-ink-700" />{' '}
-          για λογαριασμό της {invoice.creditor_name}. Για ερωτήματα σχετικά με το παραστατικό,
-          απευθυνθείτε απευθείας στον εκδότη.
+          {t.footerAfter(invoice.creditor_name)}
         </p>
       </div>
     </main>
   );
+}
+
+/** Greek, because that is the market the product sells into. */
+const DEFAULT_PAY_LOCALE = 'el' as const;
+
+/**
+ * The dictionary this page should speak in.
+ *
+ * The customer's own language where they have one, otherwise whatever their
+ * phone number implies, otherwise the creditor's — the same three steps, in the
+ * same order, that decide the language of the reminder. Falls back rather than
+ * failing: a page that cannot be read is bad, and a page that 500s is worse.
+ */
+export async function payLocale(invoiceId: string): Promise<Dictionary> {
+  const admin = createAdminClient();
+
+  try {
+    const { data: row } = await admin
+      .from('invoices')
+      .select('debtor_id, user_id')
+      .eq('id', invoiceId)
+      .maybeSingle();
+
+    if (!row) return dictionaryFor(DEFAULT_PAY_LOCALE);
+
+    const [{ data: debtor }, { data: tenant }] = await Promise.all([
+      admin.from('debtors').select('locale, phone').eq('id', row.debtor_id).maybeSingle(),
+      admin.from('users').select('locale').eq('id', row.user_id).maybeSingle(),
+    ]);
+
+    const creditorLocale = tenantLocale({ locale: tenant?.locale ?? null });
+
+    return dictionaryFor(
+      debtor ? resolveDebtorLocale(debtor, creditorLocale) : creditorLocale,
+    );
+  } catch {
+    return dictionaryFor(DEFAULT_PAY_LOCALE);
+  }
+}
+
+/**
+ * The metadata for both entry points.
+ *
+ * `generateMetadata` runs before the body and holds only the credential, so the
+ * invoice is resolved once more here. Two small reads on a page a debtor opens
+ * from an email is a fair price for a tab title they can read — and a failure
+ * falls back to the default rather than taking the page down with it.
+ */
+export async function payMetadata(credential: string) {
+  return {
+    title: (await payCopyFor(credential)).metaTitle,
+    // This page names a debtor and what they owe. Indexed, it would publish a
+    // private debt to anyone searching that person's name — and `nocache` keeps
+    // it out of the cached copy a delisting would otherwise leave behind.
+    robots: { index: false, follow: false, nocache: true },
+  };
+}
+
+async function payCopyFor(credential: string) {
+  try {
+    const { data } = await createAdminClient().rpc('get_invoice_for_payment', {
+      p_token: credential,
+    });
+
+    const invoiceId = data?.[0]?.invoice_id;
+    if (!invoiceId) return dictionaryFor(DEFAULT_PAY_LOCALE).pay;
+
+    return (await payLocale(invoiceId)).pay;
+  } catch {
+    return dictionaryFor(DEFAULT_PAY_LOCALE).pay;
+  }
 }
 
 function Row({ label, value, href }: { label: string; value: string; href?: string }) {
