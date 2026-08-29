@@ -7,6 +7,7 @@ import { formatDate, formatMoney } from '@/lib/money';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 import { FunnelBeacon } from './beacon';
+import { clientCopy } from './copy';
 import { PayButton } from './pay-button';
 import { ReportLinks } from './report-links';
 
@@ -43,6 +44,10 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
   // reminder landing on a Greek-only page was the one place in the product
   // where the language setting stopped short of the person it is for.
   const t = (await payLocale(invoice.invoice_id)).pay;
+
+  // Strings only past this line. The block holds two templates, and a function
+  // handed to a client component is a 500 after the page has already rendered.
+  const copy = clientCopy(t);
 
   const settled = invoice.status === 'paid';
   const payable = invoice.status === 'pending';
@@ -104,7 +109,7 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
               </div>
             ) : payable && invoice.payments_enabled ? (
               <>
-                <PayButton token={credential} t={t} />
+                <PayButton token={credential} t={copy} />
                 <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-ink-500">
                   <LockIcon />
                   {t.secure}
@@ -112,7 +117,7 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
                 {/* The exits for whoever is NOT paying right now: already paid
                     by transfer, or the document is wrong. Both used to be dead
                     ends that earned the visitor another reminder. */}
-                <ReportLinks token={credential} t={t} />
+                <ReportLinks token={credential} t={copy} />
               </>
             ) : payable ? (
               // The creditor has neither a connected account nor their own key.
@@ -124,7 +129,7 @@ export async function PayView({ credential, paid }: { credential: string; paid: 
                 <div className="rounded-xl bg-ink-100 px-4 py-3 text-center text-sm text-ink-600">
                   {t.noOnlinePayment}
                 </div>
-                <ReportLinks token={credential} t={t} />
+                <ReportLinks token={credential} t={copy} />
               </>
             ) : (
               <div className="rounded-xl bg-ink-100 px-4 py-3 text-center text-sm text-ink-600">
