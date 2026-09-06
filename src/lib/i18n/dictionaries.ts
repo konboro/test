@@ -401,8 +401,6 @@ const el = {
     repeatEnabled: 'Επανάληψη μέχρι να εξοφληθεί',
     sendHour: 'Ώρα αποστολής',
     sendHourHint: 'Τοπική ώρα της ζώνης της εταιρείας σας. Οι αυτόματες υπενθυμίσεις φεύγουν σε αυτήν την ώρα.',
-    sendHourInactive:
-      'Η ώρα αποθηκεύεται, αλλά τηρείται μόνο όταν η σάρωση τρέχει ωριαία. Μέχρι τότε οι υπενθυμίσεις φεύγουν στην ημερήσια εκτέλεση.',
     onIssueTitle: 'Κατά την έκδοση',
     onIssueEnabled: 'Ειδοποίηση μόλις εκδοθεί το παραστατικό',
     onIssueHint:
@@ -1883,8 +1881,6 @@ const en: typeof el = {
     repeatEnabled: 'Repeat until it is paid',
     sendHour: 'Sending hour',
     sendHourHint: 'Local time in your company timezone. Automatic reminders go out at this hour.',
-    sendHourInactive:
-      'The hour is saved, but only kept once the sweep runs hourly. Until then reminders go out on the daily run.',
     onIssueTitle: 'When the invoice is raised',
     onIssueEnabled: 'Tell the customer as soon as the invoice is confirmed',
     onIssueHint:

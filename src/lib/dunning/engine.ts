@@ -1,4 +1,3 @@
-import { hourlySweep } from '@/lib/limits';
 import { daysBetween, zonedDate, zonedHour } from '@/lib/money';
 import { channelAvailable, providerStatus, type Channel, type ProviderStatus } from '@/lib/providers';
 import { normalisePhone } from '@/lib/sms/send';
@@ -13,6 +12,7 @@ import {
   rungFor,
   scenarioWithOverrides,
   type Scenario,
+  sendWindowOpen,
 } from './scenario';
 import { sweepIssueNotices } from './issue-notice';
 import { isSnoozed } from './snooze';
@@ -239,20 +239,17 @@ async function processTenant(
   // and this only catches what did not.
   if (!dryRun) result.issueNoticesSent += await sweepIssueNotices(tenant.id);
 
-  // Honoured only where the sweep actually runs more than once a day.
+  // Nothing leaves before the hour the tenant chose.
   //
-  // Vercel's Hobby plan permits one cron firing per day — confirmed by the
-  // platform refusing an hourly schedule outright — so with a single daily
-  // firing this check would sweep only the tenants whose chosen hour happened to
-  // match it and quietly strand everyone else. Off by default therefore means
-  // exactly today's behaviour.
+  // Read in their own timezone, never UTC: a fixed UTC schedule lands an hour
+  // later in summer than in winter, and somebody who picked nine would be moved
+  // to ten twice a year without touching anything.
   //
-  // Set SWEEP_HOURLY once the route is called hourly, whether by a Pro cron or
-  // by an external scheduler pointed at it with the same secret. Read in
-  // Europe/Athens, not UTC: a fixed UTC schedule lands an hour later in summer
-  // than in winter, and a tenant who picked nine would be moved to ten without
-  // touching anything.
-  if (hourlySweep() && zonedHour(tenant.timezone) !== scenario.sendHour) return;
+  // This used to sit behind a SWEEP_HOURLY flag that was never set, so the hour
+  // was a control that saved a value and changed nothing. The flag is gone —
+  // a setting that only works once someone remembers an environment variable is
+  // a setting that does not work.
+  if (!sendWindowOpen(zonedHour(tenant.timezone), scenario.sendHour)) return;
 
   // AUTO-STOP is expressed here: only `pending` invoices are ever loaded. The
   // moment the Stripe webhook flips an invoice to `paid`, it leaves this set and

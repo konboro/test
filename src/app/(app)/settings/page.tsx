@@ -7,7 +7,7 @@ import { loadScenario } from '@/lib/dunning/engine';
 import { stepLabels } from '@/lib/dunning/status';
 import { defaultTemplateFor, EDITABLE_SLOTS, slotKey } from '@/lib/dunning/templates';
 import { getDictionary, getLocale, type Dictionary } from '@/lib/i18n';
-import { hourlySweep, smsCreditsEnforced } from '@/lib/limits';
+import { smsCreditsEnforced } from '@/lib/limits';
 import { requireOrganization } from '@/lib/orgs/active';
 import { paymentsAvailable } from '@/lib/providers';
 import { connectConfigured, SMS_PACKS } from '@/lib/stripe';
@@ -401,7 +401,7 @@ export default async function SettingsPage({
       <Card>
         <div id="scenario" className="scroll-mt-20">
           <CardHeader title={t.scenario.title} subtitle={t.scenario.hint} />
-          <ScenarioForm scenario={scenario} hourlySweepOn={hourlySweep()} />
+          <ScenarioForm scenario={scenario} />
         </div>
       </Card>
 

@@ -54,15 +54,3 @@ export function smsCreditsEnforced(): boolean {
   return optionalEnv('ENFORCE_SMS_CREDITS') === '1';
 }
 
-/**
- * Whether the dunning sweep is called more than once a day.
- *
- * The per-tenant sending hour can only be honoured if it is. Vercel's Hobby plan
- * allows a single daily cron firing, so this stays off until either the plan
- * changes or an external scheduler calls /api/cron/dunning hourly with the same
- * bearer secret. Off, the sweep behaves exactly as it did before the hour
- * existed.
- */
-export function hourlySweep(): boolean {
-  return process.env.SWEEP_HOURLY === '1';
-}

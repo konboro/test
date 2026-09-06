@@ -147,7 +147,6 @@ function StepCard({
  */
 export function ScenarioForm({
   scenario,
-  hourlySweepOn,
 }: {
   scenario: Scenario;
   /**
@@ -157,7 +156,6 @@ export function ScenarioForm({
    * moment hourly sending is switched on — but a control that quietly does
    * nothing today should say so rather than imply a precision it has not got.
    */
-  hourlySweepOn: boolean;
 }) {
   const t = useT();
   const [state, action] = useActionState<ScenarioState, FormData>(saveScenario, {});
@@ -251,11 +249,6 @@ export function ScenarioForm({
           </select>
         </Field>
 
-        {hourlySweepOn ? null : (
-          <p className="mt-2 text-xs leading-relaxed text-amber-700">
-            {t.scenario.sendHourInactive}
-          </p>
-        )}
       </div>
 
       <div className="rounded-xl border border-ink-200 p-4">

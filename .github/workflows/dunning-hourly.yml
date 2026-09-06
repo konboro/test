@@ -11,15 +11,22 @@
 # the once-per-invoice-per-step index makes a double firing a no-op rather than
 # a second message.
 #
-# Two things have to be set for this to do anything:
-#   * repository secret CRON_SECRET — the same value as the Vercel env var
-#   * SWEEP_HOURLY=1 in the Vercel environment, which is what makes the sweep
-#     read the hour at all. Without it every tenant is swept on every call.
+# One thing has to be set for this to do anything: the repository secret
+# CRON_SECRET, holding the same value as the Vercel environment variable. The
+# sweep reads the hour unconditionally now — it used to sit behind a second flag
+# that was never set, which made the setting a control that saved a value and
+# changed nothing.
 #
 # GitHub schedules on UTC and runs a scheduled job late under load, sometimes by
-# several minutes. That is fine here — the hour gate is compared in Athens time
-# and a run that arrives at 09:07 still lands in the nine o'clock hour — but it
-# is the reason the schedule is not on the hour exactly.
+# many minutes, and drops one outright now and then. The sweep is built for
+# that: a tenant's window opens at their hour and stays open for the rest of
+# their day, so a call that never arrives costs a late reminder rather than a
+# silent day with none. The unique index on (debtor_id, contact_on) is what
+# makes the extra calls free.
+#
+# GitHub also only schedules workflows that exist on the repository's DEFAULT
+# branch, and disables schedules on a repository with no activity for 60 days.
+# Both are silent. If reminders stop leaving at the chosen hour, look here first.
 
 name: dunning-hourly
 

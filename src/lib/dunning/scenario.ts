@@ -85,6 +85,25 @@ export const EXTRA_STEP_OFFSETS: Readonly<Record<string, number>> = {
 };
 
 /** What a tenant gets before they have touched anything. */
+/**
+ * Whether the tenant's sending hour has arrived, in their own day.
+ *
+ * At-or-after, deliberately, not equality. The sweep is called once an hour by
+ * a scheduler outside this system, and a scheduled call can arrive late or not
+ * at all. An equality gate turns one dropped call into a whole day with no
+ * reminders — silently, with a quiet inbox as the only symptom. At-or-after
+ * turns the same dropped call into a reminder that leaves an hour late, which
+ * nobody notices and everybody would choose.
+ *
+ * Firing repeatedly through the rest of the day is not the risk it looks like:
+ * `dunning_contacts` carries a unique index on (debtor_id, contact_on), so the
+ * second call of any day writes nothing whatever this function says. The gate
+ * decides when the first message may leave, not how many may.
+ */
+export function sendWindowOpen(localHour: number, sendHour: number): boolean {
+  return localHour >= sendHour;
+}
+
 export const DEFAULT_SCENARIO: Scenario = {
   // Email only. An SMS the moment an invoice is raised costs money to tell
   // somebody something they are not yet late for.
