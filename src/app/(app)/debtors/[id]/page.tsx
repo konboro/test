@@ -243,11 +243,20 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
                   <li key={invoice.id} className="px-4 py-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate font-medium text-ink-900">
+                        {/* The way through to the document itself. This list was
+                            a dead end: it said what was owed and what step the
+                            chasing had reached, and gave no way to act on either.
+                            Only the number is a link, not the whole row — the due
+                            date beside it is a button, and an anchor around a
+                            button is both invalid and unusable. */}
+                        <Link
+                          href={`/invoices/${invoice.id}`}
+                          className="block truncate font-medium text-ink-900 underline decoration-ink-300 underline-offset-2 hover:decoration-ink-900"
+                        >
                           {number ?? (
                             <span className="italic text-ink-400">{t.invoices.noNumber}</span>
                           )}
-                        </p>
+                        </Link>
                         <p className="tabular mt-0.5 truncate text-xs text-ink-500">
                           {invoice.mark ? (
                             <>
@@ -311,13 +320,14 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
                   return (
                     <tr key={invoice.id} className="border-b border-ink-100 last:border-0">
                       <td className="px-5 py-3">
-                        {number ? (
-                          <div className="font-medium text-ink-900">{number}</div>
-                        ) : (
-                          <div className="font-medium italic text-ink-400">
-                            {t.invoices.noNumber}
-                          </div>
-                        )}
+                        <Link
+                          href={`/invoices/${invoice.id}`}
+                          className="font-medium text-ink-900 underline decoration-ink-300 underline-offset-2 hover:decoration-ink-900"
+                        >
+                          {number ?? (
+                            <span className="italic text-ink-400">{t.invoices.noNumber}</span>
+                          )}
+                        </Link>
                         <div className="tabular mt-0.5 text-xs text-ink-500">
                           {invoice.mark ? (
                             <>

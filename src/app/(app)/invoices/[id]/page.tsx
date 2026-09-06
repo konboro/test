@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 
 import { MessageLog } from '@/components/message-log';
-import { Badge, Card, CardHeader, EmptyState, linkClass } from '@/components/ui';
+import { Badge, Card, CardHeader, EmptyState, linkClass, subtleLinkClass } from '@/components/ui';
 import { displayName } from '@/lib/debtors';
 import { loadScenario, stepForInvoice } from '@/lib/dunning/engine';
 import { stepLabels } from '@/lib/dunning/step-labels';
@@ -12,6 +12,9 @@ import { athensDate, formatDate, formatMoney } from '@/lib/money';
 import { requireOrganization } from '@/lib/orgs/active';
 import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
+
+import { markInvoicePaid } from '../actions';
+import { CopyPayLink, RemindButton } from '../invoice-forms';
 
 import { InvoiceScenarioForm } from './scenario-form';
 
@@ -125,6 +128,31 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             </a>
           ) : null}
         </div>
+
+        {/* The things a person came here to do.
+            This page could describe an invoice in full — what it is owed, where
+            the chasing had reached, every message already sent — and offered no
+            way to act on any of it. Everything had to be done from the list
+            instead, by finding the same row again. The controls are the ones the
+            list already carries, so a habit learned in one place works in the
+            other; chasing is gated on the invoice still being open, because
+            there is nothing to chase once it is settled. */}
+        {invoice.status === 'pending' ? (
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <RemindButton invoiceId={invoice.id} label={number || invoice.id.slice(0, 8)} />
+            <CopyPayLink code={invoice.short_code ?? invoice.pay_token} />
+            <form action={markInvoicePaid}>
+              <input type="hidden" name="id" value={invoice.id} />
+              <button
+                type="submit"
+                className={`inline-flex min-h-11 items-center text-sm sm:min-h-0 ${subtleLinkClass}`}
+                title={t.invoices.markPaidHint}
+              >
+                {t.invoices.markPaid}
+              </button>
+            </form>
+          </div>
+        ) : null}
       </div>
 
       <Card>
