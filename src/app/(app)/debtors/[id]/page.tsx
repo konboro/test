@@ -194,7 +194,7 @@ export default async function DebtorPage({ params }: { params: Promise<{ id: str
       </div>
 
       <Card>
-        <CardHeader title={t.debtors.title} />
+        <CardHeader title={t.debtors.contactTitle} />
         <dl className="grid gap-x-6 gap-y-3 px-5 py-4 sm:grid-cols-3">
           <Detail label={t.debtors.vat} value={debtor.vat_number} mono />
           <Detail label={t.debtors.emailLabel} value={debtor.email} />

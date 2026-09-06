@@ -1213,6 +1213,7 @@ const el = {
     noMessagesTitle: 'Δεν έχει σταλεί κανένα μήνυμα.',
     noMessagesBody: 'Ό,τι σταλεί σε αυτόν τον πελάτη — email ή SMS — θα εμφανίζεται εδώ.',
     invoicesTitle: 'Παραστατικά πελάτη',
+    contactTitle: 'Στοιχεία επικοινωνίας',
     noInvoicesTitle: 'Κανένα παραστατικό',
     noInvoicesBody: 'Δεν υπάρχει ακόμη παραστατικό για αυτόν τον πελάτη.',
     notFound: 'Ο πελάτης δεν βρέθηκε.',
@@ -1241,6 +1242,8 @@ const el = {
     overviewFailedHint: 'Προσπάθειες που δεν έφυγαν. Παραμένουν εδώ ως αρχείο.',
     overviewChannels: (email: number, sms: number) => `${email} email · ${sms} SMS`,
     overviewCapped: 'Εμφανίζονται τα πρώτα 5.000 μηνύματα της περιόδου.',
+    showMessage: 'Εμφάνιση μηνύματος',
+    hideMessage: 'Απόκρυψη μηνύματος',
   },
 
   upload: {
@@ -2677,6 +2680,7 @@ const en: typeof el = {
     noMessagesTitle: 'Nothing has been sent yet.',
     noMessagesBody: 'Everything sent to this customer — email or SMS — appears here.',
     invoicesTitle: 'Customer documents',
+    contactTitle: 'Contact details',
     noInvoicesTitle: 'No documents',
     noInvoicesBody: 'There is no document for this customer yet.',
     notFound: 'Customer not found.',
@@ -2705,6 +2709,8 @@ const en: typeof el = {
     overviewFailedHint: 'Attempts that did not leave. Kept here as the record.',
     overviewChannels: (email: number, sms: number) => `${email} email · ${sms} SMS`,
     overviewCapped: 'Showing the first 5,000 messages in the period.',
+    showMessage: 'Show message',
+    hideMessage: 'Hide message',
   },
 
   upload: {
