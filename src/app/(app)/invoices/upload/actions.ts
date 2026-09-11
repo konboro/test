@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 
 import { revalidatePath } from 'next/cache';
 
-import { getDictionary } from '@/lib/i18n';
+import { getDictionary, getLocale } from '@/lib/i18n';
 import { commitImport } from '@/lib/import/commit';
 import { parseAmountCents, type ImportRow } from '@/lib/import/parse';
 import { readInvoiceDocument } from '@/lib/invoice-scan/read';
@@ -16,7 +16,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { noticeOnIssue } from '@/lib/dunning/issue-notice';
 import { loadScenario } from '@/lib/dunning/engine';
+import { parseInvoiceMessages } from '@/lib/dunning/invoice-messages';
 import { invoiceScenarioProblem, parseInvoiceScenario } from '@/lib/dunning/invoice-scenario';
+import { effectiveNoticeTexts } from '@/lib/dunning/template-store';
 import { correctionsBetween, describeCorrections } from '@/lib/invoice-scan/corrections';
 import { proposalsFrom } from '@/lib/invoice-scan/rules';
 import { proposeRules } from '@/lib/invoice-scan/rule-store';
@@ -302,6 +304,26 @@ export async function commitUpload(_prev: UploadState, formData: FormData): Prom
       await admin
         .from('invoice_dunning_steps')
         .insert(cadence.rows.map((step) => ({ ...step, invoice_id: created.id })));
+    }
+  }
+
+  // Wording the operator tweaked beside the reading, written before the notice
+  // renders. Tolerant of the table missing — the reading is committed either
+  // way and the notice falls back to the account text.
+  if (created?.id) {
+    const messages = parseInvoiceMessages(
+      formData,
+      await effectiveNoticeTexts(org.id, await getLocale()),
+    );
+
+    if (messages.length) {
+      const { error: messageError } = await admin
+        .from('invoice_messages')
+        .insert(messages.map((row) => ({ ...row, invoice_id: created.id, user_id: org.id })));
+
+      if (messageError) {
+        console.warn('[upload] invoice_messages write failed', messageError.message);
+      }
     }
   }
 

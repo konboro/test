@@ -291,6 +291,13 @@ const el = {
       'Ούτε ειδοποίηση έκδοσης ούτε υπενθυμίσεις. Οι χειροκίνητες αποστολές λειτουργούν κανονικά.',
     prefillNote:
       'Προσυμπληρωμένο από τις Ρυθμίσεις σας. Ό,τι αλλάξετε εδώ ισχύει μόνο για αυτό το παραστατικό — αν δεν αλλάξετε τίποτα, ακολουθεί τις Ρυθμίσεις και τις μελλοντικές αλλαγές τους.',
+    noticeTextToggle: 'Κείμενο ειδοποίησης',
+    noticeTextCustom: 'δικό του κείμενο',
+    noticeEmailSubject: 'Θέμα email',
+    noticeEmailBody: 'Κείμενο email',
+    noticeSmsBody: 'Κείμενο SMS',
+    noticeTextHint:
+      'Ισχύει μόνο για αυτό το παραστατικό. Αν δεν το αλλάξετε, στέλνεται το κείμενο των Ρυθμίσεων — μαζί με τις μελλοντικές αλλαγές του. Οι μεταβλητές συμπληρώνονται αυτόματα:',
     customHint:
       'Η ώρα αποστολής και η επανάληψη παραμένουν του λογαριασμού — ένα παραστατικό δεν μπορεί να έχει δική του ώρα.',
     saved: 'Αποθηκεύτηκε.',
@@ -406,6 +413,7 @@ const el = {
     onIssueEnabled: 'Ειδοποίηση μόλις εκδοθεί το παραστατικό',
     onIssueHint:
       'Φεύγει μόλις επιβεβαιωθεί το παραστατικό, με τον σύνδεσμο πληρωμής. Δεν είναι υπενθύμιση: δεν δεσμεύει την ημερήσια επαφή του πελάτη.',
+    onIssueEditText: 'Επεξεργασία κειμένου ειδοποίησης →',
     ladderTitle: 'Υπενθυμίσεις',
     addStep: 'Προσθήκη υπενθύμισης',
     removeStep: 'Αφαίρεση',
@@ -1789,6 +1797,13 @@ const en: typeof el = {
     switchOffHint: 'No notice on issue and no reminders. Sending by hand still works.',
     prefillNote:
       'Prefilled from your Settings. Anything you change here applies to this invoice only — change nothing, and it follows Settings, including future changes.',
+    noticeTextToggle: 'Notice text',
+    noticeTextCustom: 'its own text',
+    noticeEmailSubject: 'Email subject',
+    noticeEmailBody: 'Email text',
+    noticeSmsBody: 'SMS text',
+    noticeTextHint:
+      'Applies to this invoice only. Left unchanged, the Settings text is sent — including its future edits. The variables fill in automatically:',
     customHint:
       'The sending hour and the repeat stay with the account — one invoice cannot have an hour of its own.',
     saved: 'Saved.',
@@ -1894,6 +1909,7 @@ const en: typeof el = {
     onIssueEnabled: 'Tell the customer as soon as the invoice is confirmed',
     onIssueHint:
       'Goes out with the payment link the moment the invoice is confirmed. Not a reminder: it does not spend the one contact a customer gets each day.',
+    onIssueEditText: 'Edit the notice text →',
     ladderTitle: 'Reminders',
     addStep: 'Add a reminder',
     removeStep: 'Remove',

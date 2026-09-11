@@ -515,6 +515,26 @@ export type ReportBankHint = {
   counterparty_name: string | null;
 }
 
+/**
+ * One invoice's own wording for one outgoing message.
+ *
+ * A row wins over the account template for that invoice/step/channel; no row
+ * means the account wording — including its future edits — applies. Text
+ * identical to the account template is never stored (see
+ * lib/dunning/invoice-messages).
+ */
+export type InvoiceMessageRow = {
+  invoice_id: string;
+  user_id: string;
+  step: DunningStep;
+  channel: CommChannel;
+  /** Null for SMS, which has no subject line. */
+  subject: string | null;
+  body: string;
+  created_at: string;
+  updated_at: string;
+}
+
 /** One row of `my_organizations()` — the companies the caller may act for. */
 export type MyOrganizationRow = {
   organization_id: string;
@@ -708,6 +728,12 @@ export interface Database {
         Row: InvoiceReportRow;
         Insert: InsertOf<InvoiceReportRow, 'user_id' | 'invoice_id' | 'debtor_id' | 'kind'>;
         Update: Partial<InvoiceReportRow>;
+        Relationships: NoRelationships;
+      };
+      invoice_messages: {
+        Row: InvoiceMessageRow;
+        Insert: InsertOf<InvoiceMessageRow, 'invoice_id' | 'user_id' | 'step' | 'channel' | 'body'>;
+        Update: Partial<InvoiceMessageRow>;
         Relationships: NoRelationships;
       };
     };

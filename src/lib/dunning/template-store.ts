@@ -1,6 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import type { UserLocale } from '@/types/database';
 
-import { slotKey, type TemplateOverrides, type TemplateVariant } from './templates';
+import type { InvoiceMessageInput, NoticeTexts } from './invoice-messages';
+import { defaultTemplateFor, slotKey, type TemplateOverrides, type TemplateVariant } from './templates';
 
 /**
  * A tenant's template overrides, keyed by slot.
@@ -35,4 +37,54 @@ export async function loadTemplateOverrides(userId: string): Promise<TemplateOve
   }
 
   return overrides;
+}
+
+/**
+ * One invoice's own wording, or nothing.
+ *
+ * Tolerant of the table not existing yet: deploys and migrations do not land
+ * together, and a missing override table means "no invoice has its own
+ * wording" — which is exactly what the account template is for. The warning is
+ * what tells an operator reading the logs why an edit they made is not going
+ * out.
+ */
+export async function loadInvoiceMessages(invoiceId: string): Promise<InvoiceMessageInput[]> {
+  const { data, error } = await createAdminClient()
+    .from('invoice_messages')
+    .select('*')
+    .eq('invoice_id', invoiceId);
+
+  if (error) {
+    console.warn('[templates] invoice_messages unreadable — migration not applied yet?', error.message);
+    return [];
+  }
+
+  return (data ?? []).map((row) => ({
+    step: row.step,
+    channel: row.channel,
+    subject: row.subject,
+    body: row.body,
+  }));
+}
+
+/**
+ * The account's effective wording for the notice on issue: the tenant's
+ * override where one exists, the built-in copy in the reader's language where
+ * not. This is what the quick editor prefills, and what a submission is
+ * compared against to decide whether it is an override at all.
+ */
+export async function effectiveNoticeTexts(
+  userId: string,
+  locale: UserLocale,
+): Promise<NoticeTexts> {
+  const overrides = await loadTemplateOverrides(userId);
+
+  const email = overrides['on_issue:email'] ?? defaultTemplateFor('on_issue:email', locale);
+  const sms = overrides['on_issue:sms'] ?? defaultTemplateFor('on_issue:sms', locale);
+
+  return {
+    emailSubject: email.subject ?? '',
+    emailBody: email.body,
+    smsBody: sms.body,
+  };
 }

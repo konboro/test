@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { Badge, Card, CardHeader, EmptyState, linkClass, Stat } from '@/components/ui';
 import { displayName } from '@/lib/debtors';
 import { workflowStatus } from '@/lib/dunning/status';
-import { getDictionary } from '@/lib/i18n';
+import { getDictionary, getLocale } from '@/lib/i18n';
 import { smsCreditsEnforced } from '@/lib/limits';
 import { DEFAULT_CURRENCY, totalsByCurrency } from '@/lib/currency';
 import { athensDate, daysBetween, formatDate, formatMoney } from '@/lib/money';
@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
 
 import { loadScenario } from '@/lib/dunning/engine';
+import { effectiveNoticeTexts } from '@/lib/dunning/template-store';
 import { requireOrganization } from '@/lib/orgs/active';
 
 import { AutomationSwitch } from '../settings/automation-switch';
@@ -49,6 +50,8 @@ export default async function DashboardPage() {
   // here rather than remembered and applied on a later screen.
   const org = await requireOrganization();
   const scenario = await loadScenario(org.id);
+  // For the quick wording editor beside the cadence in the create form.
+  const notice = await effectiveNoticeTexts(org.id, await getLocale());
 
   // The funnel window: how far back reminders and link activity are counted.
   const FUNNEL_DAYS = 30;
@@ -403,7 +406,7 @@ export default async function DashboardPage() {
         <CardHeader title={t.dashboard.addTitle} subtitle={t.dashboard.addHint} />
         <Dropzone reviewHref="/invoices/upload" />
         <div className="border-t border-ink-100 px-5 py-4">
-          <CreateInvoiceForm debtors={debtors ?? []} scenario={scenario} />
+          <CreateInvoiceForm debtors={debtors ?? []} scenario={scenario} notice={notice} />
         </div>
       </Card>
 

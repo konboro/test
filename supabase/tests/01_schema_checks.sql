@@ -693,5 +693,70 @@ end $$;
 reset role;
 \echo '  ok  reports are tenant-read, server-written, and invisible to anon'
 
+-- --------------------------------------------------------------------------
+-- invoice messages: one invoice's own wording, server-written, tenant-read
+-- --------------------------------------------------------------------------
+
+insert into public.invoice_messages (invoice_id, user_id, step, channel, subject, body)
+values ('bbbbbbbb-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
+        'on_issue', 'email', 'Δικό του θέμα', 'Δικό του κείμενο');
+
+do $$
+begin
+  -- An SMS has no subject line; a row claiming one implies a rendering path
+  -- that does not exist.
+  begin
+    insert into public.invoice_messages (invoice_id, user_id, step, channel, subject, body)
+    values ('bbbbbbbb-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
+            'on_issue', 'sms', 'no such thing', 'SMS');
+    raise exception 'FAIL: an SMS wording row accepted a subject';
+  exception when check_violation then
+    null;
+  end;
+
+  -- One wording per invoice, step and channel: the second save replaces, and
+  -- the schema refuses the state where two rows disagree about the words.
+  begin
+    insert into public.invoice_messages (invoice_id, user_id, step, channel, body)
+    values ('bbbbbbbb-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
+            'on_issue', 'email', 'a second wording');
+    raise exception 'FAIL: two wordings for one invoice/step/channel';
+  exception when unique_violation then
+    null;
+  end;
+end $$;
+\echo '  ok  invoice wording: sms has no subject, one row per invoice/step/channel'
+
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+
+do $$
+declare n integer;
+begin
+  select count(*) into n from public.invoice_messages;
+  if n <> 1 then raise exception 'FAIL: the tenant should read its wording row, got %', n; end if;
+
+  begin
+    update public.invoice_messages set body = 'edited from a browser';
+    raise exception 'FAIL: a session edited invoice wording directly';
+  exception when insufficient_privilege then
+    null;
+  end;
+end $$;
+
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+
+do $$
+declare n integer;
+begin
+  select count(*) into n from public.invoice_messages;
+  if n <> 0 then raise exception 'FAIL: tenant B reads % of tenant A''s wording rows', n; end if;
+end $$;
+
+reset role;
+\echo '  ok  invoice wording is tenant-read, server-written, and does not cross tenants'
+
 \echo ''
 \echo 'ALL SCHEMA CHECKS PASSED'

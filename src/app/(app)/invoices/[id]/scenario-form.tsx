@@ -27,12 +27,17 @@ export function InvoiceScenarioForm({
   scenario,
   mode,
   show,
+  notice,
+  noticeCustomised,
 }: {
   invoiceId: string;
   scenario: Scenario;
   mode: InvoiceScenarioMode;
   /** The rungs to render — see InvoiceScenarioEditor. */
   show?: ReadonlyArray<DunningStep>;
+  /** The notice wording to prefill — the invoice's own where it has one. */
+  notice?: { emailSubject: string; emailBody: string; smsBody: string };
+  noticeCustomised?: boolean;
 }) {
   const [state, action] = useActionState<InvoiceScenarioState, FormData>(saveInvoiceScenario, {});
 
@@ -40,7 +45,13 @@ export function InvoiceScenarioForm({
     <form action={action} className="space-y-4 px-4 py-4 sm:px-5">
       <input type="hidden" name="id" value={invoiceId} />
 
-      <InvoiceScenarioEditor scenario={scenario} mode={mode} show={show} />
+      <InvoiceScenarioEditor
+        scenario={scenario}
+        mode={mode}
+        show={show}
+        notice={notice}
+        noticeCustomised={noticeCustomised}
+      />
 
       {state.error ? (
         <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">

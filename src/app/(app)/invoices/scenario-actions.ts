@@ -3,9 +3,11 @@
 import { revalidatePath } from 'next/cache';
 
 import { loadScenario } from '@/lib/dunning/engine';
+import { parseInvoiceMessages } from '@/lib/dunning/invoice-messages';
 import { invoiceScenarioProblem, parseInvoiceScenario } from '@/lib/dunning/invoice-scenario';
+import { effectiveNoticeTexts } from '@/lib/dunning/template-store';
 import { saveFailed } from '@/lib/errors';
-import { getDictionary } from '@/lib/i18n';
+import { getDictionary, getLocale } from '@/lib/i18n';
 import { writableOrganization } from '@/lib/orgs/active';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -48,6 +50,13 @@ export async function saveInvoiceScenario(
   const problem = invoiceScenarioProblem(cadence);
   if (problem) return { error: t.scenario[problem] };
 
+  // The wording, held to the same contract as the cadence: text identical to
+  // the account's effective template is not an override and is not stored.
+  const messages = parseInvoiceMessages(
+    formData,
+    await effectiveNoticeTexts(org.id, await getLocale()),
+  );
+
   const { error: modeError } = await admin
     .from('invoices')
     .update({
@@ -76,6 +85,26 @@ export async function saveInvoiceScenario(
       .insert(cadence.rows.map((row) => ({ ...row, invoice_id: invoiceId })));
 
     if (rowsError) return { error: saveFailed(t, 'invoices:scenario', rowsError) };
+  }
+
+  // Wording rows are replaced wholesale for the same reason the step rows are:
+  // a field the form sent back unchanged is not an override any more, and
+  // merging would keep the old text alive invisibly. Tolerant of the table
+  // missing — the save still lands, the log says why the text did not.
+  const { error: clearMessagesError } = await admin
+    .from('invoice_messages')
+    .delete()
+    .eq('invoice_id', invoiceId)
+    .eq('step', 'on_issue');
+
+  if (clearMessagesError) {
+    console.warn('[invoices] invoice_messages clear failed', clearMessagesError.message);
+  } else if (messages.length) {
+    const { error: messagesError } = await admin
+      .from('invoice_messages')
+      .insert(messages.map((row) => ({ ...row, invoice_id: invoiceId, user_id: org.id })));
+
+    if (messagesError) return { error: saveFailed(t, 'invoices:messages', messagesError) };
   }
 
   revalidatePath(`/invoices/${invoiceId}`);

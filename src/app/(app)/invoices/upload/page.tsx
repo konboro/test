@@ -2,13 +2,14 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { Card, EmptyState, linkClass } from '@/components/ui';
-import { getDictionary } from '@/lib/i18n';
+import { getDictionary, getLocale } from '@/lib/i18n';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
 import { Dropzone } from './dropzone';
 import { ReviewCard, type Proposal } from './review-card';
 import { loadScenario } from '@/lib/dunning/engine';
+import { effectiveNoticeTexts } from '@/lib/dunning/template-store';
 import { requireOrganization } from '@/lib/orgs/active';
 
 export async function generateMetadata() {
@@ -40,6 +41,7 @@ export default async function UploadPage() {
   // What the choice beside each reading starts from.
   const org = await requireOrganization();
   const scenario = await loadScenario(org.id);
+  const notice = await effectiveNoticeTexts(org.id, await getLocale());
 
   // RLS already confines this to the tenant; the read goes through the session
   // client precisely so that it does.
@@ -115,7 +117,7 @@ export default async function UploadPage() {
             <EmptyState title={t.upload.queueEmpty} body={t.upload.queueEmptyHint} />
           </Card>
         ) : (
-          proposals.map((proposal) => <ReviewCard key={proposal.id} proposal={proposal} scenario={scenario} />)
+          proposals.map((proposal) => <ReviewCard key={proposal.id} proposal={proposal} scenario={scenario} notice={notice} />)
         )}
       </section>
     </div>
