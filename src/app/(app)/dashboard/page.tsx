@@ -10,7 +10,11 @@ import { athensDate, daysBetween, formatDate, formatMoney } from '@/lib/money';
 import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
 
-import { DataSources } from './data-sources';
+import { loadScenario } from '@/lib/dunning/engine';
+import { requireOrganization } from '@/lib/orgs/active';
+
+import { CreateInvoiceForm } from '../invoices/invoice-forms';
+import { Dropzone } from '../invoices/upload/dropzone';
 
 export async function generateMetadata() {
   return { title: (await getDictionary()).dashboard.title };
@@ -27,6 +31,11 @@ export default async function DashboardPage() {
 
   const today = athensDate();
 
+  // The account cadence, so a manually raised invoice can be given its terms
+  // here rather than remembered and applied on a later screen.
+  const org = await requireOrganization();
+  const scenario = await loadScenario(org.id);
+
   // The funnel window: how far back reminders and link activity are counted.
   const FUNNEL_DAYS = 30;
   /** An invoice counts as converted when it settles this soon after a contact. */
@@ -42,12 +51,11 @@ export default async function DashboardPage() {
     { data: recentPayments },
     { data: recentComms },
     { data: funnelEvents },
-    { data: bankConnections },
   ] = await Promise.all([
       supabase
         .from('users')
         .select(
-          'company_name, sms_credits, mydata_user_id, mydata_last_sync_at, automation_enabled, elorus_organization_id, elorus_last_sync_at',
+          'company_name, sms_credits, automation_enabled',
         )
         // No filter: the policy already shows exactly the active company, and
         // the signed-in person's id is not it once they act for more than one.
@@ -60,7 +68,7 @@ export default async function DashboardPage() {
         )
         .in('status', ['pending', 'paid'])
         .order('due_date', { ascending: true }),
-      supabase.from('debtors').select('id, name, vat_number, email, phone, muted'),
+      supabase.from('debtors').select('id, name, vat_number, email, phone, muted').order('name'),
       supabase.from('dunning_contacts').select('invoice_id, debtor_id, step, contact_on'),
       supabase
         .from('invoices')
@@ -80,9 +88,6 @@ export default async function DashboardPage() {
         .select('invoice_id, debtor_id, channel, event, occurred_at')
         .gte('occurred_at', funnelSince)
         .limit(5000),
-      // The third data source. Its freshness belongs beside the other two, and
-      // until now it was only visible from the settings screen.
-      supabase.from('bank_connections').select('status, last_synced_at'),
     ]);
 
   const allInvoices = invoices ?? [];
@@ -273,8 +278,6 @@ export default async function DashboardPage() {
     .filter((row) => row.count > 0)
     .sort((a, b) => b.total - a.total);
 
-  const bankActive = (bankConnections ?? []).filter((c) => c.status === 'active');
-
   const unreachable = (debtors ?? []).filter(
     (d) => !d.email && !d.phone && pending.some((i) => i.debtor_id === d.id),
   ).length;
@@ -340,29 +343,22 @@ export default async function DashboardPage() {
         ) : null}
       </div>
 
-      <DataSources
-        sources={{
-          billing: {
-            configured: Boolean(profile?.elorus_organization_id),
-            lastSync: profile?.elorus_last_sync_at ?? null,
-          },
-          mydata: {
-            configured: Boolean(profile?.mydata_user_id),
-            lastSync: profile?.mydata_last_sync_at ?? null,
-          },
-          bank: {
-            configured: bankActive.length > 0,
-            // The most recent read across every connected account: one stale
-            // account among several is still a reason to press the button.
-            lastSync:
-              bankActive
-                .map((c) => c.last_synced_at)
-                .filter((at): at is string => Boolean(at))
-                .sort()
-                .at(-1) ?? null,
-          },
-        }}
-      />
+      {/* The way in.
+          This is where the integrations card used to repeat what the settings
+          screen already says. Nobody comes to a dashboard to read that myDATA
+          is connected; they come having just been handed an invoice. Raising
+          one is the act the whole product hangs off, and it was two clicks and
+          a different screen away.
+
+          Both roads, because they are different jobs: drop the document and let
+          it be read, or type one in for a customer already on file. */}
+      <Card>
+        <CardHeader title={t.dashboard.addTitle} subtitle={t.dashboard.addHint} />
+        <Dropzone reviewHref="/invoices/upload" />
+        <div className="border-t border-ink-100 px-5 py-4">
+          <CreateInvoiceForm debtors={debtors ?? []} scenario={scenario} />
+        </div>
+      </Card>
 
       {outstandingCents > 0 ? (
         <Card>

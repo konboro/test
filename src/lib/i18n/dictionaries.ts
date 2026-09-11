@@ -1005,6 +1005,9 @@ const el = {
     collected: 'Εισπράχθηκαν',
     collectedHint: 'Μέσω lefta.app',
     smsBalance: 'Υπόλοιπο SMS',
+    addTitle: 'Νέο παραστατικό',
+    addHint:
+      'Αφήστε το αρχείο εδώ και διαβάζεται μόνο του — ή καταχωρήστε το με το χέρι.',
     smsLow: 'Χαμηλό υπόλοιπο',
     smsOk: 'Διαθέσιμα μηνύματα',
     aging: 'Δομή ανοιχτού υπολοίπου',
@@ -2479,6 +2482,8 @@ const en: typeof el = {
     collected: 'Collected',
     collectedHint: 'Through lefta.app',
     smsBalance: 'SMS balance',
+    addTitle: 'Add an invoice',
+    addHint: 'Drop the file here and it reads itself — or enter one by hand.',
     smsLow: 'Running low',
     smsOk: 'Messages available',
     aging: 'Outstanding by age',

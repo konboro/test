@@ -14,6 +14,7 @@ import { connectConfigured, SMS_PACKS } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
+import { DataSources } from './data-sources';
 import { ElorusForm } from './elorus-forms';
 import { BankConnect } from './bank-forms';
 import { ScanRules, type ScanRuleView } from './scan-rules';
@@ -187,7 +188,7 @@ export default async function SettingsPage({
   const { data: profile, error: profileError } = await supabase
     .from('users')
     .select(
-      'company_name, email, vat_number, business_mode, notify_on_payment, reply_to_email, automation_enabled, mydata_user_id, mydata_environment, sms_credits, stripe_account_id, stripe_charges_enabled, locale, timezone, elorus_organization_id',
+      'company_name, email, vat_number, business_mode, notify_on_payment, reply_to_email, automation_enabled, mydata_user_id, mydata_environment, mydata_last_sync_at, sms_credits, stripe_account_id, stripe_charges_enabled, locale, timezone, elorus_organization_id, elorus_last_sync_at',
     )
     .eq('id', org.id)
     .maybeSingle();
@@ -549,8 +550,38 @@ export default async function SettingsPage({
         body={t.settings.groups.books.body}
       />
 
+      {/* Moved here from the dashboard, where it repeated what the cards below
+          already say. It is kept rather than dropped because it carries the
+          only manual "sync now" in the product — the settings screen had the
+          forms to connect a source and no way to make one run. */}
+      <DataSources
+        sources={{
+          billing: {
+            configured: Boolean(profile.elorus_organization_id),
+            lastSync: profile.elorus_last_sync_at ?? null,
+          },
+          mydata: {
+            configured: Boolean(profile.mydata_user_id),
+            lastSync: profile.mydata_last_sync_at ?? null,
+          },
+          bank: {
+            configured: (bankConnections ?? []).some((c) => c.status === 'active'),
+            // The most recent read across every connected account: one stale
+            // account among several is still a reason to press the button.
+            lastSync:
+              (bankConnections ?? [])
+                .filter((c) => c.status === 'active')
+                .map((c) => c.last_synced_at)
+                .filter((at): at is string => Boolean(at))
+                .sort()
+                .at(-1) ?? null,
+          },
+        }}
+      />
+
       {profile.mydata_user_id || !profile.elorus_organization_id ? (
         <Card>
+        <div id="mydata" className="scroll-mt-20">
         <CardHeader
           title={t.settings.mydata}
           subtitle={t.settings.mydataHint}
@@ -562,6 +593,7 @@ export default async function SettingsPage({
             )
           }
         />
+        </div>
         <MyDataForm
           connected={Boolean(profile.mydata_user_id)}
           userId={profile.mydata_user_id}
@@ -571,6 +603,7 @@ export default async function SettingsPage({
       ) : null}
 
       <Card>
+        <div id="elorus" className="scroll-mt-20">
         <CardHeader
           title={t.settings.elorus}
           subtitle={t.settings.elorusHint}
@@ -582,6 +615,7 @@ export default async function SettingsPage({
             )
           }
         />
+        </div>
         <ElorusForm
           connected={Boolean(profile.elorus_organization_id)}
           organizationId={profile.elorus_organization_id}

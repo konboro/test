@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useActionState, useEffect, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { Button } from '@/components/ui';
@@ -37,12 +38,21 @@ function Submit({ count }: { count: number }) {
  * a state array assembled separately, eventually posts something other than what
  * the operator is looking at.
  */
-export function Dropzone() {
+export function Dropzone({ reviewHref }: { reviewHref?: string }) {
   const t = useT();
+  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
   const [state, action] = useActionState<UploadState, FormData>(uploadInvoiceDocuments, {});
+
+  // Dropped somewhere that has no review queue under it — the dashboard — so
+  // carry the operator to where their reading is waiting. Without this the file
+  // is read, the card is filed, and the screen says so and then sits there: the
+  // work is done somewhere the person cannot see.
+  useEffect(() => {
+    if (reviewHref && state.read) router.push(reviewHref);
+  }, [reviewHref, state.read, router]);
 
   const show = (list: FileList | null) => setFiles(list ? Array.from(list) : []);
 
