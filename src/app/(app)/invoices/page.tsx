@@ -790,7 +790,7 @@ export default async function InvoicesPage({
                           display={formatDate(invoice.due_date)}
                         />
                       </td>
-                      <td className="px-5 py-3">
+                      <td className="whitespace-nowrap px-5 py-3">
                         {age ? (
                           <Badge tone={age.tone}>{age.label}</Badge>
                         ) : (
@@ -798,6 +798,8 @@ export default async function InvoicesPage({
                         )}
                       </td>
                       <td className="px-5 py-3">
+                        {/* The second badge — a customer's "I already paid" —
+                            may drop to its own line; the first one may not. */}
                         <span className="inline-flex flex-wrap items-center gap-1.5">
                           <Badge tone={status.tone}>{status.label}</Badge>
                           {reportByInvoice.has(invoice.id) ? (
