@@ -4,7 +4,13 @@ import type { DunningStep, InvoiceRow } from '@/types/database';
 
 import { stepForInvoice } from './engine';
 import { stepShort } from './step-labels';
-import { activeSteps, DEFAULT_SCENARIO, LADDER_STEPS, type Scenario } from './scenario';
+import {
+  ABANDON_AFTER_DAYS,
+  activeSteps,
+  DEFAULT_SCENARIO,
+  LADDER_STEPS,
+  type Scenario,
+} from './scenario';
 
 export interface WorkflowStatus {
   label: string;
@@ -75,11 +81,26 @@ export function workflowStatus(
     };
   }
 
-  if (daysOverdue > 0) {
-    return { label: t.workflow.daysOverdue(daysOverdue), tone: 'danger', daysOverdue };
+  // Nothing on the ladder applies to this invoice. These two branches used to
+  // answer with the number of days late — which is the aging column, one cell to
+  // the left, saying the same thing in different words. This column's subject is
+  // what the chase is doing, so when it is doing nothing it says why.
+  //
+  // Three reasons, and they are not the same news. Past the abandon threshold
+  // the automation will never touch the invoice again, and that is the state
+  // worth naming: it is how a book quietly fills with debts nobody is chasing.
+  if (daysOverdue > ABANDON_AFTER_DAYS) {
+    return { label: t.workflow.abandoned, tone: 'danger', daysOverdue };
   }
 
-  return { label: t.workflow.dueInDays(Math.abs(daysOverdue)), tone: 'neutral', daysOverdue };
+  // Overdue and inside the window, but no step covers today — an empty scenario,
+  // or a gap between the rungs the tenant placed.
+  if (daysOverdue > 0) {
+    return { label: t.workflow.nothingScheduled, tone: 'danger', daysOverdue };
+  }
+
+  // Not due yet, with no pre-due step to run. The chase has not begun.
+  return { label: t.workflow.notStarted, tone: 'neutral', daysOverdue };
 }
 
 export { shortLabelFor, stepLabels, stepShort } from './step-labels';
