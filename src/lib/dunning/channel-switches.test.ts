@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Channel } from '@/types/database';
+// `CommChannel` is the database's name for it; `Channel` exists only as the
+// scenario module's alias, which is not importable from here without pulling
+// the engine into a test that deliberately runs without one.
+import type { CommChannel as Channel } from '@/types/database';
 
 /**
  * The account-wide channel switches.
