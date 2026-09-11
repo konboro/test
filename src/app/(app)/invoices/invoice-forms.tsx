@@ -115,9 +115,8 @@ export function CreateInvoiceForm({
       </div>
 
       <div className="border-t border-ink-100 pt-4">
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-500">
-          {t.invoiceScenario.title}
-        </p>
+        {/* The editor's switch row carries its own title; a caption above it
+            would say the same words twice in two type styles. */}
         <InvoiceScenarioEditor scenario={scenario} />
       </div>
 

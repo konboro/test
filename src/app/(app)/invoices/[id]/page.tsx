@@ -5,6 +5,7 @@ import { MessageLog } from '@/components/message-log';
 import { Badge, Card, CardHeader, EmptyState, linkClass, subtleLinkClass } from '@/components/ui';
 import { displayName } from '@/lib/debtors';
 import { loadScenario, stepForInvoice } from '@/lib/dunning/engine';
+import { scenarioWithOverrides } from '@/lib/dunning/scenario';
 import { stepLabels } from '@/lib/dunning/step-labels';
 import { workflowStatus } from '@/lib/dunning/status';
 import { getDictionary } from '@/lib/i18n';
@@ -57,18 +58,54 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
   if (!invoice) notFound();
 
-  const [{ data: debtor }, { data: contacts }, { data: messages }, { data: upload }, scenario] =
-    await Promise.all([
-      supabase.from('debtors').select('*').eq('id', invoice.debtor_id).maybeSingle(),
-      supabase.from('dunning_contacts').select('step').eq('invoice_id', invoice.id),
-      supabase
-        .from('communications_log')
-        .select('id, debtor_id, channel, step, status, recipient, subject, content, error, sent_at')
-        .eq('invoice_id', invoice.id)
-        .order('sent_at', { ascending: false }),
-      supabase.from('invoice_uploads').select('id').eq('invoice_id', invoice.id).maybeSingle(),
-      loadScenario(org.id),
-    ]);
+  const [
+    { data: debtor },
+    { data: contacts },
+    { data: messages },
+    { data: upload },
+    { data: overrides },
+    account,
+  ] = await Promise.all([
+    supabase.from('debtors').select('*').eq('id', invoice.debtor_id).maybeSingle(),
+    supabase.from('dunning_contacts').select('step').eq('invoice_id', invoice.id),
+    supabase
+      .from('communications_log')
+      .select('id, debtor_id, channel, step, status, recipient, subject, content, error, sent_at')
+      .eq('invoice_id', invoice.id)
+      .order('sent_at', { ascending: false }),
+    supabase.from('invoice_uploads').select('id').eq('invoice_id', invoice.id).maybeSingle(),
+    supabase.from('invoice_dunning_steps').select('*').eq('invoice_id', invoice.id),
+    loadScenario(org.id),
+  ]);
+
+  // The cadence THIS document follows — the account's, with the invoice's own
+  // rows on top when it has some. The page used to show the account values
+  // everywhere: the editor opened prefilled with a cadence that was not the
+  // invoice's, and one untouched save later the override was silently gone.
+  // "Next step" answered off the wrong ladder for the same reason.
+  const scenario =
+    invoice.scenario_mode === 'custom' && overrides?.length
+      ? scenarioWithOverrides(
+          account,
+          overrides.map((row) => ({
+            step: row.step,
+            enabled: row.enabled,
+            offset_days: row.offset_days,
+            channels: row.channels,
+          })),
+        )
+      : account;
+
+  // The rungs the editor renders: everything the account places, plus anything
+  // this invoice enabled on its own. Derived from enablement alone, a rung the
+  // invoice switched OFF would vanish from the screen — and an untouched save
+  // would then read as "same as the account" and erase that override.
+  const accountPlaced = new Set(
+    account.steps.filter((step) => step.enabled).map((step) => step.step),
+  );
+  const shownSteps = scenario.steps
+    .filter((step) => step.enabled || accountPlaced.has(step.step))
+    .map((step) => step.step);
 
   const today = athensDate();
   const stepName = stepLabels(t);
@@ -188,6 +225,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           invoiceId={invoice.id}
           scenario={scenario}
           mode={invoice.scenario_mode}
+          show={shownSteps}
         />
       </Card>
 

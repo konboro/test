@@ -61,12 +61,14 @@ describe('reading the editor back', () => {
 
   it('leaves a step the form never showed alone', () => {
     // A compact editor shows the rungs a tenant placed. The five it does not
-    // show must come back unmentioned, not blanked.
+    // show must come back unmentioned, not blanked. The shown step deviates
+    // from the account (-2, not the default -1) so this stays an override —
+    // values equal to the account collapse to `default` by design.
     const parsed = parseInvoiceScenario(
       form([
         [FIELD.mode, 'custom'],
         [FIELD.enabled('pre_due'), 'on'],
-        [FIELD.offset('pre_due'), '-1'],
+        [FIELD.offset('pre_due'), '-2'],
         [FIELD.channels('pre_due'), 'email'],
       ]),
       base,
@@ -100,7 +102,10 @@ describe('reading the editor back', () => {
         [FIELD.mode, 'custom'],
         [FIELD.enabled('on_issue'), 'on'],
         [FIELD.offset('on_issue'), '9'],
+        // SMS on top of the account's email-only notice, so this is a real
+        // override and the row survives the collapse-to-default.
         [FIELD.channels('on_issue'), 'email'],
+        [FIELD.channels('on_issue'), 'sms'],
       ]),
       base,
     );
@@ -120,6 +125,64 @@ describe('reading the editor back', () => {
     );
 
     expect(parsed.rows.find((r) => r.step === 'overdue_10')?.offset_days).toBe(120);
+  });
+});
+
+describe('collapsing to the account cadence', () => {
+  // The editor is a switch: whenever reminders are on, it submits whatever
+  // schedule was on screen. These are the semantics that make that safe.
+
+  /** Exactly what the switch-on editor submits when nobody touches anything. */
+  const untouched: Array<[string, string]> = [
+    [FIELD.mode, 'custom'],
+    [FIELD.enabled('on_issue'), 'on'],
+    [FIELD.channels('on_issue'), 'email'],
+    [FIELD.enabled('pre_due'), 'on'],
+    [FIELD.offset('pre_due'), '-1'],
+    [FIELD.channels('pre_due'), 'email'],
+    [FIELD.enabled('overdue_2'), 'on'],
+    [FIELD.offset('overdue_2'), '3'],
+    [FIELD.channels('overdue_2'), 'email'],
+    [FIELD.channels('overdue_2'), 'sms'],
+    [FIELD.enabled('overdue_10'), 'on'],
+    [FIELD.offset('overdue_10'), '10'],
+    [FIELD.channels('overdue_10'), 'email'],
+    [FIELD.channels('overdue_10'), 'sms'],
+  ];
+
+  it('an untouched editor means "follow the settings", not a frozen copy', () => {
+    // Rows stored today would freeze the invoice at today's cadence; a tenant
+    // who tunes their scenario next month would find it quietly left behind.
+    expect(parseInvoiceScenario(form(untouched), base)).toEqual({ mode: 'default', rows: [] });
+  });
+
+  it('one changed day is an override', () => {
+    const edited = untouched.map(([key, value]): [string, string] =>
+      key === FIELD.offset('overdue_2') ? [key, '5'] : [key, value],
+    );
+
+    const parsed = parseInvoiceScenario(form(edited), base);
+    expect(parsed.mode).toBe('custom');
+    expect(parsed.rows.find((r) => r.step === 'overdue_2')?.offset_days).toBe(5);
+  });
+
+  it('unticking a step the account runs is an override', () => {
+    const edited = untouched.filter(([key]) => key !== FIELD.enabled('overdue_10'));
+
+    const parsed = parseInvoiceScenario(form(edited), base);
+    expect(parsed.mode).toBe('custom');
+    expect(parsed.rows.find((r) => r.step === 'overdue_10')?.enabled).toBe(false);
+  });
+
+  it('channel order does not manufacture an override', () => {
+    const reordered = untouched.map(([key, value]): [string, string] => [key, value]);
+    // Swap the two overdue_2 channel entries: sms before email.
+    const first = reordered.findIndex(
+      ([key, value]) => key === FIELD.channels('overdue_2') && value === 'email',
+    );
+    reordered.splice(first, 2, [FIELD.channels('overdue_2'), 'sms'], [FIELD.channels('overdue_2'), 'email']);
+
+    expect(parseInvoiceScenario(form(reordered), base).mode).toBe('default');
   });
 });
 

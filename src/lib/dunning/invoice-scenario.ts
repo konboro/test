@@ -113,7 +113,53 @@ export function parseInvoiceScenario(
     });
   }
 
+  // The editor is a switch now, not a three-way choice: whenever reminders are
+  // on it submits the cadence that was on screen. A submission identical to the
+  // account's cadence is not an override — it IS the account cadence, and has
+  // to be stored as such, or the invoice freezes at today's values and a tenant
+  // who tunes their scenario next month finds this one quietly left behind.
+  // The distinction the radio buttons used to ask for is read off the values.
+  if (matchesScenario(rows, base)) return { mode: 'default', rows: [] };
+
   return { mode, rows };
+}
+
+function sameChannels(
+  a: ReadonlyArray<CommChannel>,
+  b: ReadonlyArray<CommChannel>,
+): boolean {
+  return a.length === b.length && [...a].sort().join() === [...b].sort().join();
+}
+
+/**
+ * Whether these rows say anything the account scenario does not.
+ *
+ * Only the rows the form rendered are compared — a step that is not in `rows`
+ * was not on screen, falls back to the account values by construction, and so
+ * cannot deviate. Unticking a step that the account runs IS a deviation: the
+ * enabled flags differ even though the stored channels fall back.
+ */
+export function matchesScenario(
+  rows: InvoiceScenarioInput['rows'],
+  base: Scenario,
+): boolean {
+  return rows.every((row) => {
+    if (row.step === 'on_issue') {
+      return (
+        row.enabled === base.onIssue.enabled &&
+        sameChannels(row.channels, base.onIssue.channels)
+      );
+    }
+
+    const counterpart = base.steps.find((s) => s.step === row.step);
+    if (!counterpart) return false;
+
+    return (
+      row.enabled === counterpart.enabled &&
+      row.offset_days === counterpart.offsetDays &&
+      sameChannels(row.channels, counterpart.channels)
+    );
+  });
 }
 
 /**
