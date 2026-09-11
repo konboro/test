@@ -286,12 +286,11 @@ const el = {
 
   invoiceScenario: {
     title: 'Αυτόματες υπενθυμίσεις',
-    modeDefault: 'Το σενάριό μου',
-    modeDefaultHint: 'Ακολουθεί ό,τι έχετε ορίσει στις ρυθμίσεις. Αλλάζοντάς το εκεί, αλλάζει και εδώ.',
-    modeCustom: 'Κάτι διαφορετικό γι αυτό το παραστατικό',
-    modeCustomHint: 'Ίδια βήματα, δικές του ημέρες και κανάλια. Δεν επηρεάζει τα υπόλοιπα παραστατικά.',
-    modeOff: 'Καμία αυτόματη υπενθύμιση',
-    modeOffHint: 'Ούτε ειδοποίηση έκδοσης ούτε υπενθυμίσεις. Οι χειροκίνητες αποστολές λειτουργούν κανονικά.',
+    switchOnHint: 'Θα σταλούν αυτόματα, με το παρακάτω πρόγραμμα.',
+    switchOffHint:
+      'Ούτε ειδοποίηση έκδοσης ούτε υπενθυμίσεις. Οι χειροκίνητες αποστολές λειτουργούν κανονικά.',
+    prefillNote:
+      'Προσυμπληρωμένο από τις Ρυθμίσεις σας. Ό,τι αλλάξετε εδώ ισχύει μόνο για αυτό το παραστατικό — αν δεν αλλάξετε τίποτα, ακολουθεί τις Ρυθμίσεις και τις μελλοντικές αλλαγές τους.',
     customHint:
       'Η ώρα αποστολής και η επανάληψη παραμένουν του λογαριασμού — ένα παραστατικό δεν μπορεί να έχει δική του ώρα.',
     saved: 'Αποθηκεύτηκε.',
@@ -1782,12 +1781,10 @@ const en: typeof el = {
 
   invoiceScenario: {
     title: 'Automatic reminders',
-    modeDefault: 'My scenario',
-    modeDefaultHint: 'Follows what you set in settings. Change it there and this follows.',
-    modeCustom: 'Something different for this invoice',
-    modeCustomHint: 'The same steps, on its own days and channels. Other invoices are unaffected.',
-    modeOff: 'No automatic reminders',
-    modeOffHint: 'No notice on issue and no reminders. Sending by hand still works.',
+    switchOnHint: 'They will go out automatically, on the schedule below.',
+    switchOffHint: 'No notice on issue and no reminders. Sending by hand still works.',
+    prefillNote:
+      'Prefilled from your Settings. Anything you change here applies to this invoice only — change nothing, and it follows Settings, including future changes.',
     customHint:
       'The sending hour and the repeat stay with the account — one invoice cannot have an hour of its own.',
     saved: 'Saved.',

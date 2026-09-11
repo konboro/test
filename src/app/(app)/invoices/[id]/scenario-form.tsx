@@ -6,7 +6,7 @@ import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui';
 import type { Scenario } from '@/lib/dunning/scenario';
 import { useT } from '@/lib/i18n/provider';
-import type { InvoiceScenarioMode } from '@/types/database';
+import type { DunningStep, InvoiceScenarioMode } from '@/types/database';
 
 import { InvoiceScenarioEditor } from '../scenario-editor';
 import { saveInvoiceScenario, type InvoiceScenarioState } from '../scenario-actions';
@@ -26,10 +26,13 @@ export function InvoiceScenarioForm({
   invoiceId,
   scenario,
   mode,
+  show,
 }: {
   invoiceId: string;
   scenario: Scenario;
   mode: InvoiceScenarioMode;
+  /** The rungs to render — see InvoiceScenarioEditor. */
+  show?: ReadonlyArray<DunningStep>;
 }) {
   const [state, action] = useActionState<InvoiceScenarioState, FormData>(saveInvoiceScenario, {});
 
@@ -37,7 +40,7 @@ export function InvoiceScenarioForm({
     <form action={action} className="space-y-4 px-4 py-4 sm:px-5">
       <input type="hidden" name="id" value={invoiceId} />
 
-      <InvoiceScenarioEditor scenario={scenario} mode={mode} />
+      <InvoiceScenarioEditor scenario={scenario} mode={mode} show={show} />
 
       {state.error ? (
         <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">

@@ -179,9 +179,7 @@ export function ReviewCard({ proposal, scenario }: { proposal: Proposal; scenari
             the customer starts hearing from us. The choice about what they hear
             belongs here, not on a screen somebody has to remember to visit. */}
         <div className="border-t border-ink-100 pt-4">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-500">
-            {t.invoiceScenario.title}
-          </p>
+          {/* The editor's switch row carries its own title. */}
           <InvoiceScenarioEditor scenario={scenario} />
         </div>
 
