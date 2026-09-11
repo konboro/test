@@ -40,6 +40,12 @@ export async function generateMetadata() {
 }
 export const dynamic = 'force-dynamic';
 
+// A bulk press runs as a server action of this page, so the page decides how
+// long it may take. Sixty seconds is the ceiling on the current plan; the
+// send budget in actions.ts stops the work before this fires, so the
+// operator gets a summary rather than a killed request.
+export const maxDuration = 60;
+
 const FILTER_KEYS = ['pending', 'paid', 'all'] as const;
 
 export default async function InvoicesPage({

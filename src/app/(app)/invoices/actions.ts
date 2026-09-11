@@ -413,17 +413,44 @@ export async function createInvoice(
  * hundred and eighty-two.
  *
  * Collapsed to one invoice per customer, a selection of any size becomes a work
- * list the size of the customer list, which one press can finish.
+ * list the size of the customer list.
  */
-const MAX_SENDS = 200;
+const MAX_SENDS = 1000;
 
 /**
  * How many rows the other bulk operations may touch in one press.
  *
- * Settling invoices and running a scenario are one database write each rather
- * than a call to a mail provider, so rows are the right unit for them.
+ * Settling invoices is one database write for the whole batch, so a thousand
+ * rows cost the same as fifty and the number is a guard against a runaway
+ * selection rather than a budget.
  */
-const BULK_LIMIT = 50;
+const BULK_LIMIT = 1000;
+
+/**
+ * How long one press may spend sending before it stops and reports the rest.
+ *
+ * The cap above is a thousand; the platform's ceiling on a single request is
+ * not. At four sends a round and half a second a round, a thousand reminders
+ * need something over two minutes, and the scenario path sends one at a time,
+ * so it needs considerably more. Without a budget the run is killed mid-flight:
+ * some customers messaged, no redirect, no summary, and an operator with no way
+ * to know where it stopped.
+ *
+ * So the work stops on its own with time to spare and reports what is left,
+ * which is the counter the page already renders. Pressing again continues —
+ * nothing is sent twice, because the day's contact is claimed before delivery
+ * and the next press sees it.
+ */
+const SEND_BUDGET_MS = 45_000;
+
+/**
+ * How many selected rows one press will read before planning.
+ *
+ * Higher than the send cap on purpose — see the query that uses it. A ceiling
+ * still exists because the ids arrive in a form post and an unbounded `in`
+ * clause is a URL long enough to be refused before it is read.
+ */
+const MAX_ROWS_READ = 5000;
 
 /**
  * Sends in flight at once, and the floor on how long a round may take.
@@ -480,7 +507,11 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
       .select('id, debtor_id, automation_enabled')
       .eq('user_id', org.id)
       .eq('status', 'pending')
-      .in('id', ids.slice(0, 1000)),
+      // Rows, not sends. The plan collapses these to one invoice per customer,
+      // so a selection has to be read wider than the send cap to produce a full
+      // thousand recipients — five thousand invoices across twelve hundred
+      // customers would otherwise arrive as a work list of eight hundred.
+      .in('id', ids.slice(0, MAX_ROWS_READ)),
     admin
       .from('communications_log')
       .select('debtor_id, sent_at')
@@ -537,6 +568,10 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
   const plan = planBulkSend(open, contacted, MAX_SENDS);
   const batch = plan.work;
   let limited = plan.limited;
+  const left = plan.left;
+
+  const startedRun = Date.now();
+  let reached = batch.length;
 
   let sent = 0;
   let skipped = 0;
@@ -547,6 +582,14 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
   // into the unique index behind the daily guarantee. There is now at most one
   // invoice per customer in the batch, so nothing in it can collide.
   for (let i = 0; i < batch.length; i += CONCURRENCY) {
+    // Checked between rounds rather than inside one: a round already in flight
+    // is finishing regardless, and abandoning its results would lose the record
+    // of messages that did go out.
+    if (Date.now() - startedRun > SEND_BUDGET_MS) {
+      reached = i;
+      break;
+    }
+
     const startedAt = Date.now();
     const results = await Promise.all(
       batch.slice(i, i + CONCURRENCY).map((id) =>
@@ -594,7 +637,7 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
       settled: settledJustNow,
       // What is genuinely still owed a message, which is customers rather than
       // rows. Zero unless the selection was larger than one press can carry.
-      left: plan.left,
+      left: left + (batch.length - reached),
     }),
   );
 }
@@ -673,8 +716,18 @@ export async function runScenarioForSelected(formData: FormData): Promise<void> 
   let failed = 0;
   let notDue = 0;
   let pausedCount = 0;
+  let unreached = 0;
 
-  for (const id of batch) {
+  const startedRun = Date.now();
+
+  for (const [index, id] of batch.entries()) {
+    // This path sends one at a time, so it runs out of clock sooner than the
+    // reminder path does. Same contract: stop cleanly, say how many are left.
+    if (Date.now() - startedRun > SEND_BUDGET_MS) {
+      unreached = batch.length - index;
+      break;
+    }
+
     const dueDate = dueDates.get(id);
     if (!dueDate) {
       failed += 1;
@@ -724,7 +777,7 @@ export async function runScenarioForSelected(formData: FormData): Promise<void> 
       failed,
       notDue,
       paused: pausedCount,
-      left: Math.max(0, ids.length - batch.length),
+      left: Math.max(0, ids.length - batch.length) + unreached,
     }),
   );
 }
