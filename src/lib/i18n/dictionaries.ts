@@ -1508,8 +1508,9 @@ const el = {
     stepSent: (step: string) => `${step} στάλθηκε`,
     stepSentFinal: (step: string) => `${step} στάλθηκε (τελικό)`,
     stepPending: (step: string) => `${step} σε αναμονή`,
-    daysOverdue: (n: number) => `${n} ημέρες σε καθυστέρηση`,
-    dueInDays: (n: number) => `Λήγει σε ${n} ημέρες`,
+    abandoned: 'Εκτός αυτοματισμού',
+    nothingScheduled: 'Χωρίς βήμα',
+    notStarted: 'Δεν ξεκίνησε',
   },
   // Deliberately not `as const`: that would make every string its own literal
   // type and force the English dictionary to repeat the Greek words verbatim.
@@ -2973,8 +2974,9 @@ const en: typeof el = {
     stepSent: (step: string) => `${step} sent`,
     stepSentFinal: (step: string) => `${step} sent (final)`,
     stepPending: (step: string) => `${step} pending`,
-    daysOverdue: (n: number) => `${n} days overdue`,
-    dueInDays: (n: number) => `Due in ${n} days`,
+    abandoned: 'Automation stopped',
+    nothingScheduled: 'No step scheduled',
+    notStarted: 'Not started',
   },
 };
 
