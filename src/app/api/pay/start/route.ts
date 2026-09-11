@@ -175,11 +175,12 @@ export async function POST(request: Request) {
     // Viva books the order in the merchant wallet's currency and the order
     // payload carries no currency field, so a non-EUR document would be charged
     // as face-value euros and then marked fully paid. Refuse instead.
+    //
+    // Reported as itself rather than as "the issuer takes no card payments".
+    // That is a different problem with a different answer: this one is settled
+    // by paying another way, not by the creditor configuring something.
     if (invoice.currency.toUpperCase() !== 'EUR') {
-      return NextResponse.json(
-        { error: 'provider_missing' },
-        { status: 409 },
-      );
+      return NextResponse.json({ error: 'currency_unsupported' }, { status: 409 });
     }
 
     const credentials = vivaCredentialsFor(creditor!);

@@ -9,6 +9,7 @@ import { commitImport } from '@/lib/import/commit';
 import { parseAmountCents, type ImportRow } from '@/lib/import/parse';
 import { readInvoiceDocument } from '@/lib/invoice-scan/read';
 import { visionReader } from '@/lib/invoice-scan/vision';
+import { normaliseCurrency } from '@/lib/currency';
 import { athensDate } from '@/lib/money';
 import { writableOrganization } from '@/lib/orgs/active';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -227,7 +228,9 @@ export async function commitUpload(_prev: UploadState, formData: FormData): Prom
     vatNumber: text('vatNumber'),
     amountCents: amount,
     // What the document said, not what the account usually deals in.
-    currency: typeof upload.extracted?.currency === 'string' ? upload.extracted.currency : null,
+    // Corrected on the card when the reading was wrong; the scan is only the
+    // starting point here, exactly like the name and the amount above it.
+    currency: normaliseCurrency(formData.get('currency') ?? upload.extracted?.currency),
     issueDate,
     // A due date is required downstream and drives the whole ladder. Falling
     // back to the issue date states "due on receipt" rather than inventing terms

@@ -355,6 +355,8 @@ const el = {
     alreadyPaid: 'Το παραστατικό έχει ήδη εξοφληθεί.',
     notPayableNow: 'Το παραστατικό δεν είναι πλέον πληρωτέο.',
     providerMissing: 'Ο εκδότης δεν δέχεται προς το παρόν ηλεκτρονικές πληρωμές.',
+    currencyUnsupported:
+      'Το παραστατικό δεν είναι σε ευρώ και δεν μπορεί να πληρωθεί με κάρτα εδώ. Επικοινωνήστε με τον εκδότη.',
     paidClaim: 'Έχω ήδη πληρώσει',
     dispute: 'Υπάρχει πρόβλημα με το παραστατικό',
     close: 'Κλείσιμο',
@@ -713,6 +715,7 @@ const el = {
     fields: {
       name: 'Επωνυμία πελάτη',
       amount: 'Ποσό',
+      currency: 'Νόμισμα',
       due_date: 'Ημερομηνία λήξης',
       issue_date: 'Ημερομηνία έκδοσης',
       email: 'Email',
@@ -1448,7 +1451,8 @@ const el = {
     heading: 'Νέο παραστατικό',
     customer: 'Πελάτης',
     choose: 'Επιλέξτε…',
-    amount: 'Ποσό (€)',
+    amount: 'Ποσό',
+    currency: 'Νόμισμα',
     series: 'Σειρά',
     number: 'Αριθμός',
     issueDate: 'Ημ. έκδοσης',
@@ -1841,6 +1845,8 @@ const en: typeof el = {
     alreadyPaid: 'This invoice has already been paid.',
     notPayableNow: 'This invoice is no longer payable.',
     providerMissing: 'The issuer is not accepting online payments at the moment.',
+    currencyUnsupported:
+      'This invoice is not in euros and cannot be paid by card here. Please contact the issuer.',
     paidClaim: 'I have already paid',
     dispute: 'Something is wrong with this invoice',
     close: 'Close',
@@ -2198,6 +2204,7 @@ const en: typeof el = {
     fields: {
       name: 'Customer name',
       amount: 'Amount',
+      currency: 'Currency',
       due_date: 'Due date',
       issue_date: 'Issue date',
       email: 'Email',
@@ -2914,7 +2921,8 @@ const en: typeof el = {
     heading: 'New invoice',
     customer: 'Customer',
     choose: 'Choose…',
-    amount: 'Amount (€)',
+    amount: 'Amount',
+    currency: 'Currency',
     series: 'Series',
     number: 'Number',
     issueDate: 'Issue date',

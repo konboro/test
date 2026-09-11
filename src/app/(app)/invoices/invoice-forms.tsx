@@ -8,6 +8,7 @@ import { Button, Field, inputClass, linkClass, subtleLinkClass } from '@/compone
 import type { ReminderPreview } from '@/lib/dunning/manual';
 import { REMINDER_CHOICES } from '@/lib/dunning/templates';
 import { Switch } from '@/components/switch';
+import { DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from '@/lib/currency';
 import { useT } from '@/lib/i18n/provider';
 import { payPath } from '@/lib/pay-code';
 
@@ -80,6 +81,20 @@ export function CreateInvoiceForm({
 
         <Field label={t.invoiceForm.amount}>
           <input name="amount" type="number" step="0.01" min="0.01" required className={inputClass} />
+        </Field>
+
+        {/* Beside the amount, because the two are one fact. The label used to
+            read "Amount (€)" and the row was written as euros whatever the
+            document said — fine until the first zloty invoice, which would have
+            been stored as euros and charged as euros. */}
+        <Field label={t.invoiceForm.currency}>
+          <select name="currency" defaultValue={DEFAULT_CURRENCY} className={inputClass}>
+            {SUPPORTED_CURRENCIES.map((code) => (
+              <option key={code} value={code}>
+                {code}
+              </option>
+            ))}
+          </select>
         </Field>
 
         <Field label={t.invoiceForm.series}>

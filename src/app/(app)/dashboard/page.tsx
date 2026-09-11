@@ -6,6 +6,7 @@ import { displayName } from '@/lib/debtors';
 import { workflowStatus } from '@/lib/dunning/status';
 import { getDictionary } from '@/lib/i18n';
 import { smsCreditsEnforced } from '@/lib/limits';
+import { DEFAULT_CURRENCY, totalsByCurrency } from '@/lib/currency';
 import { athensDate, daysBetween, formatDate, formatMoney } from '@/lib/money';
 import { createClient } from '@/lib/supabase/server';
 import type { DunningStep } from '@/types/database';
@@ -16,6 +17,18 @@ import { requireOrganization } from '@/lib/orgs/active';
 import { AutomationSwitch } from '../settings/automation-switch';
 import { CreateInvoiceForm } from '../invoices/invoice-forms';
 import { Dropzone } from '../invoices/upload/dropzone';
+
+/**
+ * Totals for a tile, one figure per currency.
+ *
+ * Joined rather than added. An empty book still shows a zero so the tile never
+ * renders blank, and the single-currency case — every tenant today — looks
+ * exactly as it always has.
+ */
+function money(totals: ReturnType<typeof totalsByCurrency>): string {
+  if (!totals.length) return formatMoney(0);
+  return totals.map((total) => formatMoney(total.cents, total.currency)).join(' · ');
+}
 
 export async function generateMetadata() {
   return { title: (await getDictionary()).dashboard.title };
@@ -95,8 +108,17 @@ export default async function DashboardPage() {
   const pending = allInvoices.filter((i) => i.status === 'pending');
   const overdue = pending.filter((i) => daysBetween(i.due_date, today) > 0);
 
-  const outstandingCents = pending.reduce((sum, i) => sum + i.amount_cents, 0);
-  const overdueCents = overdue.reduce((sum, i) => sum + i.amount_cents, 0);
+  // Kept apart by currency rather than added together.
+  //
+  // These were plain reduces over `amount_cents`: right while every invoice is
+  // in euros, and silently wrong the first time one is not — a zloty invoice
+  // added to the euro total and the sum shown with a euro sign. There is no
+  // exchange rate in this product and there should not be one; inventing one to
+  // keep a tidy single figure is how a dashboard reports money that does not
+  // exist. With a single currency this renders exactly as it always did.
+  const outstandingTotals = totalsByCurrency(pending);
+  const overdueTotals = totalsByCurrency(overdue);
+  const overdueCents = overdueTotals.reduce((sum, x) => sum + x.cents, 0);
 
   /**
    * Money that actually arrived through lefta.
@@ -118,20 +140,35 @@ export default async function DashboardPage() {
         i.revolut_order_id !== null),
   );
 
-  const collectedCents = collectedThroughLefta.reduce(
-    (sum, i) => sum + (i.paid_amount_cents ?? i.amount_cents),
-    0,
+  // What was captured, in the currency it was captured in: the charge went
+  // through the provider in the invoice's own currency.
+  const collectedTotals = totalsByCurrency(
+    collectedThroughLefta.map((i) => ({
+      amount_cents: i.paid_amount_cents ?? i.amount_cents,
+      currency: i.currency,
+    })),
   );
 
   // Aging buckets over the open balance. The thresholds mirror the ladder: at
   // 1–9 days overdue the automated steps are still doing the chasing; from day
   // 10 the final reminder has fired and the money is the operator's problem.
+  // The strip compares amounts against one another, so every figure in it has to
+  // be in one currency: widths built from a mixture mean nothing, and a segment
+  // labelled with a euro sign over a zloty sum is worse than no segment. The
+  // currency carrying the most outstanding leads the tiles above, so the strip
+  // follows it and the rest stay in those tiles where they are named.
+  const stripCurrency = outstandingTotals[0]?.currency ?? DEFAULT_CURRENCY;
+  const outstandingCents = outstandingTotals[0]?.cents ?? 0;
+  const stripInvoices = pending.filter(
+    (i) => (i.currency?.toUpperCase() || DEFAULT_CURRENCY) === stripCurrency,
+  );
+
   const agingBuckets = [
     { key: 'notDue', label: t.dashboard.agingNotDue, swatch: 'bg-brand-500', match: (d: number) => d <= 0 },
     { key: 'late1to9', label: t.dashboard.agingLate(1, 9), swatch: 'bg-amber-500', match: (d: number) => d >= 1 && d <= 9 },
     { key: 'late10plus', label: t.dashboard.agingLatePlus(10), swatch: 'bg-red-500', match: (d: number) => d >= 10 },
   ].map((bucket) => {
-    const own = pending.filter((i) => bucket.match(daysBetween(i.due_date, today)));
+    const own = stripInvoices.filter((i) => bucket.match(daysBetween(i.due_date, today)));
     return { ...bucket, count: own.length, cents: own.reduce((sum, i) => sum + i.amount_cents, 0) };
   });
 
@@ -328,18 +365,18 @@ export default async function DashboardPage() {
       >
         <Stat
           label={t.dashboard.outstanding}
-          value={formatMoney(outstandingCents)}
+          value={money(outstandingTotals)}
           hint={t.dashboard.outstandingHint(pending.length)}
         />
         <Stat
           label={t.dashboard.overdue}
-          value={formatMoney(overdueCents)}
+          value={money(overdueTotals)}
           hint={t.dashboard.overdueHint(overdue.length)}
           tone={overdueCents > 0 ? 'warning' : 'default'}
         />
         <Stat
           label={t.dashboard.collected}
-          value={formatMoney(collectedCents)}
+          value={money(collectedTotals)}
           hint={t.dashboard.collectedHint}
           tone="positive"
         />
@@ -387,7 +424,7 @@ export default async function DashboardPage() {
                       width: `${(bucket.cents / outstandingCents) * 100}%`,
                       minWidth: '8px',
                     }}
-                    title={`${bucket.label}: ${formatMoney(bucket.cents)}`}
+                    title={`${bucket.label}: ${formatMoney(bucket.cents, stripCurrency)}`}
                   />
                 ))}
             </div>
@@ -401,7 +438,7 @@ export default async function DashboardPage() {
                   />
                   <dt className="text-xs text-ink-500">{bucket.label}</dt>
                   <dd className="tabular text-sm font-semibold text-ink-900">
-                    {formatMoney(bucket.cents)}
+                    {formatMoney(bucket.cents, stripCurrency)}
                   </dd>
                   <dd className="text-xs text-ink-400">{t.dashboard.agingInvoices(bucket.count)}</dd>
                 </div>

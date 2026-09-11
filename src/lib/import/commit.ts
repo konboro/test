@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 
+import { normaliseCurrency } from '@/lib/currency';
 import type { Dictionary } from '@/lib/i18n';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -183,7 +184,7 @@ export async function commitImport(
       debtor_id: debtorId,
       invoice_number: row.reference,
       amount_cents: row.amountCents,
-      currency: row.currency ?? 'EUR',
+      currency: normaliseCurrency(row.currency),
       issue_date: row.issueDate,
       due_date: row.dueDate,
       status: 'pending',

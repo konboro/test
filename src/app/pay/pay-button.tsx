@@ -20,6 +20,8 @@ function payError(t: PayCopy, code: string | undefined): string {
       return t.notPayableNow;
     case 'provider_missing':
       return t.providerMissing;
+    case 'currency_unsupported':
+      return t.currencyUnsupported;
     default:
       return t.startFailed;
   }

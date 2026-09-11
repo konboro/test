@@ -76,6 +76,9 @@ export default async function UploadPage() {
           issueDate: text(extracted.issueDate),
           dueDate: text(extracted.dueDate),
           amount: decimal(extracted.amountCents),
+          // What the document was written in, so the reviewer sees the reader's
+          // answer rather than inheriting it unseen.
+          currency: text(extracted.currency),
           // Read off the document like everything else. Without one of these
           // nothing can ever be sent about the invoice, so making somebody
           // retype what the page already says is the worst kind of blank.

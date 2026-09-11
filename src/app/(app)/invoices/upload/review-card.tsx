@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { Badge, Button, Field, inputClass } from '@/components/ui';
+import { DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from '@/lib/currency';
 import { useT } from '@/lib/i18n/provider';
 
 import type { Scenario } from '@/lib/dunning/scenario';
@@ -25,6 +26,7 @@ export interface Proposal {
     issueDate: string | null;
     dueDate: string | null;
     amount: string | null;
+    currency: string | null;
     email: string | null;
     phone: string | null;
   };
@@ -137,6 +139,23 @@ export function ReviewCard({ proposal, scenario }: { proposal: Proposal; scenari
               defaultValue={proposal.fields.amount ?? ''}
               className={`${inputClass} ${flag('amountCents')}`}
             />
+          </Field>
+          {/* The reader names a currency from the document, and falls back to
+              euros when it finds none. That guess was invisible here and
+              uncorrectable: a zloty invoice read as euros would be filed,
+              chased and charged as euros with nothing on screen to catch it. */}
+          <Field label={t.importer.fields.currency ?? ''}>
+            <select
+              name="currency"
+              defaultValue={proposal.fields.currency ?? DEFAULT_CURRENCY}
+              className={inputClass}
+            >
+              {SUPPORTED_CURRENCIES.map((code) => (
+                <option key={code} value={code}>
+                  {code}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label={t.importer.fields.issue_date ?? ''}>
             <input

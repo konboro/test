@@ -11,6 +11,7 @@ import {
 } from '@/lib/dunning/manual';
 import { parseReminderSlot } from '@/lib/dunning/templates';
 import { parseLanguageChoice } from '@/lib/i18n/message-locale';
+import { normaliseCurrency } from '@/lib/currency';
 import { athensDate, toCents } from '@/lib/money';
 import { safeNextPath } from '@/lib/redirects';
 import { activeOrganization, writableOrganization } from '@/lib/orgs/active';
@@ -297,6 +298,10 @@ const manualInvoice = z.object({
     .optional()
     .transform((v) => (v ? v : null)),
   amount: z.coerce.number().positive('amountPositive'),
+  // Unrecognised falls back rather than being refused: the operator picks from a
+  // list and cannot type here, so anything odd arriving is a stale form or a
+  // crafted post — neither worth an error message about.
+  currency: z.unknown().transform(normaliseCurrency),
   issue_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'invalidIssueDate'),
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'invalidDueDate'),
 });
@@ -313,6 +318,7 @@ export async function createInvoice(
     invoice_number: formData.get('invoice_number'),
     series: formData.get('series'),
     amount: formData.get('amount'),
+    currency: formData.get('currency'),
     issue_date: formData.get('issue_date'),
     due_date: formData.get('due_date'),
   });
@@ -350,7 +356,7 @@ export async function createInvoice(
       invoice_number: parsed.data.invoice_number,
       series: parsed.data.series,
       amount_cents: toCents(parsed.data.amount),
-      currency: 'EUR',
+      currency: parsed.data.currency,
       issue_date: parsed.data.issue_date,
       due_date: parsed.data.due_date,
     mark: null,
