@@ -7,7 +7,6 @@ import { displayName } from '@/lib/debtors';
 import { workflowStatus } from '@/lib/dunning/status';
 import { REMINDER_CHOICES } from '@/lib/dunning/templates';
 import { getDictionary, getLocale } from '@/lib/i18n';
-import { contactLimitsDisabled } from '@/lib/limits';
 import { athensDate, formatDate, formatMoney } from '@/lib/money';
 import { settlementMethod } from '@/lib/payments/settlement';
 import { createClient } from '@/lib/supabase/server';
@@ -61,7 +60,6 @@ export default async function InvoicesPage({
     sent?: string;
     /** How many rows a bulk settle actually moved. */
     paid?: string;
-    limited?: string;
     skipped?: string;
     failed?: string;
     notDue?: string;
@@ -233,7 +231,6 @@ export default async function InvoicesPage({
     })}`;
 
   const bulkSent = Number(params.sent ?? 0);
-  const bulkLimited = Number(params.limited ?? 0);
   const bulkSkipped = Number(params.skipped ?? 0);
   const bulkFailed = Number(params.failed ?? 0);
   const bulkLeft = Number(params.left ?? 0);
@@ -309,15 +306,6 @@ export default async function InvoicesPage({
         </div>
       </div>
 
-      {contactLimitsDisabled() ? (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <p className="font-semibold">{t.invoices.limitsOffTitle}</p>
-          <p className="mt-1 text-xs leading-relaxed">
-            {t.invoices.limitsOffBody}
-          </p>
-        </div>
-      ) : null}
-
       <div className="flex flex-wrap items-center gap-3">
       <div className="flex gap-1">
         {FILTER_KEYS.map((key) => (
@@ -365,9 +353,6 @@ export default async function InvoicesPage({
       {params.bulk === 'done' ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           <p className="font-medium">{t.invoices.bulk.done(bulkSent)}</p>
-          {/* The daily guarantee doing its job is not a failure, and reporting it
-              as one would teach the operator to distrust a correct safeguard. */}
-          {bulkLimited ? <p className="mt-1 text-xs">{t.invoices.bulk.limited(bulkLimited)}</p> : null}
           {bulkSkipped ? <p className="mt-1 text-xs">{t.invoices.bulk.skipped(bulkSkipped)}</p> : null}
           {bulkNotDue ? <p className="mt-1 text-xs">{t.invoices.bulk.notDue(bulkNotDue)}</p> : null}
           {bulkPaused ? <p className="mt-1 text-xs">{t.invoices.bulk.paused(bulkPaused)}</p> : null}

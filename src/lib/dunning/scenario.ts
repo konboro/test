@@ -124,9 +124,6 @@ export const DEFAULT_SCENARIO: Scenario = {
   sendHour: 9,
 };
 
-/** Stop chasing entirely once an invoice is this far past due. */
-export const ABANDON_AFTER_DAYS = 120;
-
 export interface Rung {
   step: DunningStep;
   channels: Channel[];
@@ -248,8 +245,6 @@ export function nextScheduledRung(
 }
 
 export function rungFor(daysOverdue: number, scenario: Scenario): Rung | null {
-  if (daysOverdue > ABANDON_AFTER_DAYS) return null;
-
   const steps = activeSteps(scenario);
   if (!steps.length) return null;
 

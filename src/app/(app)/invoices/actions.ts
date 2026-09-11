@@ -27,9 +27,6 @@ import { invoiceScenarioProblem, parseInvoiceScenario } from '@/lib/dunning/invo
 import { parseInvoiceMessages } from '@/lib/dunning/invoice-messages';
 import { effectiveNoticeTexts } from '@/lib/dunning/template-store';
 import type { InvoiceScenarioMode } from '@/types/database';
-import { contactedOn, LOOKBACK_HOURS } from '@/lib/dunning/already-contacted';
-import { planBulkSend } from '@/lib/dunning/bulk-plan';
-import { DEFAULT_TIMEZONE, zonedDate } from '@/lib/money';
 
 export interface InvoiceFormState {
   error?: string;
@@ -433,30 +430,6 @@ export async function createInvoice(
 
 
 /**
- * How many messages one press may actually send.
- *
- * Counted in sends, not in selected rows. The old limit counted rows, which
- * made it meaningless: the list renders a checkbox twice for every invoice —
- * once in the card layout and once in the table, both in the document with one
- * hidden by CSS — so selecting everything submitted every id twice, "50" was
- * twenty-five invoices, and a hundred and forty rows reported themselves as two
- * hundred and eighty-two.
- *
- * Collapsed to one invoice per customer, a selection of any size becomes a work
- * list the size of the customer list.
- */
-const MAX_SENDS = 1000;
-
-/**
- * How many rows the other bulk operations may touch in one press.
- *
- * Settling invoices is one database write for the whole batch, so a thousand
- * rows cost the same as fifty and the number is a guard against a runaway
- * selection rather than a budget.
- */
-const BULK_LIMIT = 1000;
-
-/**
  * How long one press may spend sending before it stops and reports the rest.
  *
  * The cap above is a thousand; the platform's ceiling on a single request is
@@ -474,11 +447,11 @@ const BULK_LIMIT = 1000;
 const SEND_BUDGET_MS = 45_000;
 
 /**
- * How many selected rows one press will read before planning.
+ * How many selected rows one press will touch.
  *
- * Higher than the send cap on purpose — see the query that uses it. A ceiling
- * still exists because the ids arrive in a form post and an unbounded `in`
- * clause is a URL long enough to be refused before it is read.
+ * Not a decision about how much to send — that ceiling is gone. This one exists
+ * because the ids arrive in a form post, and an unbounded `in` clause is a URL
+ * long enough to be refused before it is read.
  */
 const MAX_ROWS_READ = 5000;
 
@@ -531,34 +504,12 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
 
   const admin = createAdminClient();
 
-  const [{ data: rows }, { data: alreadySent }, { data: tenant }] = await Promise.all([
-    admin
-      .from('invoices')
-      .select('id, debtor_id, automation_enabled')
-      .eq('user_id', org.id)
-      .eq('status', 'pending')
-      // Rows, not sends. The plan collapses these to one invoice per customer,
-      // so a selection has to be read wider than the send cap to produce a full
-      // thousand recipients — five thousand invoices across twelve hundred
-      // customers would otherwise arrive as a work list of eight hundred.
-      .in('id', ids.slice(0, MAX_ROWS_READ)),
-    admin
-      .from('communications_log')
-      .select('debtor_id, sent_at')
-      .eq('user_id', org.id)
-      .eq('status', 'sent')
-      .gte('sent_at', new Date(Date.now() - LOOKBACK_HOURS * 60 * 60 * 1000).toISOString()),
-    admin.from('users').select('timezone').eq('id', org.id).maybeSingle(),
-  ]);
-
-  const timezone = tenant?.timezone ?? DEFAULT_TIMEZONE;
-  const today = zonedDate(timezone);
-
-  const contacted = new Set(
-    (alreadySent ?? [])
-      .filter((row) => row.debtor_id && contactedOn([row], timezone, today))
-      .map((row) => row.debtor_id),
-  );
+  const { data: rows } = await admin
+    .from('invoices')
+    .select('id, debtor_id, automation_enabled')
+    .eq('user_id', org.id)
+    .eq('status', 'pending')
+    .in('id', ids.slice(0, MAX_ROWS_READ));
 
   // An invoice whose automation is switched off stays out of a bulk press.
   //
@@ -593,12 +544,10 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
   const open = eligible.filter((row) => !closed.has(row.id));
   const settledJustNow = closed.size;
 
-  // One invoice per customer, and none for a customer who has already heard
-  // from us today.
-  const plan = planBulkSend(open, contacted, MAX_SENDS);
-  const batch = plan.work;
-  let limited = plan.limited;
-  const left = plan.left;
+  // Every selected invoice, in full. Two rules stood here and both are gone: a
+  // cap on how many one press could carry, and a collapse to one message per
+  // customer per day. What is selected is what is sent.
+  const batch = open.map((row) => row.id);
 
   const startedRun = Date.now();
   let reached = batch.length;
@@ -607,10 +556,9 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
   let skipped = 0;
   let failed = 0;
 
-  // Concurrent, which the sequential version could not be: it sent one invoice
-  // at a time precisely because two of the same customer would race each other
-  // into the unique index behind the daily guarantee. There is now at most one
-  // invoice per customer in the batch, so nothing in it can collide.
+  // Concurrent. The sequential version existed because two invoices of the same
+  // customer would race each other into the unique index behind the daily
+  // guarantee; that index is gone, so there is nothing left to collide over.
   for (let i = 0; i < batch.length; i += CONCURRENCY) {
     // Checked between rounds rather than inside one: a round already in flight
     // is finishing regardless, and abandoning its results would lose the record
@@ -636,8 +584,7 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
 
     for (const result of results) {
       if (result.error) {
-        if (result.code === 'daily_limit') limited += 1;
-        else failed += 1;
+        failed += 1;
         continue;
       }
 
@@ -660,14 +607,13 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
     to({
       bulk: 'done',
       sent,
-      limited,
       skipped,
       failed,
       paused,
       settled: settledJustNow,
-      // What is genuinely still owed a message, which is customers rather than
-      // rows. Zero unless the selection was larger than one press can carry.
-      left: left + (batch.length - reached),
+      // What the clock stopped short of. Zero unless the run ran out of budget
+      // mid-way; pressing again continues from there.
+      left: batch.length - reached,
     }),
   );
 }
@@ -682,9 +628,7 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
  *
  * It goes out as a manual contact, which in this product deliberately does not
  * consume a rung of the automatic ladder — bringing a message forward must not
- * cancel the scheduled one. So the sweep will still send that step on its own
- * day, and the once-per-debtor-per-day guarantee is what stops the two landing
- * together.
+ * cancel the scheduled one. The sweep will still send that step on its own day.
  */
 export async function runScenarioForSelected(formData: FormData): Promise<void> {
   // Deduplicated: the same invoice arrives twice, once from each layout.
@@ -704,7 +648,7 @@ export async function runScenarioForSelected(formData: FormData): Promise<void> 
   const org = await writableOrganization();
   if (!org) redirect('/login');
 
-  const batch = ids.slice(0, BULK_LIMIT);
+  const batch = ids.slice(0, MAX_ROWS_READ);
   const scenario = await loadScenario(org.id);
   const today = athensDate();
 
@@ -741,7 +685,6 @@ export async function runScenarioForSelected(formData: FormData): Promise<void> 
   const paused = new Set((rows ?? []).filter(automationPaused).map((r) => r.id));
 
   let sent = 0;
-  let limited = 0;
   let skipped = 0;
   let failed = 0;
   let notDue = 0;
@@ -786,8 +729,7 @@ export async function runScenarioForSelected(formData: FormData): Promise<void> 
     });
 
     if (result.error) {
-      if (result.code === 'daily_limit') limited += 1;
-      else failed += 1;
+      failed += 1;
       continue;
     }
 
@@ -802,7 +744,6 @@ export async function runScenarioForSelected(formData: FormData): Promise<void> 
     to({
       bulk: 'done',
       sent,
-      limited,
       skipped,
       failed,
       notDue,
@@ -853,7 +794,7 @@ export async function markBulkPaid(formData: FormData): Promise<void> {
     })
     .eq('user_id', org.id)
     .eq('status', 'pending')
-    .in('id', ids.slice(0, BULK_LIMIT))
+    .in('id', ids.slice(0, MAX_ROWS_READ))
     .select('id, amount_cents');
 
   if (error) {

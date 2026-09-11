@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { DICTIONARIES } from '@/lib/i18n/dictionaries';
 
-import { ABANDON_AFTER_DAYS, DEFAULT_SCENARIO } from './scenario';
+import { DEFAULT_SCENARIO } from './scenario';
 import { workflowStatus } from './status';
 
 /**
@@ -43,33 +43,23 @@ describe('workflowStatus, where no step applies', () => {
     }
   });
 
-  it('names the invoices the automation has given up on', () => {
-    const status = workflowStatus(
-      pendingSince(ABANDON_AFTER_DAYS + 1),
-      new Set(),
-      TODAY,
-      en,
-      DEFAULT_SCENARIO,
-    );
+  it('keeps reporting a live step however old the invoice is', () => {
+    // This used to read "Automation stopped" past 120 days. The threshold is
+    // gone, so an ancient debt is still on the ladder and the column says so.
+    for (const days of [121, 365, 2000]) {
+      const status = workflowStatus(
+        pendingSince(days),
+        new Set(),
+        TODAY,
+        en,
+        DEFAULT_SCENARIO,
+      );
 
-    expect(status.label).toBe(en.workflow.abandoned);
-    // Real money that nothing is chasing reads as a problem, not as a shrug.
-    expect(status.tone).toBe('danger');
+      expect(status.label, `${days} days`).not.toMatch(/stopped/i);
+    }
   });
 
-  it('still chases on the threshold day itself', () => {
-    // The abandon rule is "past" the threshold, not "at" it. A row that flipped
-    // a day early would stop being chased a day early.
-    const status = workflowStatus(
-      pendingSince(ABANDON_AFTER_DAYS),
-      new Set(),
-      TODAY,
-      en,
-      DEFAULT_SCENARIO,
-    );
 
-    expect(status.label).not.toBe(en.workflow.abandoned);
-  });
 
   it('says an overdue invoice has no step waiting, rather than how late it is', () => {
     const status = workflowStatus(pendingSince(3), new Set(), TODAY, en, empty);

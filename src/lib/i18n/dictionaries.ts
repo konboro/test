@@ -277,10 +277,7 @@ const el = {
     noEmailProvider: 'Δεν έχει ρυθμιστεί πάροχος email (Resend).',
     noPhone: 'Ο πελάτης δεν έχει έγκυρο κινητό.',
     noSmsProvider: 'Δεν έχει ρυθμιστεί πάροχος SMS (Brevo).',
-    limitsOff: 'ΔΟΚΙΜΑΣΤΙΚΗ ΛΕΙΤΟΥΡΓΙΑ: το ημερήσιο όριο επικοινωνίας είναι απενεργοποιημένο.',
-    alreadyContacted: 'Ο πελάτης έχει ήδη ειδοποιηθεί σήμερα — η αποστολή θα απορριφθεί.',
     noChannel: 'Δεν υπάρχει διαθέσιμο κανάλι αποστολής.',
-    dailyLimit: 'Ο πελάτης έχει ήδη ειδοποιηθεί σήμερα. Επιτρέπεται μία επικοινωνία ανά ημέρα.',
     contactFailed: (detail: string) => `Δεν ήταν δυνατή η καταχώριση της επικοινωνίας: ${detail}`,
   },
 
@@ -1074,8 +1071,6 @@ const el = {
       send: 'Αποστολή υπενθύμισης',
       nothingSelected: 'Δεν επιλέχθηκε κανένα παραστατικό.',
       done: (sent: number) => `Στάλθηκαν ${sent} υπενθυμίσεις.`,
-      limited: (n: number) =>
-        `${n} παραλείφθηκαν: ο πελάτης είχε ήδη ειδοποιηθεί σήμερα — επιτρέπεται μία επαφή ανά ημέρα.`,
       skipped: (n: number) => `${n} χωρίς διαθέσιμο κανάλι επικοινωνίας.`,
       failed: (n: number) => `${n} απέτυχαν.`,
       capped: (n: number) =>
@@ -1138,9 +1133,6 @@ const el = {
     deletePaidWarning:
       'Αυτό το παραστατικό είναι εξοφλημένο. Διαγράφοντάς το χάνετε την καταγραφή ότι πληρώθηκε.',
     newManual: 'Χειροκίνητο παραστατικό',
-    limitsOffTitle: 'Δοκιμαστική λειτουργία — το ημερήσιο όριο είναι ανενεργό.',
-    limitsOffBody:
-      'Οι χειροκίνητες υπενθυμίσεις στέλνονται χωρίς περιορισμό και δεν καταγράφονται ως επαφές. Η αυτόματη ροή δεν επηρεάζεται. Αφαιρέστε το UNSAFE_DISABLE_CONTACT_LIMITS πριν σταλεί οτιδήποτε σε πραγματικό πελάτη.',
   },
 
   reminder: {
@@ -1236,7 +1228,7 @@ const el = {
     title: 'Ιστορικό επικοινωνίας',
     subtitle: 'Πλήρες, μη τροποποιήσιμο αρχείο κάθε μηνύματος που στάλθηκε για λογαριασμό σας.',
     cardTitle: 'Τελευταία 200 μηνύματα',
-    cardSubtitle: 'Κάθε πελάτης λαμβάνει το πολύ μία επαφή ανά ημέρα.',
+    cardSubtitle: 'Κάθε μήνυμα που στάλθηκε για λογαριασμό σας, με τη σειρά που έφυγε.',
     emptyTitle: 'Δεν έχει σταλεί κανένα μήνυμα',
     emptyBody:
       'Μόλις υπάρξει παραστατικό που πλησιάζει ή ξεπερνά τη λήξη του, η ροή θα ξεκινήσει αυτόματα.',
@@ -1332,6 +1324,14 @@ const el = {
         title: 'Λογιστική και τράπεζα',
         body: 'Από πού έρχονται τα παραστατικά και πώς αναγνωρίζεται μια εξόφληση.',
       },
+    },
+    channels: {
+      title: 'Κανάλια',
+      hint: 'Ποια κανάλια επιτρέπεται να χρησιμοποιηθούν για τους πελάτες σας. Ισχύει για όλα τα βήματα του σεναρίου, και για όσα δεν έχετε ρυθμίσει ακόμη.',
+      emailHint: 'Υπενθυμίσεις και ειδοποιήσεις με email.',
+      smsHint: 'Υπενθυμίσεις με SMS. Χρεώνονται από το υπόλοιπό σας.',
+      followsMaster: 'Ο κύριος διακόπτης είναι ανενεργός — δεν φεύγει τίποτα σε κανένα κανάλι.',
+      noProvider: 'Δεν έχει ρυθμιστεί πάροχος για αυτό το κανάλι.',
     },
     automation: {
       title: 'Αυτόματες υπενθυμίσεις',
@@ -1518,7 +1518,6 @@ const el = {
     stepSentFinal: (step: string) => `${step} στάλθηκε (τελικό)`,
     stepPending: (step: string) => `${step} σε αναμονή`,
     stepOn: (step: string, date: string) => `${step} · ${date}`,
-    abandoned: 'Εκτός αυτοματισμού',
     nothingScheduled: 'Χωρίς βήμα',
     notStarted: 'Δεν ξεκίνησε',
   },
@@ -1784,10 +1783,7 @@ const en: typeof el = {
     noEmailProvider: 'No email provider is configured (Resend).',
     noPhone: 'The customer has no valid mobile number.',
     noSmsProvider: 'No SMS provider is configured (Brevo).',
-    limitsOff: 'TEST MODE: the daily contact limit is switched off.',
-    alreadyContacted: 'This customer has already been contacted today — the send will be refused.',
     noChannel: 'No delivery channel is available.',
-    dailyLimit: 'This customer has already been contacted today. One contact per day is allowed.',
     contactFailed: (detail: string) => `The contact could not be recorded: ${detail}`,
   },
 
@@ -2560,8 +2556,6 @@ const en: typeof el = {
       send: 'Send reminder',
       nothingSelected: 'No invoice was selected.',
       done: (sent: number) => `${sent} reminders sent.`,
-      limited: (n: number) =>
-        `${n} skipped: the customer had already been contacted today — one contact per day is allowed.`,
       skipped: (n: number) => `${n} had no channel to reach the customer on.`,
       failed: (n: number) => `${n} failed.`,
       capped: (n: number) => `${n} were left out of this batch — select them again to continue.`,
@@ -2622,9 +2616,6 @@ const en: typeof el = {
     deletePaidWarning:
       'This invoice is settled. Deleting it loses the record that it was paid.',
     newManual: 'Manual invoice',
-    limitsOffTitle: 'Testing mode — the daily contact limit is off.',
-    limitsOffBody:
-      'Manual reminders send without any limit and are not recorded as contacts. The automated flow is unaffected. Remove UNSAFE_DISABLE_CONTACT_LIMITS before anything goes to a real customer.',
   },
 
   reminder: {
@@ -2715,7 +2706,7 @@ const en: typeof el = {
     title: 'Message history',
     subtitle: 'A complete, unalterable record of every message sent on your behalf.',
     cardTitle: 'Last 200 messages',
-    cardSubtitle: 'Each customer receives at most one contact per day.',
+    cardSubtitle: 'Every message sent on your behalf, in the order it left.',
     emptyTitle: 'No messages sent yet',
     emptyBody:
       'As soon as an invoice approaches or passes its due date, the flow starts automatically.',
@@ -2811,6 +2802,14 @@ const en: typeof el = {
         title: 'Accounting and bank',
         body: 'Where the invoices come from, and how a settlement is noticed.',
       },
+    },
+    channels: {
+      title: 'Channels',
+      hint: 'Which channels may be used to reach your customers. Applies to every step of the scenario, including the ones you have not set up yet.',
+      emailHint: 'Reminders and notices by email.',
+      smsHint: 'Reminders by SMS. Charged against your balance.',
+      followsMaster: 'The master switch is off — nothing goes out on any channel.',
+      noProvider: 'No provider is configured for this channel.',
     },
     automation: {
       title: 'Automatic reminders',
@@ -2993,7 +2992,6 @@ const en: typeof el = {
     stepSentFinal: (step: string) => `${step} sent (final)`,
     stepPending: (step: string) => `${step} pending`,
     stepOn: (step: string, date: string) => `${step} · ${date}`,
-    abandoned: 'Automation stopped',
     nothingScheduled: 'No step scheduled',
     notStarted: 'Not started',
   },

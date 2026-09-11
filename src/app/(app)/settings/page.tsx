@@ -9,11 +9,12 @@ import { defaultTemplateFor, EDITABLE_SLOTS, slotKey } from '@/lib/dunning/templ
 import { getDictionary, getLocale, type Dictionary } from '@/lib/i18n';
 import { smsCreditsEnforced } from '@/lib/limits';
 import { requireOrganization } from '@/lib/orgs/active';
-import { paymentsAvailable } from '@/lib/providers';
+import { channelAvailable, paymentsAvailable } from '@/lib/providers';
 import { connectConfigured, SMS_PACKS } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
+import { ChannelSwitches } from './channel-switches';
 import { DataSources } from './data-sources';
 import { ElorusForm } from './elorus-forms';
 import { BankConnect } from './bank-forms';
@@ -188,7 +189,7 @@ export default async function SettingsPage({
   const { data: profile, error: profileError } = await supabase
     .from('users')
     .select(
-      'company_name, email, vat_number, business_mode, notify_on_payment, reply_to_email, automation_enabled, mydata_user_id, mydata_environment, mydata_last_sync_at, sms_credits, stripe_account_id, stripe_charges_enabled, locale, timezone, elorus_organization_id, elorus_last_sync_at',
+      'company_name, email, vat_number, business_mode, notify_on_payment, reply_to_email, automation_enabled, mydata_user_id, mydata_environment, mydata_last_sync_at, email_enabled, sms_enabled, sms_credits, stripe_account_id, stripe_charges_enabled, locale, timezone, elorus_organization_id, elorus_last_sync_at',
     )
     .eq('id', org.id)
     .maybeSingle();
@@ -385,6 +386,22 @@ export default async function SettingsPage({
           <AutomationSwitch
             enabled={profile.automation_enabled}
             openInvoices={openInvoices ?? 0}
+          />
+
+          <div className="border-t border-ink-100 px-5 pt-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+              {t.settings.channels.title}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-ink-500">
+              {t.settings.channels.hint}
+            </p>
+          </div>
+          <ChannelSwitches
+            emailEnabled={profile.email_enabled}
+            smsEnabled={profile.sms_enabled}
+            masterOn={profile.automation_enabled}
+            emailAvailable={channelAvailable('email')}
+            smsAvailable={channelAvailable('sms')}
           />
         </div>
       </Card>

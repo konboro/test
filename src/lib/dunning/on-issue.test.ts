@@ -80,7 +80,7 @@ describe('the rungs past the original three', () => {
     expect(rungFor(30, s)?.channels).toEqual(['email', 'sms']);
   });
 
-  it('still stops for good at the abandon threshold', () => {
+  it('runs the last placed rung onward, with no threshold to stop it', () => {
     const s = scenario({
       steps: [
         ...DEFAULT_SCENARIO.steps.map((step) => ({ ...step })),
@@ -89,6 +89,7 @@ describe('the rungs past the original three', () => {
     });
 
     expect(rungFor(119, s)?.step).toBe('step_8');
-    expect(rungFor(121, s)).toBeNull();
+    expect(rungFor(121, s)?.step).toBe('step_8');
+    expect(rungFor(900, s)?.step).toBe('step_8');
   });
 });
