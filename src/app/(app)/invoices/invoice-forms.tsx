@@ -38,6 +38,7 @@ function Submit() {
 export function CreateInvoiceForm({
   debtors,
   scenario,
+  notice,
 }: {
   debtors: Array<{ id: string; name: string }>;
   /**
@@ -46,6 +47,8 @@ export function CreateInvoiceForm({
    * different terms is the moment a person knows that — not a screen later.
    */
   scenario: Scenario;
+  /** The notice wording, for the quick editor — see InvoiceScenarioEditor. */
+  notice?: { emailSubject: string; emailBody: string; smsBody: string };
 }) {
   const t = useT();
   const [state, action] = useActionState<InvoiceFormState, FormData>(createInvoice, {});
@@ -117,7 +120,7 @@ export function CreateInvoiceForm({
       <div className="border-t border-ink-100 pt-4">
         {/* The editor's switch row carries its own title; a caption above it
             would say the same words twice in two type styles. */}
-        <InvoiceScenarioEditor scenario={scenario} />
+        <InvoiceScenarioEditor scenario={scenario} notice={notice} />
       </div>
 
       {state.error ? (

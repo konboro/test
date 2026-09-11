@@ -52,7 +52,16 @@ function Commit() {
  * this" from "we guessed" at a glance, because they are about to turn it into a
  * demand for money.
  */
-export function ReviewCard({ proposal, scenario }: { proposal: Proposal; scenario: Scenario }) {
+export function ReviewCard({
+  proposal,
+  scenario,
+  notice,
+}: {
+  proposal: Proposal;
+  scenario: Scenario;
+  /** The notice wording, for the quick editor — see InvoiceScenarioEditor. */
+  notice?: { emailSubject: string; emailBody: string; smsBody: string };
+}) {
   const t = useT();
   const [state, action] = useActionState<UploadState, FormData>(commitUpload, {});
 
@@ -199,7 +208,7 @@ export function ReviewCard({ proposal, scenario }: { proposal: Proposal; scenari
             belongs here, not on a screen somebody has to remember to visit. */}
         <div className="border-t border-ink-100 pt-4">
           {/* The editor's switch row carries its own title. */}
-          <InvoiceScenarioEditor scenario={scenario} />
+          <InvoiceScenarioEditor scenario={scenario} notice={notice} />
         </div>
 
         {state.error ? (

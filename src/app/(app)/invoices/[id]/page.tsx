@@ -8,7 +8,8 @@ import { loadScenario, stepForInvoice } from '@/lib/dunning/engine';
 import { scenarioWithOverrides } from '@/lib/dunning/scenario';
 import { stepLabels } from '@/lib/dunning/step-labels';
 import { workflowStatus } from '@/lib/dunning/status';
-import { getDictionary } from '@/lib/i18n';
+import { effectiveNoticeTexts } from '@/lib/dunning/template-store';
+import { getDictionary, getLocale } from '@/lib/i18n';
 import { athensDate, formatDate, formatMoney } from '@/lib/money';
 import { requireOrganization } from '@/lib/orgs/active';
 import { createClient } from '@/lib/supabase/server';
@@ -77,6 +78,28 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     supabase.from('invoice_dunning_steps').select('*').eq('invoice_id', invoice.id),
     loadScenario(org.id),
   ]);
+
+  // The wording the quick editor prefills: the invoice's own where it has one,
+  // the account's effective text where not. The account text is also what a
+  // save compares against, so reverting the words by hand deletes the override.
+  const [accountNotice, { data: ownMessages }] = await Promise.all([
+    effectiveNoticeTexts(org.id, await getLocale()),
+    supabase.from('invoice_messages').select('*').eq('invoice_id', invoice.id),
+  ]);
+
+  const ownEmail = (ownMessages ?? []).find(
+    (row) => row.step === 'on_issue' && row.channel === 'email',
+  );
+  const ownSms = (ownMessages ?? []).find(
+    (row) => row.step === 'on_issue' && row.channel === 'sms',
+  );
+
+  const notice = {
+    emailSubject: ownEmail?.subject ?? accountNotice.emailSubject,
+    emailBody: ownEmail?.body ?? accountNotice.emailBody,
+    smsBody: ownSms?.body ?? accountNotice.smsBody,
+  };
+  const noticeCustomised = Boolean(ownEmail || ownSms);
 
   // The cadence THIS document follows — the account's, with the invoice's own
   // rows on top when it has some. The page used to show the account values
@@ -226,6 +249,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           scenario={scenario}
           mode={invoice.scenario_mode}
           show={shownSteps}
+          notice={notice}
+          noticeCustomised={noticeCustomised}
         />
       </Card>
 

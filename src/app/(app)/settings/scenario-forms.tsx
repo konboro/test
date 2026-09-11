@@ -200,6 +200,16 @@ export function ScenarioForm({
         </div>
 
         <p className="mt-2 text-xs leading-relaxed text-ink-500">{t.scenario.onIssueHint}</p>
+
+        {/* The wording lives with the other templates further down this page,
+            which nobody scrolling a scenario card can be expected to know. The
+            link opens that editor directly — the words and the schedule are one
+            decision, split across two sections for layout reasons only. */}
+        <p className="mt-2">
+          <a href="#tpl-on_issue-email" className="text-sm text-brand-700 underline-offset-2 hover:underline">
+            {t.scenario.onIssueEditText}
+          </a>
+        </p>
       </div>
 
       <div className="space-y-4">

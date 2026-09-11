@@ -19,11 +19,13 @@ import { reconcileCheckouts } from '@/lib/payments/reconcile';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { saveFailed } from '@/lib/errors';
-import { formError, getDictionary } from '@/lib/i18n';
+import { formError, getDictionary, getLocale } from '@/lib/i18n';
 import { redirect } from 'next/navigation';
 import { automationPaused, loadScenario, missingColumn, stepForInvoice } from '@/lib/dunning/engine';
 import { noticeOnIssue } from '@/lib/dunning/issue-notice';
 import { invoiceScenarioProblem, parseInvoiceScenario } from '@/lib/dunning/invoice-scenario';
+import { parseInvoiceMessages } from '@/lib/dunning/invoice-messages';
+import { effectiveNoticeTexts } from '@/lib/dunning/template-store';
 import type { InvoiceScenarioMode } from '@/types/database';
 
 export interface InvoiceFormState {
@@ -347,6 +349,14 @@ export async function createInvoice(
   const problem = invoiceScenarioProblem(cadence);
   if (problem) return { error: t.scenario[problem] };
 
+  // The wording the operator may have tweaked beside the cadence. Compared
+  // against the account's effective text: untouched means no row, and the
+  // notice keeps following the account template.
+  const messages = parseInvoiceMessages(
+    formData,
+    await effectiveNoticeTexts(org.id, await getLocale()),
+  );
+
   const base = {
       user_id: org.id,
       debtor_id: parsed.data.debtor_id,
@@ -391,6 +401,20 @@ export async function createInvoice(
     // leave it following the account cadence while claiming its own. Saying so
     // is better than a silent difference nobody can see.
     if (rowsError) return { error: saveFailed(t, 'invoices:scenario', rowsError) };
+  }
+
+  // Before the notice goes out, or it would render the account wording the
+  // operator just replaced. Tolerant of the table missing (deploys and
+  // migrations do not land together): the invoice stands, the notice falls
+  // back to the account text, and the log says why.
+  if (invoiceId && messages.length) {
+    const { error: messageError } = await createAdminClient()
+      .from('invoice_messages')
+      .insert(messages.map((row) => ({ ...row, invoice_id: invoiceId, user_id: org.id })));
+
+    if (messageError) {
+      console.warn('[invoices] invoice_messages write failed', messageError.message);
+    }
   }
 
   // The customer is told the invoice exists, now, while it is being raised —

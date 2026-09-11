@@ -4,9 +4,10 @@ import type { InvoiceRow } from '@/types/database';
 
 import { dispatchContact } from './dispatch';
 import { loadScenario, automationPaused } from './engine';
+import { overlayInvoiceMessages } from './invoice-messages';
 import type { ScenarioNotice } from './scenario';
 import { loadTarget } from './manual';
-import { loadTemplateOverrides } from './template-store';
+import { loadInvoiceMessages, loadTemplateOverrides } from './template-store';
 
 /**
  * The message that goes out when an invoice is raised.
@@ -132,7 +133,13 @@ export async function sendIssueNotice(params: {
     // spent. The message is still written to the log like every other.
     contactId: null,
     channels: scenario.onIssue.channels,
-    overrides: await loadTemplateOverrides(userId),
+    // The invoice's own wording laid over the account's, resolved here so the
+    // dispatcher keeps seeing one set of templates. Precedence in one line:
+    // invoice row, else account override, else built-in copy.
+    overrides: overlayInvoiceMessages(
+      await loadTemplateOverrides(userId),
+      await loadInvoiceMessages(invoiceId),
+    ),
   });
 
   if (outcome.emailsSent === 0 && outcome.smsSent === 0) {

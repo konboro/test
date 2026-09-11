@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useRef, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 
 import { Badge, Button, Field, inputClass, subtleLinkClass } from '@/components/ui';
 import { applyPlaceholders, PLACEHOLDERS, type TemplateContext } from '@/lib/dunning/templates';
@@ -67,6 +67,23 @@ function SlotEditor({ slot }: { slot: TemplateSlotView }) {
   const [resetState, reset, resetting] = useActionState<SettingsState, FormData>(resetTemplate, {});
   const [open, setOpen] = useState(false);
 
+  /** Deep-linkable: `#tpl-on_issue-email` opens this editor from anywhere on the page. */
+  const anchor = `tpl-${slot.key.replace(/:/g, '-')}`;
+
+  useEffect(() => {
+    const openFromHash = () => {
+      if (window.location.hash !== `#${anchor}`) return;
+      setOpen(true);
+      // The panel does not exist until after this state lands, so the native
+      // hash jump has nothing to aim at yet — scroll once it does.
+      queueMicrotask(() => document.getElementById(anchor)?.scrollIntoView());
+    };
+
+    openFromHash();
+    window.addEventListener('hashchange', openFromHash);
+    return () => window.removeEventListener('hashchange', openFromHash);
+  }, [anchor]);
+
   // Held in state so the preview tracks what is typed rather than what was last
   // saved — a preview that lags the textarea is worse than none.
   const [body, setBody] = useState(slot.body);
@@ -95,7 +112,7 @@ function SlotEditor({ slot }: { slot: TemplateSlotView }) {
   }
 
   return (
-    <li className="px-5 py-4">
+    <li id={anchor} className="scroll-mt-24 px-5 py-4">
       <div className="flex items-center justify-between gap-4">
         <button
           type="button"

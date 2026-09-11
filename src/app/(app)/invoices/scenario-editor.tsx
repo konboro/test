@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { Switch } from '@/components/switch';
 import { Field, inputClass } from '@/components/ui';
+import { MESSAGE_FIELD, MESSAGE_LIMITS } from '@/lib/dunning/invoice-messages';
 import { FIELD } from '@/lib/dunning/invoice-scenario';
 import type { Scenario } from '@/lib/dunning/scenario';
 import { stepLabels } from '@/lib/dunning/step-labels';
@@ -26,6 +27,8 @@ export function InvoiceScenarioEditor({
   scenario,
   mode: initialMode = 'default',
   show,
+  notice,
+  noticeCustomised = false,
 }: {
   /**
    * The cadence to prefill: the account's, or — on an invoice that already
@@ -43,6 +46,15 @@ export function InvoiceScenarioEditor({
    * erases the very override that hid it.
    */
   show?: ReadonlyArray<DunningStep>;
+  /**
+   * The wording of the notice on issue, prefilled for the quick editor:
+   * either the account's effective text, or — on an invoice that already has
+   * its own — that. Absent, the quick editor is not offered at all, which is
+   * how surfaces that did not load the texts stay unchanged.
+   */
+  notice?: { emailSubject: string; emailBody: string; smsBody: string };
+  /** Opens the editor expanded — an override that exists should be visible. */
+  noticeCustomised?: boolean;
 }) {
   const t = useT();
   const [on, setOn] = useState(initialMode !== 'off');
@@ -118,6 +130,8 @@ export function InvoiceScenarioEditor({
             ))}
           </div>
 
+          {notice ? <NoticeTextEditor notice={notice} customised={noticeCustomised} /> : null}
+
           {placed.map((step) => (
             <div key={step.step} className="border-t border-ink-100 pt-3">
               <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm font-medium text-ink-900">
@@ -171,6 +185,93 @@ export function InvoiceScenarioEditor({
 
           <p className="text-xs leading-relaxed text-ink-500">
             {t.invoiceScenario.prefillNote} {t.invoiceScenario.customHint}
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The words of the notice, right where it is being switched on.
+ *
+ * Collapsed by default because most invoices say the standard thing — but
+ * raising an invoice is exactly when an operator knows this customer needs
+ * different words, and sending them to Settings (which changes the wording for
+ * everyone) was the only door. Untouched text is not an override: the parser
+ * compares against the account's and stores nothing when they agree.
+ *
+ * Fields render only while expanded, for the same reason the schedule renders
+ * only while the switch is on: a field that is not in the form is "no
+ * override", and hiding it with CSS would submit text nobody looked at.
+ */
+function NoticeTextEditor({
+  notice,
+  customised,
+}: {
+  notice: { emailSubject: string; emailBody: string; smsBody: string };
+  customised: boolean;
+}) {
+  const t = useT();
+  const [open, setOpen] = useState(customised);
+
+  return (
+    <div className="rounded-lg border border-ink-200">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className="flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-ink-700 transition hover:bg-ink-50"
+      >
+        <span className="font-medium">
+          {t.invoiceScenario.noticeTextToggle}
+          {customised ? (
+            <span className="ml-2 rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700">
+              {t.invoiceScenario.noticeTextCustom}
+            </span>
+          ) : null}
+        </span>
+        <span aria-hidden className="text-ink-400">
+          {open ? '▴' : '▾'}
+        </span>
+      </button>
+
+      {open ? (
+        <div className="space-y-3 border-t border-ink-100 p-3">
+          <Field label={t.invoiceScenario.noticeEmailSubject}>
+            <input
+              name={MESSAGE_FIELD.subject('on_issue', 'email')}
+              defaultValue={notice.emailSubject}
+              maxLength={MESSAGE_LIMITS.subject}
+              className={inputClass}
+            />
+          </Field>
+
+          <Field label={t.invoiceScenario.noticeEmailBody}>
+            <textarea
+              name={MESSAGE_FIELD.body('on_issue', 'email')}
+              defaultValue={notice.emailBody}
+              rows={7}
+              maxLength={MESSAGE_LIMITS.body}
+              className={`${inputClass} font-mono text-xs leading-relaxed`}
+            />
+          </Field>
+
+          <Field label={t.invoiceScenario.noticeSmsBody}>
+            <textarea
+              name={MESSAGE_FIELD.body('on_issue', 'sms')}
+              defaultValue={notice.smsBody}
+              rows={2}
+              maxLength={MESSAGE_LIMITS.body}
+              className={`${inputClass} font-mono text-xs leading-relaxed`}
+            />
+          </Field>
+
+          <p className="text-xs leading-relaxed text-ink-500">
+            {t.invoiceScenario.noticeTextHint}
+          </p>
+          <p className="tabular text-xs text-ink-400">
+            {'{{invoice}} {{amount}} {{due_date}} {{pay_url}} {{debtor_name}} {{creditor_name}}'}
           </p>
         </div>
       ) : null}
