@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { issueNoticeDecision } from './issue-notice';
-import { ABANDON_AFTER_DAYS, DEFAULT_SCENARIO, rungFor } from './scenario';
+import { DEFAULT_SCENARIO, rungFor } from './scenario';
 
 const TODAY = '2026-08-28';
 
@@ -78,9 +78,13 @@ describe('where a late arrival lands on the ladder', () => {
     for (let day = 0; day <= 30; day += 1) expect(step(day)).not.toBe('pre_due');
   });
 
-  it('leaves a very old debt alone entirely', () => {
-    // Past the abandon threshold nothing fires at all, however it was entered.
-    expect(step(ABANDON_AFTER_DAYS)).toBe('overdue_10');
-    expect(step(ABANDON_AFTER_DAYS + 1)).toBeNull();
+  it('never stops chasing an invoice for being old', () => {
+    // There used to be a threshold — 120 days — past which nothing fired again,
+    // however the invoice had been entered. It was removed deliberately: a debt
+    // does not stop being owed because it aged, and the operator's largest
+    // balance was sitting on the wrong side of it.
+    for (const day of [120, 121, 365, 2000]) {
+      expect(step(day), `${day} days overdue`).toBe('overdue_10');
+    }
   });
 });

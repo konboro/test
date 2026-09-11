@@ -41,8 +41,8 @@ describe('the default scenario', () => {
     // windows are for.
     expect(rungFor(-1, scenario())?.step).toBe('pre_due');
     expect(rungFor(9, scenario())?.step).toBe('overdue_2');
-    expect(rungFor(400, scenario())).toBeNull();
     expect(rungFor(119, scenario())?.step).toBe('overdue_10');
+    expect(rungFor(400, scenario())?.step).toBe('overdue_10');
   });
 
   it('says nothing in the gap the ladder leaves around the due date', () => {
@@ -50,8 +50,11 @@ describe('the default scenario', () => {
     expect(rungFor(1, scenario())).toBeNull();
   });
 
-  it('stops for good after 120 days', () => {
-    expect(rungFor(121, scenario())).toBeNull();
+  it('has no age at which it gives up', () => {
+    // There used to be one, at 120 days. It was removed: the operator's largest
+    // balance sat on the wrong side of it, uncontacted and unreported.
+    expect(rungFor(121, scenario())?.step).toBe('overdue_10');
+    expect(rungFor(3650, scenario())?.step).toBe('overdue_10');
   });
 });
 
@@ -123,9 +126,9 @@ describe('repeating the last step', () => {
     expect(rungFor(60, scenario())).toMatchObject({ step: 'overdue_10', cycle: 0 });
   });
 
-  it('never repeats past the abandon point', () => {
+  it('goes on repeating past the day it used to give up on', () => {
     const s = scenario({ repeat: { enabled: true, everyDays: 30, max: 6 } });
-    expect(rungFor(130, s)).toBeNull();
+    expect(rungFor(130, s)).not.toBeNull();
   });
 });
 

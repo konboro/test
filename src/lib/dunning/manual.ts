@@ -25,14 +25,12 @@ import {
   tenantLocale,
   type LanguageChoice,
 } from '@/lib/i18n/message-locale';
-import { contactLimitsDisabled } from '@/lib/limits';
-import { athensDate, formatDate, zonedDate } from '@/lib/money';
+import { formatDate, zonedDate } from '@/lib/money';
 import { channelAvailable, providerStatus, type Channel } from '@/lib/providers';
 import { normalisePhone, segmentCount } from '@/lib/sms/send';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { DebtorRow, InvoiceRow, TemplateStep, UserRow } from '@/types/database';
 
-import { contactedOn, LOOKBACK_HOURS } from './already-contacted';
 import { dispatchContact, templateContext } from './dispatch';
 import { isSnoozed } from './snooze';
 import { loadTemplateOverrides } from './template-store';
@@ -47,7 +45,7 @@ import { getDictionary, type Dictionary } from '@/lib/i18n';
  * make a working safeguard look like a fault. Comparing the translated message
  * would work only until someone rewords it.
  */
-export type ManualFailure = 'daily_limit';
+export type ManualFailure = never;
 
 export interface ManualReminderResult {
   ok: boolean;
@@ -219,21 +217,11 @@ function resolveChannels(
 }
 
 /** True when this debtor has already used up today's single contact. */
-async function contactedToday(debtorId: string): Promise<boolean> {
-  const { count } = await createAdminClient()
-    .from('dunning_contacts')
-    .select('id', { count: 'exact', head: true })
-    .eq('debtor_id', debtorId)
-    .eq('contact_on', athensDate());
-
-  return (count ?? 0) > 0;
-}
-
 /**
  * Renders what would be sent, without sending or claiming anything.
  *
  * Read-only by construction: it never touches dunning_contacts, so opening the
- * preview can never cost the debtor their one contact for the day.
+ * preview records nothing and changes no bookkeeping.
  */
 export async function previewManualReminder(params: {
   userId: string;
@@ -282,12 +270,6 @@ export async function previewManualReminder(params: {
   const { channels: available, notes } = resolveChannels(debtor, t);
   // What the operator asked for, narrowed to what is actually possible.
   const channels = narrowChannels(available, params.only ?? 'both');
-
-  if (contactLimitsDisabled()) {
-    notes.push(t.manual.limitsOff);
-  } else if (await contactedToday(debtor.id)) {
-    notes.push(t.manual.alreadyContacted);
-  }
 
   return {
     ok: true,
@@ -339,58 +321,30 @@ export async function sendManualReminder(params: {
     return fail(notes.join(' ') || t.manual.noChannel);
   }
 
-  // Has this person already heard from us today?
-  //
-  // Asked of the send log, not of the claim, and asked whatever the testing
-  // flag says. The claim is the ledger; this is the fact. With the flag on the
-  // ledger is not written at all, which is how fifty customers were written to
-  // with nothing recorded and one of them twice — the flag was meant to skip
-  // bookkeeping and quietly removed the protection with it.
-  const dayStart = new Date(Date.now() - LOOKBACK_HOURS * 60 * 60 * 1000).toISOString();
-  const { data: alreadySent } = await supabase
-    .from('communications_log')
-    .select('sent_at')
-    .eq('user_id', userId)
-    .eq('debtor_id', debtor.id)
-    .eq('status', 'sent')
-    .gte('sent_at', dayStart);
+  // The row records the contact; it is no longer permission to make one. It used
+  // to be both — claiming it was how the one-a-day rule was enforced, and a
+  // duplicate came back as a refusal. The rule is gone, so this only writes the
+  // history that the log and the ladder read.
+  const { data: contact, error: contactError } = await supabase
+    .from('dunning_contacts')
+    .insert({
+      user_id: userId,
+      debtor_id: debtor.id,
+      invoice_id: invoice.id,
+      // Null step and manual = true: this is a contact, not a rung. The chosen
+      // wording above does not change that.
+      step: null,
+      manual: true,
+      contact_on: zonedDate(tenant.timezone),
+    })
+    .select('id')
+    .single();
 
-  if (contactedOn(alreadySent ?? [], tenant.timezone, zonedDate(tenant.timezone))) {
-    return fail(t.manual.dailyLimit, 'daily_limit');
+  if (contactError || !contact) {
+    return fail(t.manual.contactFailed(contactError?.message ?? ''));
   }
 
-  // Claiming the row is what grants the right to contact this debtor today.
-  //
-  // With the testing flag on, nothing is claimed at all: the send goes out
-  // unmetered and `dunning_contacts` is left untouched, so ladder bookkeeping is
-  // identical to never having pressed the button. See lib/limits.ts.
-  let contactId: string | null = null;
-
-  if (!contactLimitsDisabled()) {
-    const { data: contact, error: contactError } = await supabase
-      .from('dunning_contacts')
-      .insert({
-        user_id: userId,
-        debtor_id: debtor.id,
-        invoice_id: invoice.id,
-        // Null step and manual = true: this is a contact, not a rung. The chosen
-        // wording above does not change that.
-        step: null,
-        manual: true,
-        contact_on: zonedDate(tenant.timezone),
-      })
-      .select('id')
-      .single();
-
-    if (contactError || !contact) {
-      if (contactError?.code === '23505') {
-        return fail(t.manual.dailyLimit, 'daily_limit');
-      }
-      return fail(t.manual.contactFailed(contactError?.message ?? ''));
-    }
-
-    contactId = contact.id;
-  }
+  const contactId = contact.id;
 
   const outcome = await dispatchContact({
     tenant,

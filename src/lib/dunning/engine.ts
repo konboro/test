@@ -414,15 +414,15 @@ async function processTenant(
 
     const outcome = await deliver(tenant, candidate, today, result, dryRun, overrides);
 
-    // `dailyLimit` means the debtor was already contacted today (by an earlier
+    // `stepAlreadySent` means the rung is already on file (by an earlier
     // run, or a concurrent worker) — nothing else will get through for them.
-    if (outcome === 'contacted' || outcome === 'dailyLimit') {
+    if (outcome === 'contacted') {
       contactedThisRun.add(candidate.debtor.id);
     }
   }
 }
 
-type DeliveryOutcome = 'contacted' | 'dailyLimit' | 'stepAlreadySent' | 'skipped';
+type DeliveryOutcome = 'contacted' | 'stepAlreadySent' | 'skipped';
 
 async function deliver(
   tenant: UserRow,
@@ -493,12 +493,12 @@ async function deliver(
     // 23505 = unique_violation. Which index tripped decides what happens next,
     // so read the constraint name rather than guessing.
     if (contactError?.code === '23505') {
-      const dailyLimit = (contactError.message ?? '').includes('one_per_debtor_per_day');
+
       result.skipped.push({
         invoiceId: invoice.id,
-        reason: dailyLimit ? 'daily contact limit reached' : 'step already sent for this invoice',
+        reason: 'step already sent for this invoice',
       });
-      return dailyLimit ? 'dailyLimit' : 'stepAlreadySent';
+      return 'stepAlreadySent';
     }
 
     result.errors.push({

@@ -5,7 +5,6 @@ import type { DunningStep, InvoiceRow } from '@/types/database';
 import { stepForInvoice } from './engine';
 import { stepShort } from './step-labels';
 import {
-  ABANDON_AFTER_DAYS,
   activeSteps,
   DEFAULT_SCENARIO,
   LADDER_STEPS,
@@ -90,17 +89,10 @@ export function workflowStatus(
     };
   }
 
-  // Nothing on the ladder applies to this invoice. These two branches used to
-  // answer with the number of days late — which is the aging column, one cell to
-  // the left, saying the same thing in different words. This column's subject is
+  // Nothing on the ladder applies to this invoice. These branches used to answer
+  // with the number of days late — which is the aging column, one cell to the
+  // left, saying the same thing in different words. This column's subject is
   // what the chase is doing, so when it is doing nothing it says why.
-  //
-  // Three reasons, and they are not the same news. Past the abandon threshold
-  // the automation will never touch the invoice again, and that is the state
-  // worth naming: it is how a book quietly fills with debts nobody is chasing.
-  if (daysOverdue > ABANDON_AFTER_DAYS) {
-    return { label: t.workflow.abandoned, tone: 'danger', daysOverdue };
-  }
 
   // Sitting between two rungs, or waiting for the first one. Neither is
   // "nothing scheduled" if a rung is genuinely coming, and the date is the
