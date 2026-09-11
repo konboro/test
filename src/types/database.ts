@@ -88,6 +88,16 @@ export type UserRow = {
   payment_provider: PaymentProviderName | null;
   sms_credits: number;
   automation_enabled: boolean;
+  /**
+   * Whether this channel may be used to reach a debtor at all.
+   *
+   * An account-wide no, above the per-step choice: a tenant who does not want
+   * text messages wants one switch, and wants it to hold for the rungs they have
+   * not configured yet. Both default true, so they only ever mean something a
+   * person has actually said.
+   */
+  email_enabled: boolean;
+  sms_enabled: boolean;
   reply_to_email: string | null;
   locale: UserLocale;
   /**

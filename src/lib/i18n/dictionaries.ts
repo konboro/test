@@ -1317,6 +1317,14 @@ const el = {
         body: 'Από πού έρχονται τα παραστατικά και πώς αναγνωρίζεται μια εξόφληση.',
       },
     },
+    channels: {
+      title: 'Κανάλια',
+      hint: 'Ποια κανάλια επιτρέπεται να χρησιμοποιηθούν για τους πελάτες σας. Ισχύει για όλα τα βήματα του σεναρίου, και για όσα δεν έχετε ρυθμίσει ακόμη.',
+      emailHint: 'Υπενθυμίσεις και ειδοποιήσεις με email.',
+      smsHint: 'Υπενθυμίσεις με SMS. Χρεώνονται από το υπόλοιπό σας.',
+      followsMaster: 'Ο κύριος διακόπτης είναι ανενεργός — δεν φεύγει τίποτα σε κανένα κανάλι.',
+      noProvider: 'Δεν έχει ρυθμιστεί πάροχος για αυτό το κανάλι.',
+    },
     automation: {
       title: 'Αυτόματες υπενθυμίσεις',
       subtitle: 'Ο κεντρικός διακόπτης. Όσο είναι κλειστός, δεν φεύγει κανένα μήνυμα σε κανέναν πελάτη.',
@@ -2778,6 +2786,14 @@ const en: typeof el = {
         title: 'Accounting and bank',
         body: 'Where the invoices come from, and how a settlement is noticed.',
       },
+    },
+    channels: {
+      title: 'Channels',
+      hint: 'Which channels may be used to reach your customers. Applies to every step of the scenario, including the ones you have not set up yet.',
+      emailHint: 'Reminders and notices by email.',
+      smsHint: 'Reminders by SMS. Charged against your balance.',
+      followsMaster: 'The master switch is off — nothing goes out on any channel.',
+      noProvider: 'No provider is configured for this channel.',
     },
     automation: {
       title: 'Automatic reminders',

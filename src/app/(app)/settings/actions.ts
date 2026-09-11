@@ -78,6 +78,50 @@ export async function updateProfile(
 }
 
 /**
+ * Turns one channel on or off for the whole account.
+ *
+ * Above the per-step choice rather than instead of it. A tenant who does not
+ * want text messages at all was left editing every rung of the scenario to take
+ * 'sms' out of each, which is a per-step answer to a question about the account
+ * — and says nothing about the rungs they have not configured yet.
+ *
+ * Nothing is rewritten when this is switched: the scenario keeps its channels
+ * and the narrowing happens per send, so turning a channel back on restores the
+ * steps exactly as they were instead of leaving somebody to rebuild them.
+ */
+export async function setChannel(
+  _prev: SettingsState,
+  formData: FormData,
+): Promise<SettingsState> {
+  const t = await getDictionary();
+
+  const channel = String(formData.get('channel') ?? '');
+  if (channel !== 'email' && channel !== 'sms') {
+    return { error: t.forms.errors.invalidData };
+  }
+
+  // Anything that is not an explicit "on" means off, the same reading the master
+  // switch takes: a malformed request stops messages rather than starting them.
+  const enabled = formData.get('enabled') === 'on';
+
+  const supabase = await createClient();
+  const org = await writableOrganization();
+  if (!org) return { error: t.forms.errors.unauthorized };
+
+  const { error } = await supabase
+    .from('users')
+    .update(channel === 'email' ? { email_enabled: enabled } : { sms_enabled: enabled })
+    .eq('id', org.id);
+
+  if (error) return { error: saveFailed(t, 'settings', error) };
+
+  revalidatePath('/settings');
+  revalidatePath('/dashboard');
+
+  return { success: t.forms.success.settingsSaved };
+}
+
+/**
  * Turns the whole reminder automation on or off.
  *
  * Deliberately not part of the profile form. It used to ride along with the

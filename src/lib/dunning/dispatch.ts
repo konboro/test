@@ -92,10 +92,7 @@ export async function dispatchContact(params: {
    * Only ever set for a manual send: a rung has exactly one wording.
    */
   templateVariant?: TemplateVariant;
-  /**
-   * Null only when the contact limits are lifted for testing, in which case no
-   * contact row exists to point at. The message is still logged.
-   */
+  /** The contact row this message belongs to, where there is one. */
   contactId: string | null;
   channels: ReadonlyArray<Channel>;
   overrides: TemplateOverrides;
@@ -107,7 +104,20 @@ export async function dispatchContact(params: {
    */
   locale?: Locale;
 }): Promise<DispatchOutcome> {
-  const { tenant, debtor, invoice, step, contactId, channels } = params;
+  const { tenant, debtor, invoice, step, contactId } = params;
+
+  // The account's own answer about each channel, applied here rather than at the
+  // three call sites.
+  //
+  // Every send in the product comes through this function — the nightly sweep,
+  // the notice when an invoice is raised, and the button an operator presses —
+  // so narrowing once is what makes one switch mean the same thing on all three.
+  // Applied per send rather than by rewriting the scenario, because switching a
+  // channel back on has to restore the steps as they were rather than leave the
+  // tenant to rebuild them.
+  const channels = params.channels.filter((channel) =>
+    channel === 'email' ? tenant.email_enabled !== false : tenant.sms_enabled !== false,
+  );
 
   const authoredIn = tenantLocale(tenant);
   const locale = params.locale ?? resolveDebtorLocale(debtor, authoredIn);
