@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { activeSteps, DEFAULT_SCENARIO, rungFor, type Scenario } from './scenario';
+import {
+  activeSteps,
+  DEFAULT_SCENARIO,
+  nextScheduledRung,
+  rungFor,
+  type Scenario,
+} from './scenario';
 
 const scenario = (over: Partial<Scenario> = {}): Scenario => ({
   ...DEFAULT_SCENARIO,
@@ -120,5 +126,62 @@ describe('repeating the last step', () => {
   it('never repeats past the abandon point', () => {
     const s = scenario({ repeat: { enabled: true, everyDays: 30, max: 6 } });
     expect(rungFor(130, s)).toBeNull();
+  });
+});
+
+/**
+ * The status column used to say "step 3 pending", which answers a question
+ * nobody asked. These pin the answer it gives instead: the day something
+ * happens — and, as importantly, silence when nothing will.
+ */
+describe('nextScheduledRung', () => {
+  // The built-in cadence: a nudge the day before, then day 3 and day 10.
+  const TODAY = '2026-09-11';
+
+  it('names the first rung and the day it lands, before the invoice is due', () => {
+    expect(nextScheduledRung('2026-09-20', TODAY, DEFAULT_SCENARIO)).toEqual({
+      step: 'pre_due',
+      on: '2026-09-19',
+    });
+  });
+
+  it('looks past a rung whose window has closed rather than promising it', () => {
+    // Due today: the pre-due nudge was yesterday and its window ended with it.
+    // Reporting 10/09 would promise a message that is never going to be sent.
+    expect(nextScheduledRung(TODAY, TODAY, DEFAULT_SCENARIO)).toEqual({
+      step: 'overdue_2',
+      on: '2026-09-14',
+    });
+  });
+
+  it('reports a missed rung as today, because that is when it catches up', () => {
+    // Five days overdue: day 3 was the 9th and its window runs to day 9, so the
+    // next sweep sends it. The honest date is today, not the day it was due.
+    expect(nextScheduledRung('2026-09-06', TODAY, DEFAULT_SCENARIO)).toEqual({
+      step: 'overdue_2',
+      on: TODAY,
+    });
+  });
+
+  it('skips what has already been sent', () => {
+    expect(
+      nextScheduledRung('2026-09-06', TODAY, DEFAULT_SCENARIO, new Set(['overdue_2'])),
+    ).toEqual({ step: 'overdue_10', on: '2026-09-16' });
+  });
+
+  it('says nothing when the whole ladder is behind us', () => {
+    expect(
+      nextScheduledRung(
+        '2026-09-06',
+        TODAY,
+        DEFAULT_SCENARIO,
+        new Set(['pre_due', 'overdue_2', 'overdue_10']),
+      ),
+    ).toBeNull();
+  });
+
+  it('says nothing when the tenant placed no rungs at all', () => {
+    const empty = scenario({ steps: DEFAULT_SCENARIO.steps.map((s) => ({ ...s, enabled: false })) });
+    expect(nextScheduledRung('2026-09-06', TODAY, empty)).toBeNull();
   });
 });

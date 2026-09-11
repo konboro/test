@@ -118,3 +118,26 @@ describe('workflowStatus, where a step does apply', () => {
     expect(status.tone).toBe('positive');
   });
 });
+
+describe('workflowStatus, when a step is still coming', () => {
+  it('says which day rather than the word pending', () => {
+    // Due in five days, default cadence: the nudge lands the day before.
+    const status = workflowStatus(
+      { status: 'pending', due_date: addDays(TODAY, 5) },
+      new Set(),
+      TODAY,
+      en,
+    );
+
+    expect(status.label).toContain('15/09');
+    expect(status.label).not.toContain('pending');
+    expect(status.label).not.toContain('Not started');
+  });
+
+  it('dates the rung that is due today too', () => {
+    const status = workflowStatus(pendingSince(3), new Set(), TODAY, en);
+
+    expect(status.label).toContain(en.steps.shortOverdue2);
+    expect(status.label).toMatch(/[0-9]{2}.[0-9]{2}/);
+  });
+});

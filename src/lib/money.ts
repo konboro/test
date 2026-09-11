@@ -80,6 +80,21 @@ export function addDays(isoDate: string, days: number): string {
  * carried one produced an Invalid Date, which is a crashed page rather than a
  * wrong-looking one. Taking the leading day makes both work and neither shift.
  */
+/**
+ * A date for a column that has no room for a year.
+ *
+ * The workflow cell reports the day a step is due, next to an amount and two
+ * badges. "13/09" fits there and "13 Σεπτεμβρίου 2026" does not, and inside a
+ * chase that never runs past 120 days the year carries no information anyway.
+ */
+export function formatDayMonth(isoDate: string, locale = 'el-GR'): string {
+  return new Date(`${isoDate}T00:00:00Z`).toLocaleDateString(locale, {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: 'UTC',
+  });
+}
+
 export function formatDate(isoDate: string, locale = 'el-GR'): string {
   return new Intl.DateTimeFormat(locale, {
     day: '2-digit',

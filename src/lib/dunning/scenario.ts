@@ -11,6 +11,9 @@
  * module only has to respect what it is given.
  */
 
+// Date arithmetic only — both are pure, so the module keeps its promise of
+// having no clock of its own.
+import { addDays, daysBetween } from '@/lib/money';
 import type { DunningStep } from '@/types/database';
 
 export type Channel = 'email' | 'sms';
@@ -198,6 +201,52 @@ export function activeSteps(scenario: Scenario): ScenarioStep[] {
  * run is caught up on the following day instead of being skipped — the same
  * property the fixed ladder had, now derived rather than written out.
  */
+export interface ScheduledRung {
+  step: DunningStep;
+  /** The day it is due to go out, as YYYY-MM-DD. */
+  on: string;
+}
+
+/**
+ * The next rung that will actually fire, and the day it is due to.
+ *
+ * The status column used to say "step 3 pending", which answers a question
+ * nobody asked — of course it is pending, it has not happened. What an operator
+ * wants from that cell is when, so they can decide whether to wait or to press
+ * the button themselves.
+ *
+ * Two things stop this being a simple lookup of the next offset. A rung already
+ * sent is behind us. And a rung whose day has passed without firing has not
+ * merely slipped — its window may have closed, because each rung only applies
+ * until the next one begins. So a date in the past is reported as today only
+ * when today is still inside that rung's window, which is exactly the question
+ * `rungFor` already answers; otherwise the rung is skipped, because it is never
+ * going to happen and promising it would be worse than saying nothing.
+ */
+export function nextScheduledRung(
+  dueDate: string,
+  today: string,
+  scenario: Scenario,
+  completed: ReadonlySet<DunningStep> = new Set(),
+): ScheduledRung | null {
+  const dueToday = rungFor(daysBetween(dueDate, today), scenario);
+
+  for (const step of activeSteps(scenario)) {
+    if (completed.has(step.step)) continue;
+
+    const on = addDays(dueDate, step.offsetDays);
+
+    // Still ahead of us: this is the one, on its own day.
+    if (on >= today) return { step: step.step, on };
+
+    // Behind us, but today is inside its window — a run that was missed is
+    // caught up on the next sweep, which is today.
+    if (dueToday?.step === step.step) return { step: step.step, on: today };
+  }
+
+  return null;
+}
+
 export function rungFor(daysOverdue: number, scenario: Scenario): Rung | null {
   if (daysOverdue > ABANDON_AFTER_DAYS) return null;
 

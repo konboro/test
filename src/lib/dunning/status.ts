@@ -1,5 +1,5 @@
 import { DICTIONARIES, type Dictionary } from '@/lib/i18n/dictionaries';
-import { athensDate, daysBetween } from '@/lib/money';
+import { athensDate, daysBetween, formatDayMonth } from '@/lib/money';
 import type { DunningStep, InvoiceRow } from '@/types/database';
 
 import { stepForInvoice } from './engine';
@@ -9,6 +9,7 @@ import {
   activeSteps,
   DEFAULT_SCENARIO,
   LADDER_STEPS,
+  nextScheduledRung,
   type Scenario,
 } from './scenario';
 
@@ -72,10 +73,18 @@ export function workflowStatus(
     };
   }
 
+  // What is coming, and when. Computed once because all three branches below
+  // want it: an invoice with a step due today, one not due yet, and one sitting
+  // in a gap between rungs are three different states, but the useful thing to
+  // say about each is the same — the next date something happens.
+  const upcoming = nextScheduledRung(invoice.due_date, today, scenario, completedSteps);
+
   const pending = stepForInvoice(invoice.due_date, today, scenario);
   if (pending) {
+    const on = upcoming?.step === pending.step ? upcoming.on : today;
+
     return {
-      label: t.workflow.stepPending(short[pending.step]),
+      label: t.workflow.stepOn(short[pending.step], formatDayMonth(on, t.dateTimeTag)),
       tone: pending.step === 'pre_due' ? 'info' : 'warning',
       daysOverdue,
     };
@@ -93,13 +102,25 @@ export function workflowStatus(
     return { label: t.workflow.abandoned, tone: 'danger', daysOverdue };
   }
 
-  // Overdue and inside the window, but no step covers today — an empty scenario,
-  // or a gap between the rungs the tenant placed.
+  // Sitting between two rungs, or waiting for the first one. Neither is
+  // "nothing scheduled" if a rung is genuinely coming, and the date is the
+  // whole answer: an invoice three days late with the next step on the 13th is
+  // not a problem, and one with no step at all is.
+  if (upcoming) {
+    return {
+      label: t.workflow.stepOn(short[upcoming.step], formatDayMonth(upcoming.on, t.dateTimeTag)),
+      tone: daysOverdue > 0 ? 'warning' : 'neutral',
+      daysOverdue,
+    };
+  }
+
+  // Overdue, inside the window, and nothing will ever run — an empty scenario,
+  // or every rung already sent.
   if (daysOverdue > 0) {
     return { label: t.workflow.nothingScheduled, tone: 'danger', daysOverdue };
   }
 
-  // Not due yet, with no pre-due step to run. The chase has not begun.
+  // Not due yet, with nothing placed before the due date. The chase has not begun.
   return { label: t.workflow.notStarted, tone: 'neutral', daysOverdue };
 }
 
