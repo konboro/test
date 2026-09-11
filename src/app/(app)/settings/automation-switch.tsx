@@ -17,13 +17,22 @@ import { setAutomation, type SettingsState } from './actions';
  * in front of it is how someone ends up watching reminders go out while they
  * click through a confirmation. Switching on asks first.
  */
-function Control({ on, onRequestEnable }: { on: boolean; onRequestEnable: () => void }) {
+function Control({
+  on,
+  hero,
+  onRequestEnable,
+}: {
+  on: boolean;
+  hero: boolean;
+  onRequestEnable: () => void;
+}) {
   const t = useT();
   const { pending } = useFormStatus();
 
   return (
     <Switch
       on={on}
+      size={hero ? 'xl' : 'lg'}
       label={t.settings.automation.title}
       // Off → on goes through the confirmation panel, so the control only
       // submits in the direction that needs no confirming.
@@ -48,16 +57,26 @@ function ConfirmButton() {
 export function AutomationSwitch({
   enabled,
   openInvoices,
+  hero = false,
 }: {
   enabled: boolean;
   openInvoices: number;
+  /**
+   * Rendered as the thing the screen is about rather than a row in a list.
+   *
+   * The dashboard wants the master switch at a size that matches what it
+   * governs — whether a hundred and forty customers get written to on their
+   * own. The settings row stays as it was; the same component draws both, so
+   * the two can never end up meaning subtly different things.
+   */
+  hero?: boolean;
 }) {
   const t = useT();
   const [state, action] = useActionState<SettingsState, FormData>(setAutomation, {});
   const [confirming, setConfirming] = useState(false);
 
   return (
-    <form action={action} className="space-y-4 px-5 py-5">
+    <form action={action} className={hero ? 'space-y-4 px-5 py-6 sm:px-6' : 'space-y-4 px-5 py-5'}>
       {/*
         Carries what the click switches *to*, not what is currently shown. The
         server then never has to infer the new value from a control that may be
@@ -68,14 +87,24 @@ export function AutomationSwitch({
 
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-ink-900">{t.fields.automationOn}</p>
-          <p className="mt-1 text-xs leading-relaxed text-ink-500">{t.fields.automationHint}</p>
+          <p className={hero ? 'text-base font-semibold text-ink-900' : 'text-sm font-medium text-ink-900'}>
+            {t.fields.automationOn}
+          </p>
+          <p
+            className={
+              hero
+                ? 'mt-1 max-w-xl text-sm leading-relaxed text-ink-600'
+                : 'mt-1 text-xs leading-relaxed text-ink-500'
+            }
+          >
+            {t.fields.automationHint}
+          </p>
         </div>
 
         <div className="flex shrink-0 flex-col items-center gap-1.5">
-          <Control on={enabled} onRequestEnable={() => setConfirming(true)} />
+          <Control on={enabled} hero={hero} onRequestEnable={() => setConfirming(true)} />
           <span
-            className={`text-xs font-medium ${enabled ? 'text-emerald-700' : 'text-ink-500'}`}
+            className={`font-medium ${hero ? 'text-sm' : 'text-xs'} ${enabled ? 'text-emerald-700' : 'text-ink-500'}`}
           >
             {enabled ? t.settings.automation.stateOn : t.settings.automation.stateOff}
           </span>

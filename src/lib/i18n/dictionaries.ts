@@ -993,8 +993,6 @@ const el = {
     title: 'Επισκόπηση',
     lastSync: (when: string) => `Τελευταίος συγχρονισμός myDATA: ${when}`,
     neverSynced: 'Δεν έχει γίνει ακόμη συγχρονισμός με το myDATA.',
-    automationOff: 'Η αυτοματοποίηση είναι απενεργοποιημένη. Δεν θα σταλεί καμία υπενθύμιση.',
-    settingsLink: 'Ρυθμίσεις',
     unreachable: (count: number) =>
       `${count} ${count === 1 ? 'πελάτης' : 'πελάτες'} με ανεξόφλητα παραστατικά δεν έχουν email ή τηλέφωνο — δεν μπορούν να λάβουν υπενθύμιση.`,
     fixContacts: 'Συμπλήρωση στοιχείων',
@@ -2471,8 +2469,6 @@ const en: typeof el = {
     title: 'Overview',
     lastSync: (when: string) => `Last myDATA sync: ${when}`,
     neverSynced: 'No myDATA sync has run yet.',
-    automationOff: 'Automation is switched off. No reminders will be sent.',
-    settingsLink: 'Settings',
     unreachable: (count: number) =>
       `${count} ${count === 1 ? 'customer' : 'customers'} with unpaid invoices have neither an email nor a phone number — they cannot be reminded.`,
     fixContacts: 'Add contact details',

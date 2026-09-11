@@ -13,6 +13,7 @@ import type { DunningStep } from '@/types/database';
 import { loadScenario } from '@/lib/dunning/engine';
 import { requireOrganization } from '@/lib/orgs/active';
 
+import { AutomationSwitch } from '../settings/automation-switch';
 import { CreateInvoiceForm } from '../invoices/invoice-forms';
 import { Dropzone } from '../invoices/upload/dropzone';
 
@@ -284,20 +285,29 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* The title stands alone now. It used to carry myDATA's last sync time
-          as though that spoke for every source, which it never did — the
-          billing system and the bank had their own clocks and neither was
-          shown. All three are reported together, further down. */}
+      {/* The title stands alone. It used to carry myDATA's last sync time as
+          though that spoke for every source, which it never did — the billing
+          system and the bank had their own clocks and neither was shown. All
+          three are reported together on the settings screen. */}
       <h1 className="text-xl font-semibold text-ink-900">{t.dashboard.title}</h1>
 
-      {profile && !profile.automation_enabled ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          {t.dashboard.automationOff}{' '}
-          <Link href="/settings" className="font-medium underline">
-            {t.dashboard.settingsLink}
-          </Link>
-        </div>
-      ) : null}
+      {/* The master switch, at the size of what it governs.
+          It used to be a banner here that said automation was off and sent the
+          reader to settings to do something about it — a notice about a control
+          rather than the control. Whether the product writes to customers on its
+          own is the single biggest thing about it, so it is the first thing on
+          the screen and it is switchable where it is read.
+
+          The same component the settings row uses, so the two cannot drift into
+          meaning different things: off takes effect on one click, on asks first
+          and says how many customers it is about to start writing to. */}
+      <Card>
+        <AutomationSwitch
+          enabled={Boolean(profile?.automation_enabled)}
+          openInvoices={pending.length}
+          hero
+        />
+      </Card>
 
       {unreachable > 0 ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">

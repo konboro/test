@@ -10,6 +10,7 @@
  */
 
 const SIZES = {
+  xl: { track: 'h-12 w-24', thumb: 'h-10 w-10', on: 'translate-x-12', off: 'translate-x-1' },
   lg: { track: 'h-9 w-16', thumb: 'h-7 w-7', on: 'translate-x-8', off: 'translate-x-1' },
   sm: { track: 'h-7 w-12', thumb: 'h-5 w-5', on: 'translate-x-6', off: 'translate-x-1' },
 } as const;
