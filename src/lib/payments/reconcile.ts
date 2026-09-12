@@ -129,38 +129,18 @@ export async function reconcileCheckouts(scope: ReconcileScope = {}): Promise<Re
 
   const admin = createAdminClient();
 
-  // Only open invoices that actually started a checkout. Everything else has
-  // nothing to ask about.
-  let query = admin
-    .from('invoices')
-    .select('id, user_id, amount_cents, stripe_checkout_session_id, revolut_order_id, viva_order_code')
-    .eq('status', 'pending')
-    .or(
-      'stripe_checkout_session_id.not.is.null,revolut_order_id.not.is.null,viva_order_code.not.is.null',
-    );
-
   // An empty list means "these none", not "all of them" — a caller that filtered
   // everything out must not silently reconcile the whole book.
-  if (scope.invoiceIds) {
-    if (!scope.invoiceIds.length) return result;
-    query = query.in('id', scope.invoiceIds.slice(0, BATCH));
-  }
+  if (scope.invoiceIds && !scope.invoiceIds.length) return result;
 
-  const { data: invoices, error } = await query
-    .order('updated_at', { ascending: false })
-    .limit(BATCH);
+  const candidates = await openCheckouts(admin, scope, result);
+  if (!candidates.length) return result;
 
-  if (error) {
-    result.errors.push({ invoiceId: '-', error: `Loading invoices: ${error.message}` });
-    return result;
-  }
-
-  if (!invoices?.length) return result;
 
   // One read per tenant rather than one per invoice.
   const tenants = new Map<string, TenantPaymentRow | null>();
 
-  for (const invoice of invoices) {
+  for (const { invoice, provider, reference } of candidates) {
     if (!tenants.has(invoice.user_id)) {
       const { data } = await admin
         .from('users')
@@ -174,20 +154,16 @@ export async function reconcileCheckouts(scope: ReconcileScope = {}): Promise<Re
     const tenant = tenants.get(invoice.user_id);
     if (!tenant) continue;
 
-    // Viva first, so it is counted rather than attempted.
-    if (!invoice.stripe_checkout_session_id && !invoice.revolut_order_id) {
-      if (invoice.viva_order_code) result.unverifiable += 1;
-      continue;
-    }
 
     result.checked += 1;
 
     let state: CheckoutState;
 
     try {
-      state = invoice.stripe_checkout_session_id
-        ? await stripeState(tenant, invoice.id, invoice.stripe_checkout_session_id)
-        : await revolutState(tenant, invoice.id, invoice.revolut_order_id!);
+      state =
+        provider === 'stripe'
+          ? await stripeState(tenant, invoice.id, reference)
+          : await revolutState(tenant, invoice.id, reference);
     } catch (cause) {
       // One provider being unreachable must not stop the rest of the run.
       result.errors.push({
@@ -220,7 +196,7 @@ export async function reconcileCheckouts(scope: ReconcileScope = {}): Promise<Re
         status: 'paid',
         paid_at: new Date().toISOString(),
         paid_amount_cents: decision.paidCents,
-        ...(invoice.stripe_checkout_session_id && decision.reference
+        ...(provider === 'stripe' && decision.reference
           ? { stripe_payment_intent_id: decision.reference }
           : {}),
       })
@@ -241,6 +217,105 @@ export async function reconcileCheckouts(scope: ReconcileScope = {}): Promise<Re
   }
 
   return result;
+}
+
+/** One open checkout worth asking a provider about. */
+interface Candidate {
+  invoice: { id: string; user_id: string; amount_cents: number };
+  provider: 'stripe' | 'revolut';
+  /** The session or order id to ask with. */
+  reference: string;
+}
+
+/**
+ * Every checkout still worth asking about, gathered from where each provider
+ * actually keeps its orders.
+ *
+ * Stripe keeps the session id on the invoice row. Revolut and Viva do not:
+ * their pointer columns on `invoices` are written **only at settlement**, so a
+ * pending invoice never carries one. Reading `invoices.revolut_order_id` here
+ * therefore matched nothing, ever, and the Revolut branch below was unreachable
+ * — somebody who paid by Revolut and closed the tab was never reconciled at
+ * all, which is the exact failure this module exists to prevent. Every minted
+ * order is in `revolut_orders` / `viva_orders`, which is where to look.
+ */
+async function openCheckouts(
+  admin: ReturnType<typeof createAdminClient>,
+  scope: ReconcileScope,
+  result: ReconcileResult,
+): Promise<Candidate[]> {
+  const openInvoices = async (ids: string[]) => {
+    if (!ids.length) return new Map<string, Candidate['invoice']>();
+
+    const { data } = await admin
+      .from('invoices')
+      .select('id, user_id, amount_cents')
+      .eq('status', 'pending')
+      .in('id', ids.slice(0, BATCH));
+
+    return new Map((data ?? []).map((row) => [row.id, row]));
+  };
+
+  let stripeQuery = admin
+    .from('invoices')
+    .select('id, user_id, amount_cents, stripe_checkout_session_id')
+    .eq('status', 'pending')
+    .not('stripe_checkout_session_id', 'is', null);
+
+  if (scope.invoiceIds) stripeQuery = stripeQuery.in('id', scope.invoiceIds.slice(0, BATCH));
+
+  const { data: stripeRows, error } = await stripeQuery
+    .order('updated_at', { ascending: false })
+    .limit(BATCH);
+
+  if (error) {
+    result.errors.push({ invoiceId: '-', error: `Loading invoices: ${error.message}` });
+    return [];
+  }
+
+  const candidates: Candidate[] = (stripeRows ?? []).map((row) => ({
+    invoice: { id: row.id, user_id: row.user_id, amount_cents: row.amount_cents },
+    provider: 'stripe' as const,
+    reference: row.stripe_checkout_session_id!,
+  }));
+
+  // Every Revolut order minted for the invoice, newest first — so a second press
+  // of Pay no longer hides the first order the way one pointer column did.
+  let revolutQuery = admin
+    .from('revolut_orders')
+    .select('order_id, invoice_id')
+    .order('created_at', { ascending: false })
+    .limit(BATCH);
+
+  if (scope.invoiceIds) {
+    revolutQuery = revolutQuery.in('invoice_id', scope.invoiceIds.slice(0, BATCH));
+  }
+
+  const { data: revolutRows } = await revolutQuery;
+  const revolutOpen = await openInvoices([
+    ...new Set((revolutRows ?? []).map((row) => row.invoice_id)),
+  ]);
+
+  for (const row of revolutRows ?? []) {
+    const invoice = revolutOpen.get(row.invoice_id);
+    if (invoice) candidates.push({ invoice, provider: 'revolut', reference: row.order_id });
+  }
+
+  // Viva is counted, not asked: reading an order back by the code we store is a
+  // 404 on this API version, so settlement there still rests on the return URL.
+  let vivaQuery = admin
+    .from('viva_orders')
+    .select('invoice_id')
+    .order('created_at', { ascending: false })
+    .limit(BATCH);
+
+  if (scope.invoiceIds) vivaQuery = vivaQuery.in('invoice_id', scope.invoiceIds.slice(0, BATCH));
+
+  const { data: vivaRows } = await vivaQuery;
+  const vivaOpen = await openInvoices([...new Set((vivaRows ?? []).map((row) => row.invoice_id))]);
+  result.unverifiable += vivaOpen.size;
+
+  return candidates;
 }
 
 async function stripeState(

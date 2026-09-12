@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { appUrl } from '@/lib/env';
 import { payPath } from '@/lib/pay-code';
+import { settlementFor } from '@/lib/payments/reconcile';
 import { notifyPaymentReceived } from '@/lib/payments/notify';
 import { PAYMENT_COLUMNS, vivaCredentialsFor } from '@/lib/payments/provider';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -101,17 +102,45 @@ export async function GET(request: NextRequest) {
   if (!isSettled(transaction)) return back('');
 
   try {
+    // Viva charges exactly what the order was minted for, so the amount recorded
+    // at minting time is the amount that arrived. The invoice row is only the
+    // fallback — its amount can legitimately change while a checkout sits open
+    // (an Elorus correction, a manual edit), and writing the corrected figure
+    // here would claim money that never came.
+    //
+    // Which is exactly why the coverage check belongs here: corrected upwards
+    // mid-checkout, the minted amount no longer covers the debt. Same rule as
+    // the webhook and the nightly reconciliation, from the same function.
+    const captured = order?.amount_cents ?? invoice.amount_cents;
+    const decision = settlementFor(invoice, {
+      kind: 'paid',
+      capturedCents: captured,
+      reference: transaction.transactionId,
+    });
+
+    if (decision.action === 'skip') {
+      console.error('[viva:return] capture does not cover the invoice', {
+        invoiceId: invoice.id,
+        captured,
+        owed: invoice.amount_cents,
+      });
+
+      // Recorded, not closed: the remainder is still owed and still chased.
+      await admin
+        .from('invoices')
+        .update({ paid_amount_cents: captured, viva_transaction_id: transaction.transactionId })
+        .eq('id', invoice.id)
+        .eq('status', 'pending');
+
+      return back('?paid=1');
+    }
+
     const { data: settled, error } = await admin
       .from('invoices')
       .update({
         status: 'paid',
         paid_at: new Date().toISOString(),
-        // Viva charges exactly what the order was minted for, so the amount
-        // recorded at minting time is the amount that arrived. The invoice row
-        // is only the fallback — its amount can legitimately change while a
-        // checkout sits open (an Elorus correction, a manual edit), and writing
-        // the corrected figure here would claim money that never came.
-        paid_amount_cents: order?.amount_cents ?? invoice.amount_cents,
+        paid_amount_cents: decision.paidCents,
         viva_transaction_id: transaction.transactionId,
       })
       .eq('id', invoice.id)

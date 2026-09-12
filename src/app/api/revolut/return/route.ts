@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { appUrl } from '@/lib/env';
 import { PAY_CODE_LENGTH, payCredentialColumn, payPath } from '@/lib/pay-code';
+import { settlementFor } from '@/lib/payments/reconcile';
 import { notifyPaymentReceived } from '@/lib/payments/notify';
 import { PAYMENT_COLUMNS, revolutCredentialsFor } from '@/lib/payments/provider';
 import { belongsToInvoice, isPaid, retrieveOrder } from '@/lib/revolut/client';
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
 
   const { data: invoice } = await admin
     .from('invoices')
-    .select('id, user_id, status')
+    .select('id, user_id, status, amount_cents')
     .eq(payCredentialColumn(token), token)
     .maybeSingle();
 
@@ -113,12 +114,39 @@ export async function GET(request: NextRequest) {
   if (!isPaid(remote)) return back('');
 
   try {
+    // The amount the order was minted for is the amount that arrived; the
+    // invoice row can have moved since (an Elorus correction, a manual edit).
+    // Which is why the coverage check belongs here — same rule as the webhook
+    // and the nightly reconciliation, from the same function.
+    const decision = settlementFor(invoice, {
+      kind: 'paid',
+      capturedCents: order.amount_cents,
+      reference: remote.id,
+    });
+
+    if (decision.action === 'skip') {
+      console.error('[revolut:return] capture does not cover the invoice', {
+        invoiceId: invoice.id,
+        captured: order.amount_cents,
+        owed: invoice.amount_cents,
+      });
+
+      // Recorded, not closed: the remainder is still owed and still chased.
+      await admin
+        .from('invoices')
+        .update({ paid_amount_cents: order.amount_cents, revolut_order_id: remote.id })
+        .eq('id', invoice.id)
+        .eq('status', 'pending');
+
+      return back('?paid=1');
+    }
+
     const { data: settled, error } = await admin
       .from('invoices')
       .update({
         status: 'paid',
         paid_at: new Date().toISOString(),
-        paid_amount_cents: order.amount_cents,
+        paid_amount_cents: decision.paidCents,
         revolut_order_id: remote.id,
       })
       .eq('id', invoice.id)

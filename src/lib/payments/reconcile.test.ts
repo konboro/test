@@ -95,3 +95,28 @@ describe('settlementFor', () => {
     });
   });
 });
+
+describe('the invoice corrected upwards while a checkout sat open', () => {
+  it('is not closed by the stale capture, on any path', () => {
+    // The production shape: Elorus rewrites amount_cents on every sync, so a
+    // 500 EUR invoice can become 1250 EUR while the debtor is on the checkout.
+    // The three browser-return paths had no coverage check at all and closed it
+    // in full for the 500 that arrived, forgiving 750 and stopping the chase.
+    const corrected = { id: 'inv-1', amount_cents: 125000 };
+
+    expect(settlementFor(corrected, paid(50000))).toEqual({
+      action: 'skip',
+      reason: 'under-capture',
+    });
+  });
+
+  it('closes it when the capture still covers the corrected figure', () => {
+    // Corrected downwards instead: the money covers the debt and the record
+    // should say what actually left the customer's account.
+    expect(settlementFor({ id: 'inv-2', amount_cents: 40000 }, paid(50000))).toEqual({
+      action: 'settle',
+      paidCents: 50000,
+      reference: 'pi_1',
+    });
+  });
+});
