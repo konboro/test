@@ -39,6 +39,7 @@ async function ownedOpenReport(reportId: string) {
 function refresh() {
   revalidatePath('/invoices');
   revalidatePath('/dashboard');
+  revalidatePath('/statistics');
   revalidatePath('/logs');
 }
 

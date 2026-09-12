@@ -74,6 +74,7 @@ export async function updateProfile(
 
   revalidatePath('/settings');
   revalidatePath('/dashboard');
+  revalidatePath('/statistics');
   return { success: t.forms.success.settingsSaved };
 }
 
@@ -117,6 +118,7 @@ export async function setChannel(
 
   revalidatePath('/settings/reminders');
   revalidatePath('/dashboard');
+  revalidatePath('/statistics');
 
   return { success: t.forms.success.settingsSaved };
 }
@@ -155,6 +157,7 @@ export async function setAutomation(
 
   revalidatePath('/settings/reminders');
   revalidatePath('/dashboard');
+  revalidatePath('/statistics');
 
   return {
     success: enabled ? t.forms.success.automationOn : t.forms.success.automationOff,

@@ -139,6 +139,18 @@ export async function previewReminder(
  * It governs the sweep only. The reminder button on the same row keeps working
  * while an invoice is paused — pausing says "stop chasing this on your own",
  * not "refuse me when I ask".
+ *
+ * Both columns are written, because the pause is stored twice: `scenario_mode`
+ * of 'off' says the same thing as `automation_enabled` of false, and the cadence
+ * editor has always written the pair together. This wrote only the flag, so a
+ * box unticked here and then ticked again left the mode saying 'off' — and the
+ * invoice's own page, which reads the mode, reported that nothing was scheduled
+ * while the sweep, which read the flag, went on sending.
+ *
+ * Switching back on restores 'custom' rather than 'default' when the invoice has
+ * a ladder of its own. Those rows outlive the pause — only the cadence editor
+ * deletes them — so resuming with 'default' would quietly abandon a schedule the
+ * operator wrote by hand and never asked to lose.
  */
 export async function toggleInvoiceAutomation(formData: FormData) {
   const id = String(formData.get('id') ?? '');
@@ -152,10 +164,37 @@ export async function toggleInvoiceAutomation(formData: FormData) {
   const org = await writableOrganization();
   if (!org) return;
 
-  await supabase.from('invoices').update({ automation_enabled: !enabled }).eq('id', id);
+  // `enabled` is what the row was showing, so the press is asking for its
+  // opposite.
+  const turningOn = !enabled;
+
+  let mode: InvoiceScenarioMode = 'off';
+
+  if (turningOn) {
+    const { data: overrides } = await supabase
+      .from('invoice_dunning_steps')
+      .select('invoice_id')
+      .eq('invoice_id', id)
+      .limit(1);
+
+    mode = overrides?.length ? 'custom' : 'default';
+  }
+
+  const { error } = await supabase
+    .from('invoices')
+    .update({ automation_enabled: turningOn, scenario_mode: mode })
+    .eq('id', id);
+
+  // A column missing from the update grant is denied rather than ignored, and
+  // the whole statement fails with it — so a failure here means the switch did
+  // not move, and saying nothing would leave the operator looking at a box that
+  // springs back on the next render with no explanation.
+  if (error) console.error('[invoices] automation toggle refused', error.message);
 
   revalidatePath('/invoices');
   revalidatePath('/dashboard');
+  revalidatePath('/statistics');
+  revalidatePath(`/invoices/${id}`);
 }
 
 export async function markInvoicePaid(formData: FormData) {
@@ -188,6 +227,7 @@ export async function markInvoicePaid(formData: FormData) {
 
   revalidatePath('/invoices');
   revalidatePath('/dashboard');
+  revalidatePath('/statistics');
 }
 
 
@@ -233,6 +273,7 @@ export async function deleteInvoice(
   revalidatePath('/invoices');
   revalidatePath('/debtors');
   revalidatePath('/dashboard');
+  revalidatePath('/statistics');
 
   return { ok: true };
 }
@@ -283,6 +324,7 @@ export async function updateDueDate(
   revalidatePath('/invoices');
   revalidatePath('/debtors');
   revalidatePath('/dashboard');
+  revalidatePath('/statistics');
 
   return { success: 'saved' };
 }
@@ -425,6 +467,7 @@ export async function createInvoice(
 
   revalidatePath('/invoices');
   revalidatePath('/dashboard');
+  revalidatePath('/statistics');
   return { success: t.forms.success.invoiceCreated };
 }
 
@@ -658,7 +701,7 @@ export async function runScenarioForSelected(formData: FormData): Promise<void> 
   // missingColumn() for why a deploy can legitimately run ahead of a migration.
   const selected = await supabase
     .from('invoices')
-    .select('id, due_date, automation_enabled')
+    .select('id, due_date, automation_enabled, scenario_mode')
     .eq('user_id', org.id)
     .in('id', batch);
 
@@ -676,7 +719,12 @@ export async function runScenarioForSelected(formData: FormData): Promise<void> 
 
     // Absent means the switch does not exist yet, and an invoice that cannot be
     // paused is one that is chased — the same reading automationPaused() takes.
-    rows = fallback.data?.map((row) => ({ ...row, automation_enabled: true })) ?? null;
+    rows =
+      fallback.data?.map((row) => ({
+        ...row,
+        automation_enabled: true,
+        scenario_mode: 'default' as const,
+      })) ?? null;
   }
 
   const language = parseLanguageChoice(formData.get('lang'));
@@ -813,6 +861,7 @@ export async function markBulkPaid(formData: FormData): Promise<void> {
   revalidatePath('/invoices');
   revalidatePath('/debtors');
   revalidatePath('/dashboard');
+  revalidatePath('/statistics');
 
   redirect(to({ paid: changed?.length ?? 0 }));
 }

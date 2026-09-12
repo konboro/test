@@ -102,6 +102,7 @@ export async function createLease(_prev: LeaseState, formData: FormData): Promis
 
   revalidatePath('/leases');
   revalidatePath('/dashboard');
+  revalidatePath('/statistics');
 
   return { success: t.leases.created };
 }

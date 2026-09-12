@@ -383,7 +383,23 @@ export function toCredit(raw: RawTransaction, fallbackId?: string): IncomingCred
   const bookedOn = raw.booking_date ?? raw.value_date;
 
   if (!providerTxId || !amount || !currency || !bookedOn) return null;
-  if (raw.credit_debit_indicator && raw.credit_debit_indicator !== 'CRDT') return null;
+
+  // Only an explicit credit counts.
+  //
+  // This used to accept a movement whose direction the bank had not stated, on
+  // the grounds that the amount was positive. Under PSD2 the amount usually is
+  // positive on both sides and the indicator carries the sign, so a bank that
+  // omits the field would have had its outgoing payments read as customer
+  // receipts — and a receipt is what settles an invoice. Every transaction on
+  // the statement this was written against carried the field, so requiring it
+  // costs nothing there and fails towards not marking a debt paid, which is the
+  // direction a mistake about money should fail in.
+  if (raw.credit_debit_indicator !== 'CRDT') {
+    if (!raw.credit_debit_indicator) {
+      console.warn('[bank] movement with no credit/debit indicator, skipped', providerTxId);
+    }
+    return null;
+  }
 
   const amountCents = toMinorUnits(amount);
   if (amountCents <= 0) return null;

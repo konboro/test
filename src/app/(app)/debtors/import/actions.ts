@@ -191,6 +191,7 @@ export async function runImport(_prev: ImportState, formData: FormData): Promise
   revalidatePath('/debtors');
   revalidatePath('/invoices');
   revalidatePath('/dashboard');
+  revalidatePath('/statistics');
 
   return { outcome };
 }

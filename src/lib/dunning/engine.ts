@@ -99,16 +99,26 @@ export function deliverableChannels(
 /**
  * Whether chasing has been switched off for this one invoice.
  *
- * A predicate rather than an inline `!invoice.automation_enabled`, and it
- * compares against `false` on purpose. The column does not exist until
- * 20260819130000 is applied, so on a database that has not taken the migration
- * the field is absent — and a truthiness test reads absent as paused, for every
- * invoice the tenant has. Deploys and migrations do not land together, and that
- * failure would be silent: no reminders, no error, a sweep reporting everything
- * skipped. Pinned by a test for exactly that reason.
+ * Reads both columns, because the answer is stored twice. `scenario_mode` of
+ * 'off' and `automation_enabled` of false mean the same thing, and every writer
+ * is supposed to keep them in step — but the checkbox on the invoice list could
+ * only ever write one of them, so they could drift apart. When they did, the
+ * sweep resumed the ladder off one column while the invoice's own page reported
+ * nothing scheduled off the other. Asking both here means the disagreement can
+ * only ever be resolved in favour of not writing to somebody.
+ *
+ * Both comparisons are against a literal on purpose. Neither column exists until
+ * its migration is applied, so on a database that has not taken them the field
+ * is absent — and a truthiness test reads absent as paused, for every invoice
+ * the tenant has. Deploys and migrations do not land together, and that failure
+ * would be silent: no reminders, no error, a sweep reporting everything skipped.
+ * Pinned by a test for exactly that reason.
  */
-export function automationPaused(invoice: { automation_enabled?: boolean | null }): boolean {
-  return invoice.automation_enabled === false;
+export function automationPaused(invoice: {
+  automation_enabled?: boolean | null;
+  scenario_mode?: string | null;
+}): boolean {
+  return invoice.automation_enabled === false || invoice.scenario_mode === 'off';
 }
 
 export function stepForInvoice(

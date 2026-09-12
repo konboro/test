@@ -124,6 +124,7 @@ export async function confirmMatch(formData: FormData): Promise<void> {
   revalidatePath('/bank');
   revalidatePath('/invoices');
   revalidatePath('/dashboard');
+  revalidatePath('/statistics');
 }
 
 /**

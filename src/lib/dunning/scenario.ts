@@ -60,6 +60,17 @@ export interface Scenario {
  * meaning to lose. Order here is presentation only — the engine sorts by the
  * offsets a tenant actually chose.
  */
+/**
+ * How far from the due date a rung may sit, in days.
+ *
+ * Mirrored from `check (offset_days between -30 and 120)` on both ladder tables.
+ * It was written out a third and a fourth time — once in the account-wide
+ * editor's own LIMITS, once in the per-invoice parser — and three copies of one
+ * rule is two copies too many: the database rejects what the form let through,
+ * and the operator gets a constraint violation instead of a sentence.
+ */
+export const OFFSET_BOUNDS = { min: -30, max: 120 } as const;
+
 export const LADDER_STEPS: ReadonlyArray<DunningStep> = [
   'pre_due',
   'overdue_2',

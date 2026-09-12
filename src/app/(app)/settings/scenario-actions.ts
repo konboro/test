@@ -2,7 +2,12 @@
 
 import { revalidatePath } from 'next/cache';
 
-import { DEFAULT_SCENARIO, EXTRA_STEP_OFFSETS, LADDER_STEPS } from '@/lib/dunning/scenario';
+import {
+  DEFAULT_SCENARIO,
+  EXTRA_STEP_OFFSETS,
+  LADDER_STEPS,
+  OFFSET_BOUNDS,
+} from '@/lib/dunning/scenario';
 import { saveFailed } from '@/lib/errors';
 import { getDictionary } from '@/lib/i18n';
 import { writableOrganization } from '@/lib/orgs/active';
@@ -24,7 +29,7 @@ export interface ScenarioState {
  * to.
  */
 const LIMITS = {
-  offset: { min: -30, max: 120 },
+  offset: OFFSET_BOUNDS,
   repeatEvery: { min: 7, max: 90 },
   repeatMax: { min: 1, max: 6 },
 };

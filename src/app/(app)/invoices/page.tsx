@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { Badge, Card, CardHeader, EmptyState, linkClass, subtleLinkClass } from '@/components/ui';
 import { aging } from '@/lib/aging';
 import { displayName } from '@/lib/debtors';
+import { automationPaused } from '@/lib/dunning/engine';
 import { workflowStatus } from '@/lib/dunning/status';
 import { REMINDER_CHOICES } from '@/lib/dunning/templates';
 import { getDictionary, getLocale } from '@/lib/i18n';
@@ -637,7 +638,7 @@ export default async function InvoicesPage({
                             <label className="flex items-center gap-2 text-sm text-ink-600">
                               <InvoiceAutomationSwitch
                                 invoiceId={invoice.id}
-                                enabled={invoice.automation_enabled !== false}
+                                enabled={!automationPaused(invoice)}
                                 label={label}
                               />
                               {t.invoices.colAutomation}
@@ -817,7 +818,7 @@ export default async function InvoicesPage({
                         {invoice.status === 'pending' ? (
                           <InvoiceAutomationSwitch
                             invoiceId={invoice.id}
-                            enabled={invoice.automation_enabled !== false}
+                            enabled={!automationPaused(invoice)}
                             label={label}
                           />
                         ) : (

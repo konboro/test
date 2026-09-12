@@ -106,6 +106,7 @@ export async function createDebtor(
 
   revalidatePath('/debtors');
   revalidatePath('/dashboard');
+  revalidatePath('/statistics');
   return { success: t.forms.success.debtorAdded };
 }
 
@@ -149,6 +150,7 @@ export async function updateDebtor(
 
   revalidatePath('/debtors');
   revalidatePath('/dashboard');
+  revalidatePath('/statistics');
   return { success: t.forms.success.debtorUpdated };
 }
 
@@ -196,6 +198,7 @@ export async function deleteDebtor(
   revalidatePath('/debtors');
   revalidatePath('/invoices');
   revalidatePath('/dashboard');
+  revalidatePath('/statistics');
   revalidatePath('/logs');
 
   return { ok: true };
@@ -217,6 +220,7 @@ export async function toggleMute(formData: FormData) {
 
   revalidatePath('/debtors');
   revalidatePath('/dashboard');
+  revalidatePath('/statistics');
 }
 
 /**
@@ -266,4 +270,5 @@ export async function snoozeDebtor(formData: FormData) {
   revalidatePath(`/debtors/${id}`);
   revalidatePath('/invoices');
   revalidatePath('/dashboard');
+  revalidatePath('/statistics');
 }

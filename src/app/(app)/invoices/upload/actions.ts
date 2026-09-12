@@ -335,6 +335,7 @@ export async function commitUpload(_prev: UploadState, formData: FormData): Prom
   revalidatePath('/invoices/upload');
   revalidatePath('/invoices');
   revalidatePath('/dashboard');
+  revalidatePath('/statistics');
 
   return { read: outcome.invoicesCreated };
 }

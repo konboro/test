@@ -237,5 +237,21 @@ describe('automationPaused', () => {
     expect(automationPaused({})).toBe(false);
     expect(automationPaused({ automation_enabled: undefined })).toBe(false);
     expect(automationPaused({ automation_enabled: null })).toBe(false);
+    expect(automationPaused({ scenario_mode: undefined })).toBe(false);
+    expect(automationPaused({ scenario_mode: null })).toBe(false);
+  });
+
+  it('is true when the cadence says off, whatever the flag says', () => {
+    // The pair drifted whenever the invoice list's checkbox was used: it could
+    // only write the flag, so ticking it back on left the mode at 'off'. The
+    // sweep then resumed off one column while the invoice's own page reported
+    // nothing scheduled off the other.
+    expect(automationPaused({ scenario_mode: 'off' })).toBe(true);
+    expect(automationPaused({ automation_enabled: true, scenario_mode: 'off' })).toBe(true);
+  });
+
+  it('is false for the two cadences that do send', () => {
+    expect(automationPaused({ automation_enabled: true, scenario_mode: 'default' })).toBe(false);
+    expect(automationPaused({ automation_enabled: true, scenario_mode: 'custom' })).toBe(false);
   });
 });

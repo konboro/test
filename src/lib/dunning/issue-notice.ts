@@ -53,7 +53,7 @@ export function issueNoticeDecision(input: {
   if (invoice.issue_notice_sent_at) return { send: false, reason: 'already sent' };
   if (invoice.status !== 'pending') return { send: false, reason: 'invoice not open' };
 
-  if (invoice.scenario_mode === 'off' || automationPaused(invoice)) {
+  if (automationPaused(invoice)) {
     return { send: false, reason: 'automation off for this invoice' };
   }
 

@@ -1,6 +1,6 @@
 import type { CommChannel, DunningStep, InvoiceScenarioMode } from '@/types/database';
 
-import { EXTRA_STEP_OFFSETS, LADDER_STEPS, type Scenario } from './scenario';
+import { EXTRA_STEP_OFFSETS, LADDER_STEPS, OFFSET_BOUNDS, type Scenario } from './scenario';
 
 /**
  * One invoice's cadence, as a form talks about it.
@@ -19,10 +19,8 @@ export const FIELD = {
   channels: (step: string) => `sc_${step}_channels`,
 } as const;
 
-/** Mirrored from the check constraint on the table. */
-const OFFSET = { min: -30, max: 120 };
-
-const clamp = (value: number) => Math.min(OFFSET.max, Math.max(OFFSET.min, value));
+const clamp = (value: number) =>
+  Math.min(OFFSET_BOUNDS.max, Math.max(OFFSET_BOUNDS.min, value));
 
 export interface InvoiceScenarioInput {
   mode: InvoiceScenarioMode;
