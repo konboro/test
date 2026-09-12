@@ -47,6 +47,46 @@ describe('the operator', () => {
   });
 });
 
+/**
+ * Both numbers carry their own check digit, so a typo in either is arithmetic
+ * rather than opinion — and a wrong NIP on a published notice is the kind of
+ * error nobody reads closely enough to catch by eye. Kept in the test rather
+ * than in the module: this guards a constant, it is not behaviour the product
+ * needs at runtime.
+ */
+const checkDigit = (digits: string, weights: number[]): number =>
+  weights.reduce((sum, weight, index) => sum + weight * Number(digits[index]), 0) % 11;
+
+describe('the registered numbers', () => {
+  it('has a NIP that passes its checksum', () => {
+    const nip = LEGAL_ENTITY.nip;
+    if (nip === null) return;
+
+    expect(nip).toMatch(/^\d{10}$/);
+    expect(checkDigit(nip, [6, 5, 7, 2, 3, 4, 5, 6, 7])).toBe(Number(nip[9]));
+  });
+
+  it('has a nine-digit REGON that passes its checksum', () => {
+    const regon = LEGAL_ENTITY.regon;
+    if (regon === null) return;
+
+    // The value first supplied was this one padded to fourteen characters,
+    // which fails the fourteen-digit checksum — a legal entity's REGON is the
+    // nine-digit one, and that is what gets published.
+    expect(regon).toMatch(/^\d{9}$/);
+    expect(checkDigit(regon, [8, 9, 2, 3, 4, 5, 6, 7])).toBe(Number(regon[8]));
+  });
+
+  it('has a KRS of ten digits, leading zeros kept', () => {
+    const krs = LEGAL_ENTITY.krs;
+    if (krs === null) return;
+
+    // No checksum to verify, but the leading zeros are part of it: stored as a
+    // number somewhere along the way, 0001265140 becomes 1265140.
+    expect(krs).toMatch(/^\d{10}$/);
+  });
+});
+
 describe('the identity line', () => {
   it.each(LOCALES)('names the company in %s', (locale) => {
     expect(entityIdentity(locale)).toContain('Mobimetry sp. z o.o.');
