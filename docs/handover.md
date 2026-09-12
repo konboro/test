@@ -59,15 +59,36 @@ Numbers are claimed by creating the file. Three collisions have already
 happened. Take the next free number and create the file immediately rather than
 reserving one.
 
-**Not every branch should be merged.** `feat/sms-twilio` would replace the live
-Brevo transport with Twilio and remove 35 lines from a sender that works today.
-The operator parked Twilio deliberately. Leaving a branch unmerged is a
-decision, and it belongs in the report rather than in silence.
+**Not every branch should be merged,** and the decision belongs in the report
+rather than in silence. `feat/sms-twilio` was the standing example: it would
+have replaced the live Brevo transport and removed 35 lines from a sender that
+works, and the operator parked Twilio deliberately.
+
+That branch is now retired with `git merge -s ours` — examined, tree unchanged,
+not one file touched, Brevo still the live transport. Its own change had since
+arrived by another route anyway: the Brevo integration split the providers into
+`src/lib/sms/twilio.ts` and `brevo.ts` behind a chooser, so mainline already
+carries the same `ValidityPeriod: 36000` ceiling and the same credential pair.
+
+Which means the parking was never really held by the unmerged branch, and that
+is the part worth carrying forward: an absent merge is a signal only until
+someone merges it. What holds Twilio back is the trap below.
 
 ## Traps this codebase has already sprung
 
-Worth reading before writing anything that matches text or touches grants.
+Worth reading before writing anything that matches text, touches grants, or
+sets an environment variable in production.
 
+- **Two SMS credentials are a provider switch.** `smsTransport()` returns
+  `twilio` whenever `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` are both set,
+  and only falls through to `brevo` otherwise. So adding those two variables
+  moves every reminder in production onto Twilio — no deploy, no flag, no log
+  line saying the sender changed. The precedence is deliberate (a name and a
+  set of credentials can disagree, and a provider selected but not configured
+  is a reminder that silently does not send), but it means the live sender is
+  decided by which secrets exist. `STRIPE_SECRET_KEY` does the same thing to
+  payment routing in `tenantPayments()`: a tenant with a connected account
+  switches from their own key to Connect the moment the platform key appears.
 - **`\b` is ASCII-only.** `/\bΑΦΜ\b/` and `/\bNIP\b/` can never match, and a
   regex that never fires looks exactly like a document that never mentioned the
   label. Every label in `src/lib/invoice-scan/fields.ts` uses explicit
