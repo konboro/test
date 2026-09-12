@@ -185,11 +185,27 @@ export async function toggleInvoiceAutomation(formData: FormData) {
     .update({ automation_enabled: turningOn, scenario_mode: mode })
     .eq('id', id);
 
-  // A column missing from the update grant is denied rather than ignored, and
-  // the whole statement fails with it — so a failure here means the switch did
-  // not move, and saying nothing would leave the operator looking at a box that
-  // springs back on the next render with no explanation.
-  if (error) console.error('[invoices] automation toggle refused', error.message);
+  // Deploys and migrations do not land together, and `scenario_mode` is only
+  // granted to a session by 20260912120000. A column missing from the grant is
+  // denied rather than ignored, and the whole statement fails with it — so
+  // between this shipping and that migration running, the switch would simply
+  // stop working. Falling back to the column that has always been granted keeps
+  // it working exactly as it did before, and the pair reconciles the moment the
+  // migration lands.
+  if (error) {
+    if (error.code !== '42501' && !missingColumn(error)) {
+      console.error('[invoices] automation toggle refused', error.message);
+    } else {
+      console.warn('[invoices] scenario_mode not writable yet — migration not applied');
+
+      const retry = await supabase
+        .from('invoices')
+        .update({ automation_enabled: turningOn })
+        .eq('id', id);
+
+      if (retry.error) console.error('[invoices] automation toggle refused', retry.error.message);
+    }
+  }
 
   revalidatePath('/invoices');
   revalidatePath('/dashboard');
