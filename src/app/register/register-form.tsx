@@ -5,22 +5,25 @@ import { useFormStatus } from 'react-dom';
 
 import { signUp, type AuthState } from '@/app/auth/actions';
 import { Button, Field, inputClass } from '@/components/ui';
+import { useT } from '@/lib/i18n/provider';
 
 function Submit() {
+  const t = useT();
   const { pending } = useFormStatus();
   return (
     <Button type="submit" disabled={pending} className="w-full">
-      {pending ? 'Δημιουργία…' : 'Δημιουργία λογαριασμού'}
+      {pending ? t.auth.creating : t.auth.registerLink}
     </Button>
   );
 }
 
 export function RegisterForm() {
+  const t = useT();
   const [state, action] = useActionState<AuthState, FormData>(signUp, {});
 
   return (
     <form action={action} className="mt-6 space-y-4 rounded-xl border border-ink-200 bg-white p-6 shadow-sm">
-      <Field label="Επωνυμία επιχείρησης">
+      <Field label={t.auth.companyName}>
         <input name="company_name" required className={inputClass} />
       </Field>
 
@@ -28,7 +31,7 @@ export function RegisterForm() {
         <input name="email" type="email" required autoComplete="email" className={inputClass} />
       </Field>
 
-      <Field label="Κωδικός" hint="Τουλάχιστον 8 χαρακτήρες.">
+      <Field label={t.auth.password} hint={t.auth.passwordHint}>
         <input
           name="password"
           type="password"

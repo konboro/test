@@ -1,134 +1,68 @@
 import { redirect } from 'next/navigation';
 
-import { Badge, Card, CardHeader } from '@/components/ui';
-import { LADDER } from '@/lib/dunning/engine';
-import { STEP_LABELS } from '@/lib/dunning/status';
-import { SMS_PACKS } from '@/lib/stripe';
-import { createClient } from '@/lib/supabase/server';
+import { Card, CardHeader } from '@/components/ui';
+import { getDictionary } from '@/lib/i18n';
 
-import { CreditPacks, MyDataForm, ProfileForm } from './settings-forms';
+import { noProfile, settingsAccess } from './access';
+import { ProfileForm } from './settings-forms';
 
-export const metadata = { title: 'Ρυθμίσεις — lefta.app' };
+export async function generateMetadata() {
+  return { title: (await getDictionary()).settings.title };
+}
 export const dynamic = 'force-dynamic';
 
+/**
+ * Who this company is, and where its customers reply.
+ *
+ * Also the landing place for anything that still points at `/settings` with the
+ * query of a round trip that now belongs to another tab. A hash never reaches
+ * the server, so `#stripe` on an old bookmark cannot be rescued — but `?stripe=`
+ * and `?bank=` can, and those are the ones a payment provider or a bank sends
+ * somebody back with.
+ */
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ credits?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { credits } = await searchParams;
+  const params = await searchParams;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  if (typeof params.stripe === 'string') {
+    redirect(`/settings/payments?stripe=${encodeURIComponent(params.stripe)}#stripe`);
+  }
+  if (typeof params.credits === 'string') {
+    redirect(`/settings/reminders?credits=${encodeURIComponent(params.credits)}#credits`);
+  }
+  if (typeof params.bank === 'string') {
+    // The bank round trip carries counts as well as an outcome, and a summary
+    // that lost them would report a sync that found nothing.
+    const carried = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (typeof value === 'string') carried.set(key, value);
+    }
+    redirect(`/settings/sources?${carried}#bank`);
+  }
 
-  const { data: profile } = await supabase
+  const t = await getDictionary();
+  const { supabase, org } = await settingsAccess();
+
+  const { data: profile, error } = await supabase
     .from('users')
-    .select(
-      'company_name, vat_number, reply_to_email, default_payment_terms_days, automation_enabled, mydata_user_id, mydata_environment, sms_credits',
-    )
-    .eq('id', user.id)
+    .select('company_name, email, vat_number, business_mode, reply_to_email, timezone')
+    .eq('id', org.id)
     .maybeSingle();
 
-  if (!profile) redirect('/login');
+  if (!profile) noProfile('business', error);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-ink-900">Ρυθμίσεις</h1>
-        <p className="mt-0.5 text-sm text-ink-500">Στοιχεία επιχείρησης, myDATA και SMS.</p>
-      </div>
-
-      {credits === 'success' ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Η πληρωμή ολοκληρώθηκε. Τα SMS πιστώνονται μόλις επιβεβαιωθεί από το Stripe — συνήθως
-          σε λίγα δευτερόλεπτα.
-        </div>
-      ) : null}
-      {credits === 'cancelled' ? (
-        <div className="rounded-xl border border-ink-200 bg-white px-4 py-3 text-sm text-ink-600">
-          Η αγορά ακυρώθηκε. Δεν χρεωθήκατε.
-        </div>
-      ) : null}
+    <div className="space-y-4">
+      <p className="max-w-2xl text-sm leading-relaxed text-ink-500">
+        {t.settings.tabIntro.business}
+      </p>
 
       <Card>
-        <CardHeader title="Στοιχεία επιχείρησης" />
+        <CardHeader title={t.settings.business} />
         <ProfileForm profile={profile} />
-      </Card>
-
-      <Card>
-        <CardHeader
-          title="Σύνδεση myDATA (ΑΑΔΕ)"
-          subtitle="Το Subscription Key αποθηκεύεται κρυπτογραφημένο (AES-256-GCM) και δεν επιστρέφεται ποτέ στον browser."
-          action={
-            profile.mydata_user_id ? (
-              <Badge tone="positive">Συνδεδεμένο</Badge>
-            ) : (
-              <Badge tone="warning">Μη συνδεδεμένο</Badge>
-            )
-          }
-        />
-        <MyDataForm
-          connected={Boolean(profile.mydata_user_id)}
-          userId={profile.mydata_user_id}
-          environment={profile.mydata_environment}
-        />
-      </Card>
-
-      <Card>
-        <div id="credits" className="scroll-mt-20">
-          <CardHeader
-            title="Υπόλοιπο SMS"
-            subtitle="Ένα SMS καταναλώνεται ανά απεσταλμένο μήνυμα. Τα email είναι απεριόριστα."
-            action={
-              <span className="tabular text-sm font-semibold text-ink-900">
-                {profile.sms_credits} διαθέσιμα
-              </span>
-            }
-          />
-          <CreditPacks packs={SMS_PACKS} />
-        </div>
-      </Card>
-
-      <Card>
-        <CardHeader
-          title="Ροή υπενθυμίσεων"
-          subtitle="Σταθερή και μη παραμετροποιήσιμη. Το lefta.app λειτουργεί αποκλειστικά ως πάροχος λογισμικού."
-        />
-        <ol className="divide-y divide-ink-100">
-          {LADDER.map((rung) => (
-            <li key={rung.step} className="flex items-start justify-between gap-4 px-5 py-4">
-              <div>
-                <p className="text-sm font-medium text-ink-900">{STEP_LABELS[rung.step]}</p>
-                <p className="mt-0.5 text-xs text-ink-500">
-                  {rung.offsetFrom < 0
-                    ? `${Math.abs(rung.offsetFrom)} ημέρες πριν τη λήξη`
-                    : `${rung.offsetFrom} ημέρες μετά τη λήξη`}
-                </p>
-              </div>
-              <div className="flex gap-1.5">
-                {rung.channels.map((channel) => (
-                  <Badge key={channel} tone={channel === 'sms' ? 'info' : 'neutral'}>
-                    {channel === 'sms' ? 'SMS' : 'Email'}
-                  </Badge>
-                ))}
-              </div>
-            </li>
-          ))}
-        </ol>
-        <div className="border-t border-ink-100 bg-ink-50 px-5 py-4 text-xs leading-relaxed text-ink-600">
-          <p>
-            <strong className="font-semibold text-ink-800">Όριο συχνότητας:</strong> κάθε πελάτης
-            λαμβάνει το πολύ <strong>μία επαφή ανά ημερολογιακή ημέρα</strong>, ανεξάρτητα από το
-            πλήθος των ανεξόφλητων παραστατικών του. Το όριο επιβάλλεται στη βάση δεδομένων.
-          </p>
-          <p className="mt-2">
-            <strong className="font-semibold text-ink-800">Αυτόματη διακοπή:</strong> μόλις ένα
-            παραστατικό σημανθεί ως εξοφλημένο, η ροή σταματά αμέσως για αυτό.
-          </p>
-        </div>
       </Card>
     </div>
   );

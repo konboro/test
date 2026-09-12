@@ -1,26 +1,27 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { addDays, athensDate, daysBetween, toCents } from '@/lib/money';
+import { emailAvailable, paymentsAvailable, smsAvailable } from '@/lib/providers';
 import { normalisePhone, segmentCount } from '@/lib/sms/send';
 
-import { LADDER, stepForInvoice } from './engine';
+import { deliverableChannels, LADDER, reachableChannels, stepForInvoice, automationPaused } from './engine';
 import { workflowStatus } from './status';
 
 const TODAY = '2026-08-15';
 
 describe('stepForInvoice', () => {
-  it('fires step 1 three days before the due date', () => {
-    expect(stepForInvoice(addDays(TODAY, 3), TODAY)?.step).toBe('pre_due');
+  it('fires the pre-due reminder the day before the due date', () => {
+    expect(stepForInvoice(addDays(TODAY, 1), TODAY)?.step).toBe('pre_due');
   });
 
-  it('stays silent between the pre-due window and day 2 overdue', () => {
+  it('stays silent between the pre-due window and the first overdue step', () => {
     // Due today, and one day overdue: nothing scheduled.
     expect(stepForInvoice(TODAY, TODAY)).toBeNull();
     expect(stepForInvoice(addDays(TODAY, -1), TODAY)).toBeNull();
   });
 
-  it('fires step 2 at two days overdue', () => {
-    const rung = stepForInvoice(addDays(TODAY, -2), TODAY);
+  it('fires step 2 at three days overdue', () => {
+    const rung = stepForInvoice(addDays(TODAY, -3), TODAY);
     expect(rung?.step).toBe('overdue_2');
     expect(rung?.channels).toEqual(['email', 'sms']);
   });
@@ -36,8 +37,11 @@ describe('stepForInvoice', () => {
     expect(stepForInvoice(addDays(TODAY, -5), TODAY)?.step).toBe('overdue_2');
   });
 
-  it('abandons invoices far past due', () => {
-    expect(stepForInvoice(addDays(TODAY, -200), TODAY)).toBeNull();
+  it('keeps chasing an invoice far past due', () => {
+    // This returned null for two hundred days overdue: a threshold at 120 days
+    // stopped the ladder for good. Removed deliberately — a debt does not stop
+    // being owed because it aged.
+    expect(stepForInvoice(addDays(TODAY, -200), TODAY)?.step).toBe('overdue_10');
   });
 
   it('never sends SMS on the pre-due step', () => {
@@ -56,15 +60,12 @@ describe('stepForInvoice', () => {
 });
 
 describe('per-step reachability', () => {
-  /** Mirrors the deliverability check the engine applies before claiming a contact. */
-  function deliverable(
+  // The engine's own function, not a copy of it: a reimplementation here could
+  // drift from the check that actually guards the contact claim.
+  const deliverable = (
     channels: ReadonlyArray<'email' | 'sms'>,
     debtor: { email: string | null; phone: string | null },
-  ) {
-    return channels.some((channel) =>
-      channel === 'email' ? Boolean(debtor.email) : normalisePhone(debtor.phone) !== null,
-    );
-  }
+  ) => reachableChannels(channels, debtor).length > 0;
 
   const phoneOnly = { email: null, phone: '6971234567' };
   const emailOnly = { email: 'a@b.gr', phone: null };
@@ -84,6 +85,74 @@ describe('per-step reachability', () => {
 
   it('skips a debtor with an unusable phone and no email', () => {
     expect(deliverable(['email', 'sms'], { email: null, phone: '123' })).toBe(false);
+  });
+});
+
+describe('provider availability gates the contact claim', () => {
+  const reachableBoth = { email: 'a@b.gr', phone: '6971234567' };
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  /** Production with none of the provider keys present. */
+  function unconfiguredProduction() {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('RESEND_API_KEY', '');
+    vi.stubEnv('BREVO_API_KEY', '');
+    vi.stubEnv('STRIPE_SECRET_KEY', '');
+  }
+
+  it('treats both channels as available outside production, so a dry run still exercises the flow', () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('RESEND_API_KEY', '');
+    vi.stubEnv('BREVO_API_KEY', '');
+
+    expect(emailAvailable()).toBe(true);
+    expect(smsAvailable()).toBe(true);
+  });
+
+  it('reports a channel unavailable in production when its key is missing', () => {
+    unconfiguredProduction();
+
+    expect(emailAvailable()).toBe(false);
+    expect(smsAvailable()).toBe(false);
+  });
+
+  it('leaves a step undeliverable when the debtor is reachable but no provider is configured', () => {
+    unconfiguredProduction();
+
+    // This is the case that must never claim a contact row: the debtor has both
+    // an email and a phone, so the old check said "deliverable" and burned the
+    // step on a message that could not be sent.
+    expect(reachableChannels(['email', 'sms'], reachableBoth)).toEqual(['email', 'sms']);
+    expect(deliverableChannels(['email', 'sms'], reachableBoth)).toEqual([]);
+  });
+
+  it('falls back to the configured channel when only one provider is set up', () => {
+    unconfiguredProduction();
+    vi.stubEnv('RESEND_API_KEY', 're_live_x');
+
+    expect(deliverableChannels(['email', 'sms'], reachableBoth)).toEqual(['email']);
+  });
+
+  it('still refuses a channel the debtor cannot receive, however well configured', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('RESEND_API_KEY', 're_live_x');
+    vi.stubEnv('BREVO_API_KEY', 'xkeysib_x');
+
+    expect(deliverableChannels(['email', 'sms'], { email: null, phone: '6971234567' })).toEqual([
+      'sms',
+    ]);
+  });
+
+  it('has no dry-run for card payments in any environment', () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('STRIPE_SECRET_KEY', '');
+    expect(paymentsAvailable()).toBe(false);
+
+    vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_x');
+    expect(paymentsAvailable()).toBe(true);
   });
 });
 
@@ -152,5 +221,37 @@ describe('sms segmentation', () => {
   it('allows 160 characters of GSM text in one segment', () => {
     expect(segmentCount('a'.repeat(160))).toBe(1);
     expect(segmentCount('a'.repeat(161))).toBe(2);
+  });
+});
+
+describe('automationPaused', () => {
+  it('is true only when the invoice was explicitly switched off', () => {
+    expect(automationPaused({ automation_enabled: false })).toBe(true);
+    expect(automationPaused({ automation_enabled: true })).toBe(false);
+  });
+
+  it('treats a missing column as chasing, not as paused', () => {
+    // The state of every row on a database that has not taken 20260819130000.
+    // Read as paused, the sweep would stop for an entire tenant and say only
+    // that everything was skipped.
+    expect(automationPaused({})).toBe(false);
+    expect(automationPaused({ automation_enabled: undefined })).toBe(false);
+    expect(automationPaused({ automation_enabled: null })).toBe(false);
+    expect(automationPaused({ scenario_mode: undefined })).toBe(false);
+    expect(automationPaused({ scenario_mode: null })).toBe(false);
+  });
+
+  it('is true when the cadence says off, whatever the flag says', () => {
+    // The pair drifted whenever the invoice list's checkbox was used: it could
+    // only write the flag, so ticking it back on left the mode at 'off'. The
+    // sweep then resumed off one column while the invoice's own page reported
+    // nothing scheduled off the other.
+    expect(automationPaused({ scenario_mode: 'off' })).toBe(true);
+    expect(automationPaused({ automation_enabled: true, scenario_mode: 'off' })).toBe(true);
+  });
+
+  it('is false for the two cadences that do send', () => {
+    expect(automationPaused({ automation_enabled: true, scenario_mode: 'default' })).toBe(false);
+    expect(automationPaused({ automation_enabled: true, scenario_mode: 'custom' })).toBe(false);
   });
 });

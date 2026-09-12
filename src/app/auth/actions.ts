@@ -3,7 +3,10 @@
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
+import { safeNextPath } from '@/lib/redirects';
 import { createClient } from '@/lib/supabase/server';
+import { appUrl } from '@/lib/env';
+import { formError, getDictionary } from '@/lib/i18n';
 
 export interface AuthState {
   error?: string;
@@ -11,59 +14,79 @@ export interface AuthState {
 }
 
 const credentials = z.object({
-  email: z.string().email('Δώστε ένα έγκυρο email.'),
-  password: z.string().min(8, 'Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες.'),
+  email: z.string().email('emailRequired'),
+  password: z.string().min(8, 'passwordMin'),
 });
 
 export async function signIn(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const t = await getDictionary();
+
   const parsed = credentials.safeParse({
     email: formData.get('email'),
     password: formData.get('password'),
   });
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? 'Μη έγκυρα στοιχεία.' };
+    return { error: formError(t, parsed.error.issues[0]?.message) };
   }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
 
   if (error) {
-    return { error: 'Λάθος email ή κωδικός.' };
+    return { error: t.forms.errors.badCredentials };
   }
 
-  const next = formData.get('next');
-  redirect(typeof next === 'string' && next.startsWith('/') ? next : '/dashboard');
+  redirect(safeNextPath(formData.get('next')));
 }
 
 export async function signUp(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const t = await getDictionary();
+
   const parsed = credentials.safeParse({
     email: formData.get('email'),
     password: formData.get('password'),
   });
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? 'Μη έγκυρα στοιχεία.' };
+    return { error: formError(t, parsed.error.issues[0]?.message) };
   }
 
   const companyName = String(formData.get('company_name') ?? '').trim();
-  if (!companyName) return { error: 'Συμπληρώστε την επωνυμία της επιχείρησης.' };
+  if (!companyName) return { error: t.forms.errors.companyNameRequired };
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     ...parsed.data,
-    // Consumed by the `handle_new_auth_user` trigger, which provisions the
-    // tenant row in public.users.
-    options: { data: { company_name: companyName } },
+    options: {
+      // Consumed by the `handle_new_auth_user` trigger, which provisions the
+      // tenant row in public.users.
+      data: { company_name: companyName },
+      // Said explicitly rather than left to the project's Site URL. The link
+      // in the confirmation email is the first thing a new tenant clicks, and
+      // a Site URL still pointing at a preview deployment sends them to a
+      // stranger's copy of the app with a valid code in the query string.
+      emailRedirectTo: `${appUrl()}/auth/callback`,
+    },
   });
 
   if (error) {
-    return { error: error.message };
+    // Supabase answers in English whatever language the page is in, and its
+    // wording is written for a developer reading a stack trace. Only one of
+    // these is worth passing on at all — that the address is taken, because it
+    // tells the reader to sign in instead — and it is worth saying properly.
+    console.error('[auth:signUp]', error);
+
+    const taken =
+      error.code === 'user_already_exists' ||
+      /already registered|already exists/i.test(error.message);
+
+    return { error: taken ? t.forms.errors.emailTaken : t.forms.errors.signUpFailed };
   }
 
   // With email confirmation enabled the user has no session yet.
   if (!data.session) {
-    return { notice: 'Ελέγξτε το email σας για να επιβεβαιώσετε τον λογαριασμό.' };
+    return { notice: t.forms.notices.confirmEmail };
   }
 
   redirect('/dashboard');

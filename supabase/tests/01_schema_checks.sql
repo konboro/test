@@ -51,6 +51,49 @@ end $$;
 \echo '  ok  pay_token generated as 24 random bytes'
 
 -- --------------------------------------------------------------------------
+-- short_code: auto-generated, unique, drawn from the unambiguous alphabet
+-- --------------------------------------------------------------------------
+
+do $$
+declare c1 text; c2 text;
+begin
+  select short_code into c1 from public.invoices where id = 'bbbbbbbb-0000-0000-0000-000000000001';
+  select short_code into c2 from public.invoices where id = 'bbbbbbbb-0000-0000-0000-000000000002';
+
+  if c1 is null or length(c1) <> 10 then
+    raise exception 'FAIL: short_code should be 10 chars, got %', coalesce(length(c1)::text, 'null');
+  end if;
+
+  -- Lowercase or an ambiguous glyph here would break the root-level route: the
+  -- middleware only treats a path as public when it matches this alphabet.
+  if c1 !~ '^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{10}$' then
+    raise exception 'FAIL: short_code outside the allowed alphabet: %', c1;
+  end if;
+
+  if c1 = c2 then
+    raise exception 'FAIL: short_code repeated across invoices: %', c1;
+  end if;
+end $$;
+\echo '  ok  short_code generated as 10 unambiguous symbols'
+
+-- The public lookup has to answer to either credential, or every reminder sent
+-- before short links existed would 404.
+do $$
+declare tok text; code text; by_token uuid; by_code uuid;
+begin
+  select pay_token, short_code into tok, code
+    from public.invoices where id = 'bbbbbbbb-0000-0000-0000-000000000001';
+
+  select invoice_id into by_token from public.get_invoice_for_payment(tok);
+  select invoice_id into by_code  from public.get_invoice_for_payment(code);
+
+  if by_token is distinct from by_code or by_code is null then
+    raise exception 'FAIL: lookup disagrees between credentials (% vs %)', by_token, by_code;
+  end if;
+end $$;
+\echo '  ok  get_invoice_for_payment accepts both the short code and the legacy token'
+
+-- --------------------------------------------------------------------------
 -- COMPLIANCE LOCK: one contact per debtor per calendar day
 -- --------------------------------------------------------------------------
 
@@ -58,19 +101,30 @@ insert into public.dunning_contacts (user_id, debtor_id, invoice_id, step, conta
 values ('11111111-1111-1111-1111-111111111111', 'aaaaaaaa-0000-0000-0000-000000000001',
         'bbbbbbbb-0000-0000-0000-000000000001', 'overdue_2', '2026-08-15');
 
+-- The one-a-day rule was removed at the operator's decision, along with its
+-- unique index (20260911093000). A second contact to the same debtor on the
+-- same day is now allowed on purpose, and this block used to assert the
+-- refusal — so the whole suite failed on it. It asserts the new behaviour
+-- instead, because the decision is worth pinning down as much as the rule was.
+insert into public.dunning_contacts (user_id, debtor_id, invoice_id, step, contact_on)
+values ('11111111-1111-1111-1111-111111111111', 'aaaaaaaa-0000-0000-0000-000000000001',
+        'bbbbbbbb-0000-0000-0000-000000000002', 'pre_due', '2026-08-15');
+\echo '  ok  a second contact to the same debtor on the same day is allowed'
+
 do $$
 begin
-  -- Same debtor, same day, a DIFFERENT invoice and step: must still be refused.
+  -- What did NOT go with it: the same rung still fires at most once for one
+  -- invoice, so a missed cron run is caught up rather than replayed.
   begin
     insert into public.dunning_contacts (user_id, debtor_id, invoice_id, step, contact_on)
     values ('11111111-1111-1111-1111-111111111111', 'aaaaaaaa-0000-0000-0000-000000000001',
-            'bbbbbbbb-0000-0000-0000-000000000002', 'pre_due', '2026-08-15');
-    raise exception 'FAIL: daily contact limit was not enforced';
+            'bbbbbbbb-0000-0000-0000-000000000001', 'overdue_2', '2026-08-16');
+    raise exception 'FAIL: the same step fired twice for one invoice';
   exception when unique_violation then
     null;
   end;
 end $$;
-\echo '  ok  second contact to the same debtor on the same day is refused'
+\echo '  ok  the same step is still refused twice for one invoice'
 
 do $$
 begin
@@ -292,14 +346,428 @@ set role anon;
 do $$
 declare n integer;
 begin
-  select count(*) into n from public.invoices;
-  if n <> 0 then raise exception 'FAIL: anon read % invoices', n; end if;
+  -- Stronger than "no rows", and what the schema now actually does: the anon
+  -- grants were revoked outright, so this is refused before any policy is
+  -- consulted. The check used to assert an empty result, which stopped being
+  -- the truth when 20260819160000_revoke_anon_grants.sql landed.
+  begin
+    select count(*) into n from public.invoices;
+    raise exception 'FAIL: anon could select from invoices at all';
+  exception when insufficient_privilege then
+    null;
+  end;
 
-  select count(*) into n from public.debtors;
-  if n <> 0 then raise exception 'FAIL: anon read % debtors', n; end if;
+  begin
+    select count(*) into n from public.debtors;
+    raise exception 'FAIL: anon could select from debtors at all';
+  exception when insufficient_privilege then
+    null;
+  end;
 end $$;
 \echo '  ok  anon reads no invoices and no debtors directly'
 
 reset role;
+
+-- --------------------------------------------------------------------------
+-- funnel events: tenant-readable, server-written, invisible to anon
+-- --------------------------------------------------------------------------
+
+insert into public.funnel_events (user_id, invoice_id, debtor_id, channel, event)
+values ('11111111-1111-1111-1111-111111111111', 'bbbbbbbb-0000-0000-0000-000000000001',
+        'aaaaaaaa-0000-0000-0000-000000000001', 'email', 'page_view');
+
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+
+do $$
+declare n integer;
+begin
+  select count(*) into n from public.funnel_events;
+  if n <> 1 then raise exception 'FAIL: tenant A sees % funnel events, expected 1', n; end if;
+
+  begin
+    insert into public.funnel_events (user_id, invoice_id, event)
+    values ('11111111-1111-1111-1111-111111111111', 'bbbbbbbb-0000-0000-0000-000000000001',
+            'page_view');
+    raise exception 'FAIL: a session wrote its own funnel event';
+  exception when insufficient_privilege then
+    null;
+  end;
+end $$;
+\echo '  ok  funnel events are readable by their tenant and writable only by the server'
+
+reset role;
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+set role authenticated;
+
+do $$
+declare n integer;
+begin
+  select count(*) into n from public.funnel_events;
+  if n <> 0 then raise exception 'FAIL: tenant B sees % of tenant A''s funnel events', n; end if;
+end $$;
+\echo '  ok  funnel events do not cross tenants'
+
+reset role;
+
+set role anon;
+
+do $$
+begin
+  -- Stronger than zero rows: anon holds no SELECT grant on this table at all.
+  begin
+    perform count(*) from public.funnel_events;
+    raise exception 'FAIL: anon could select from funnel_events';
+  exception when insufficient_privilege then
+    null;
+  end;
+end $$;
+\echo '  ok  anon cannot read funnel events at all'
+
+reset role;
+
+-- --------------------------------------------------------------------------
+-- many companies per login, many logins per company
+-- --------------------------------------------------------------------------
+--
+-- The header is the whole scoping mechanism, so these checks are about what it
+-- can and cannot do: select among your own companies, and nothing else.
+
+do $$
+declare n integer;
+begin
+  select count(*) into n from public.organization_members
+   where organization_id = member_id and role = 'owner';
+  if n <> 2 then raise exception 'FAIL: signup did not make each tenant an owner (got %)', n; end if;
+end $$;
+\echo '  ok  the signup trigger makes a new account the owner of its company'
+
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+
+-- A second company, created the only way a browser can create one.
+do $$
+declare second uuid; n integer;
+begin
+  second := public.create_organization('Alpha Deftero AE', '999888777');
+
+  select count(*) into n from public.my_organizations();
+  if n <> 2 then raise exception 'FAIL: expected 2 companies for tenant A, got %', n; end if;
+
+  -- With no header at all, nothing moved: still their original company.
+  select count(*) into n from public.debtors;
+  if n <> 1 then raise exception 'FAIL: default company should still show its 1 debtor, got %', n; end if;
+
+  -- Acting for the new company: its own books, which are empty.
+  perform set_config('request.headers', json_build_object('x-lefta-org', second)::text, true);
+
+  if public.current_org_id() <> second then
+    raise exception 'FAIL: the header did not select the second company';
+  end if;
+
+  select count(*) into n from public.debtors;
+  if n <> 0 then raise exception 'FAIL: the second company sees % debtors of the first', n; end if;
+
+  select count(*) into n from public.users;
+  if n <> 1 then raise exception 'FAIL: expected exactly the active company row, got %', n; end if;
+
+  perform set_config('request.headers', '', true);
+end $$;
+\echo '  ok  a second company is created, switched into, and sees only its own rows'
+
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+
+-- The forgery test: B asks for A's company by id.
+do $$
+declare n integer; a uuid := '11111111-1111-1111-1111-111111111111';
+begin
+  perform set_config('request.headers', json_build_object('x-lefta-org', a)::text, true);
+
+  if public.current_org_id() <> '22222222-2222-2222-2222-222222222222' then
+    raise exception 'FAIL: a forged header selected a company the caller is not a member of';
+  end if;
+
+  select count(*) into n from public.debtors where user_id = a;
+  if n <> 0 then raise exception 'FAIL: forged header exposed % of another tenant''s debtors', n; end if;
+
+  perform set_config('request.headers', '', true);
+end $$;
+\echo '  ok  a forged header grants nothing — it only selects among your own companies'
+
+-- Junk in the header must not raise: it is evaluated inside every policy, and
+-- an exception there would take down every query rather than deny one.
+do $$
+declare n integer;
+begin
+  perform set_config('request.headers', '{"x-lefta-org":"not-a-uuid"}', true);
+  select count(*) into n from public.debtors;
+  perform set_config('request.headers', 'not even json', true);
+  select count(*) into n from public.debtors;
+  perform set_config('request.headers', '', true);
+end $$;
+\echo '  ok  a malformed header falls back instead of raising'
+
+reset role;
+
+-- A viewer reads everything and writes nothing.
+insert into auth.users (id, email) values
+  ('33333333-3333-3333-3333-333333333333', 'viewer@example.gr');
+
+insert into public.organization_members (organization_id, member_id, member_email, role)
+values ('11111111-1111-1111-1111-111111111111', '33333333-3333-3333-3333-333333333333',
+        'viewer@example.gr', 'viewer');
+
+set role authenticated;
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+
+do $$
+declare n integer; a uuid := '11111111-1111-1111-1111-111111111111';
+begin
+  -- Signing up gave this person a company of their own, so acting for the one
+  -- they were invited into is a switch — the same one the cookie makes.
+  perform set_config('request.headers', json_build_object('x-lefta-org', a)::text, true);
+
+  select count(*) into n from public.debtors;
+  if n <> 1 then raise exception 'FAIL: viewer should see the 1 debtor of that company, got %', n; end if;
+
+  if public.current_org_role() <> 'viewer' then
+    raise exception 'FAIL: role resolved as %', coalesce(public.current_org_role(), 'null');
+  end if;
+
+  begin
+    insert into public.debtors (user_id, name)
+    values ('11111111-1111-1111-1111-111111111111', 'Should not exist');
+    raise exception 'FAIL: a viewer inserted a debtor';
+  exception when insufficient_privilege then
+    null;
+  end;
+
+  begin
+    update public.debtors set name = 'Renamed' where user_id = a;
+    -- An update that matches no row is not an error; the policy simply hides
+    -- every row from a viewer's UPDATE, which is the same outcome by a
+    -- different route.
+    if found then raise exception 'FAIL: a viewer updated a debtor'; end if;
+  exception when insufficient_privilege then
+    null;
+  end;
+
+  perform set_config('request.headers', '', true);
+end $$;
+\echo '  ok  a viewer reads the company and cannot write to it'
+
+reset role;
+
+-- Invitations: single use, email-bound, and never readable as a token.
+insert into auth.users (id, email) values
+  ('44444444-4444-4444-4444-444444444444', 'newbie@example.gr');
+
+do $$
+declare token text; joined uuid; n integer; granted text;
+begin
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  token := public.invite_member('newbie@example.gr', 'member');
+
+  select count(*) into n from public.organization_invites where token_hash = token;
+  if n <> 0 then raise exception 'FAIL: the raw token is stored, not its hash'; end if;
+
+  -- Someone else holding the link gets nothing: a forwarded invitation is not
+  -- a way into a company's receivables.
+  perform set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+  begin
+    perform public.accept_invite(token);
+    raise exception 'FAIL: an invitation was accepted by the wrong address';
+  exception when others then
+    if sqlerrm like 'FAIL:%' then raise; end if;
+  end;
+
+  -- The invited address joins, once.
+  perform set_config('request.jwt.claim.sub', '44444444-4444-4444-4444-444444444444', true);
+  joined := public.accept_invite(token);
+  if joined <> '11111111-1111-1111-1111-111111111111' then
+    raise exception 'FAIL: accepted into the wrong company';
+  end if;
+
+  select role into granted from public.organization_members
+   where organization_id = joined and member_id = '44444444-4444-4444-4444-444444444444';
+  if granted <> 'member' then
+    raise exception 'FAIL: the invited role was not applied (got %)', coalesce(granted, 'null');
+  end if;
+
+  begin
+    perform public.accept_invite(token);
+    raise exception 'FAIL: an invitation was used twice';
+  exception when others then
+    if sqlerrm like 'FAIL:%' then raise; end if;
+  end;
+end $$;
+\echo '  ok  an invitation is single use, bound to its address, and stored as a hash'
+
+-- A company must never be left with nobody who can administer it.
+do $$
+begin
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  begin
+    perform public.remove_member('11111111-1111-1111-1111-111111111111');
+    raise exception 'FAIL: the last owner was removed';
+  exception when others then
+    if sqlerrm like 'FAIL:%' then raise; end if;
+  end;
+end $$;
+\echo '  ok  the last owner cannot be removed'
+
+-- --------------------------------------------------------------------------
+-- invoice reports: filed by the server, read by the tenant, decided by nobody's browser
+-- --------------------------------------------------------------------------
+
+-- Filed the way the payment endpoint files them: service role, values from the
+-- invoice row the credential resolved to.
+insert into public.invoice_reports (user_id, invoice_id, debtor_id, kind, details)
+values ('11111111-1111-1111-1111-111111111111', 'bbbbbbbb-0000-0000-0000-000000000001',
+        'aaaaaaaa-0000-0000-0000-000000000001', 'paid_claim',
+        '{"summary":"Δηλώνει έμβασμα."}');
+
+do $$
+begin
+  -- A second open claim on the same invoice folds into the first: the partial
+  -- unique index is also what keeps the anonymous endpoint from piling up rows.
+  begin
+    insert into public.invoice_reports (user_id, invoice_id, debtor_id, kind)
+    values ('11111111-1111-1111-1111-111111111111', 'bbbbbbbb-0000-0000-0000-000000000001',
+            'aaaaaaaa-0000-0000-0000-000000000001', 'paid_claim');
+    raise exception 'FAIL: two open reports of the same kind on one invoice';
+  exception when unique_violation then
+    null;
+  end;
+
+  -- A different kind is a different conversation and coexists.
+  insert into public.invoice_reports (user_id, invoice_id, debtor_id, kind)
+  values ('11111111-1111-1111-1111-111111111111', 'bbbbbbbb-0000-0000-0000-000000000001',
+          'aaaaaaaa-0000-0000-0000-000000000001', 'dispute');
+end $$;
+\echo '  ok  one open report per invoice and kind; kinds coexist'
+
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+
+do $$
+declare n integer;
+begin
+  select count(*) into n from public.invoice_reports;
+  if n <> 2 then raise exception 'FAIL: the tenant should see its 2 reports, got %', n; end if;
+
+  -- The row a money decision is based on takes no browser writes at all —
+  -- not from the debtor (anon) and not from the creditor's own session.
+  begin
+    update public.invoice_reports set status = 'resolved';
+    raise exception 'FAIL: a session edited a report';
+  exception when insufficient_privilege then
+    null;
+  end;
+
+  begin
+    insert into public.invoice_reports (user_id, invoice_id, debtor_id, kind)
+    values ('11111111-1111-1111-1111-111111111111', 'bbbbbbbb-0000-0000-0000-000000000002',
+            'aaaaaaaa-0000-0000-0000-000000000001', 'dispute');
+    raise exception 'FAIL: a session filed a report';
+  exception when insufficient_privilege then
+    null;
+  end;
+end $$;
+
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+
+do $$
+declare n integer;
+begin
+  select count(*) into n from public.invoice_reports;
+  if n <> 0 then raise exception 'FAIL: tenant B sees % of tenant A''s reports', n; end if;
+end $$;
+
+reset role;
+set role anon;
+
+do $$
+begin
+  begin
+    perform count(*) from public.invoice_reports;
+    raise exception 'FAIL: anon could read invoice reports';
+  exception when insufficient_privilege then
+    null;
+  end;
+end $$;
+
+reset role;
+\echo '  ok  reports are tenant-read, server-written, and invisible to anon'
+
+-- --------------------------------------------------------------------------
+-- invoice messages: one invoice's own wording, server-written, tenant-read
+-- --------------------------------------------------------------------------
+
+insert into public.invoice_messages (invoice_id, user_id, step, channel, subject, body)
+values ('bbbbbbbb-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
+        'on_issue', 'email', 'Δικό του θέμα', 'Δικό του κείμενο');
+
+do $$
+begin
+  -- An SMS has no subject line; a row claiming one implies a rendering path
+  -- that does not exist.
+  begin
+    insert into public.invoice_messages (invoice_id, user_id, step, channel, subject, body)
+    values ('bbbbbbbb-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
+            'on_issue', 'sms', 'no such thing', 'SMS');
+    raise exception 'FAIL: an SMS wording row accepted a subject';
+  exception when check_violation then
+    null;
+  end;
+
+  -- One wording per invoice, step and channel: the second save replaces, and
+  -- the schema refuses the state where two rows disagree about the words.
+  begin
+    insert into public.invoice_messages (invoice_id, user_id, step, channel, body)
+    values ('bbbbbbbb-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
+            'on_issue', 'email', 'a second wording');
+    raise exception 'FAIL: two wordings for one invoice/step/channel';
+  exception when unique_violation then
+    null;
+  end;
+end $$;
+\echo '  ok  invoice wording: sms has no subject, one row per invoice/step/channel'
+
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+
+do $$
+declare n integer;
+begin
+  select count(*) into n from public.invoice_messages;
+  if n <> 1 then raise exception 'FAIL: the tenant should read its wording row, got %', n; end if;
+
+  begin
+    update public.invoice_messages set body = 'edited from a browser';
+    raise exception 'FAIL: a session edited invoice wording directly';
+  exception when insufficient_privilege then
+    null;
+  end;
+end $$;
+
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+
+do $$
+declare n integer;
+begin
+  select count(*) into n from public.invoice_messages;
+  if n <> 0 then raise exception 'FAIL: tenant B reads % of tenant A''s wording rows', n; end if;
+end $$;
+
+reset role;
+\echo '  ok  invoice wording is tenant-read, server-written, and does not cross tenants'
+
 \echo ''
 \echo 'ALL SCHEMA CHECKS PASSED'

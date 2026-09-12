@@ -1,0 +1,229 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  applyPlaceholders,
+  DEFAULT_TEMPLATES,
+  defaultTemplateFor,
+  EDITABLE_SLOTS,
+  parseReminderChoice,
+  parseReminderSlot,
+  parseSlotKey,
+  REMINDER_CHOICES,
+  renderEmail,
+  renderSms,
+  slotKey,
+  templateFor,
+  type TemplateContext,
+  type TemplateOverrides,
+} from './templates';
+
+const ctx: TemplateContext = {
+  debtorName: 'Παπαδόπουλος ΑΕ',
+  creditorName: 'Alpha AE',
+  invoiceLabel: 'A 1042',
+  amountCents: 124000,
+  currency: 'EUR',
+  dueDate: '2026-07-31',
+  payUrl: 'https://lefta.app/pay/abc123',
+};
+
+describe('placeholders', () => {
+  it('substitutes every documented token', () => {
+    const out = applyPlaceholders(
+      '{{debtor_name}}|{{creditor_name}}|{{invoice}}|{{amount}}|{{due_date}}|{{pay_url}}',
+      ctx,
+    );
+
+    expect(out).toContain('Παπαδόπουλος ΑΕ');
+    expect(out).toContain('Alpha AE');
+    expect(out).toContain('A 1042');
+    expect(out).toContain('https://lefta.app/pay/abc123');
+    expect(out).not.toContain('{{');
+  });
+
+  it('tolerates whitespace inside the braces', () => {
+    expect(applyPlaceholders('{{ invoice }}', ctx)).toBe('A 1042');
+  });
+
+  it('leaves an unknown token alone rather than blanking it', () => {
+    // A typo must be visible in the preview, not silently eat the sentence.
+    expect(applyPlaceholders('Ποσό {{amuont}} τώρα', ctx)).toBe('Ποσό {{amuont}} τώρα');
+  });
+});
+
+describe('template resolution', () => {
+  it('falls back to the built-in copy when a tenant has no override', () => {
+    expect(templateFor('overdue_2', 'email', {})).toBe(DEFAULT_TEMPLATES['overdue_2:email']);
+  });
+
+  it('prefers the tenant override', () => {
+    const overrides: TemplateOverrides = {
+      'overdue_2:email': { subject: 'Δικό μας θέμα', body: 'Δικό μας κείμενο {{amount}}' },
+    };
+
+    const email = renderEmail('overdue_2', ctx, overrides);
+    expect(email.subject).toBe('Δικό μας θέμα');
+    expect(email.text).toContain('Δικό μας κείμενο');
+    expect(email.text).toContain('1.240,00');
+  });
+
+  it('keeps slots independent — overriding one leaves the others default', () => {
+    const overrides: TemplateOverrides = {
+      'overdue_2:email': { subject: 's', body: 'b' },
+    };
+
+    expect(renderEmail('pre_due', ctx, overrides).text).toContain('σας υπενθυμίζουμε');
+  });
+
+  it('routes the manual reminder to its own slot', () => {
+    expect(slotKey(null, 'email')).toBe('manual:email');
+
+    const overrides: TemplateOverrides = {
+      'manual:sms': { subject: null, body: 'Χειροκίνητο: {{invoice}}' },
+    };
+    // The wording is the tenant's; the link is not optional, so it is appended
+    // to an override that left it out rather than being sent without one.
+    expect(renderSms(null, ctx, overrides)).toContain('Χειροκίνητο: A 1042');
+    expect(renderSms(null, ctx, overrides)).toContain(ctx.payUrl);
+  });
+
+  it('every editable slot has a built-in default behind it', () => {
+    // Resolved rather than looked up: the rungs past the original three have no
+    // copy of their own and borrow it, which is exactly the case a lookup into
+    // the table would miss while the editor showed an empty box.
+    for (const slot of EDITABLE_SLOTS) {
+      for (const locale of ['el', 'en'] as const) {
+        expect(defaultTemplateFor(slot.key, locale).body).not.toBe('');
+      }
+
+      expect(parseSlotKey(slot.key)).toEqual({
+        step: slot.step,
+        channel: slot.channel,
+        variant: slot.variant ?? null,
+      });
+    }
+  });
+
+  it('resolves every reminder choice to a renderable template', () => {
+    for (const choice of REMINDER_CHOICES) {
+      const slot = parseReminderSlot(choice.value);
+      expect(slot).toEqual({ step: choice.step, variant: choice.variant ?? null });
+      // Both channels must render for any choice the picker offers, including
+      // the step-1 wording whose SMS body the ladder itself never uses, and a
+      // named wording that defines only one of the two.
+      expect(renderEmail(slot!.step, ctx, {}, slot!.variant).text).not.toBe('');
+      expect(renderSms(slot!.step, ctx, {}, slot!.variant)).not.toBe('');
+    }
+  });
+
+  it('distinguishes an unknown choice from the manual slot', () => {
+    // `null` is a real step meaning "manual", so a rejection has to be
+    // `undefined` or the two collapse and junk input sends the manual template.
+    expect(parseReminderChoice('manual')).toBeNull();
+    expect(parseReminderChoice('nope')).toBeUndefined();
+  });
+
+  it('refuses a slot key that is not offered in the editor', () => {
+    expect(parseSlotKey('pre_due:sms')).toBeNull();
+    expect(parseSlotKey('nonsense')).toBeNull();
+    expect(parseSlotKey('overdue_2:carrier_pigeon')).toBeNull();
+  });
+});
+
+describe('email rendering', () => {
+  it('escapes tenant copy instead of letting it inject markup', () => {
+    // A template is copy, not a way to author HTML in a message sent on someone
+    // else's behalf.
+    const overrides: TemplateOverrides = {
+      'manual:email': {
+        subject: 'x',
+        body: '<script>alert(1)</script> & "quoted"',
+      },
+    };
+
+    const html = renderEmail(null, ctx, overrides).html;
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('&lt;script&gt;');
+    expect(html).toContain('&amp;');
+  });
+
+  it('escapes values substituted into the body too', () => {
+    const html = renderEmail(
+      null,
+      { ...ctx, debtorName: '<b>Acme</b>' },
+      { 'manual:email': { subject: 'x', body: '{{debtor_name}}' } },
+    ).html;
+
+    expect(html).not.toContain('<b>Acme</b>');
+    expect(html).toContain('&lt;b&gt;Acme&lt;/b&gt;');
+  });
+
+  it('keeps the payment button and platform footer whatever the copy says', () => {
+    const html = renderEmail(null, ctx, {
+      'manual:email': { subject: 'x', body: 'μόνο αυτό' },
+    }).html;
+
+    expect(html).toContain(ctx.payUrl);
+    expect(html).toContain('lefta.app');
+  });
+
+  it('turns blank lines into paragraphs and single breaks into <br>', () => {
+    const html = renderEmail(null, ctx, {
+      'manual:email': { subject: 'x', body: 'πρώτη\nδεύτερη\n\nτρίτη' },
+    }).html;
+
+    expect(html).toContain('πρώτη<br />δεύτερη');
+    expect((html.match(/<p style="margin:0 0 16px;/g) ?? []).length).toBe(2);
+  });
+
+  it('uses the second paragraph as the inbox preview line', () => {
+    // Every reminder opens with the same greeting, so previewing it would tell
+    // the recipient nothing.
+    const html = renderEmail(null, ctx, {
+      'manual:email': { subject: 'θέμα', body: 'Αγαπητοί συνεργάτες,\n\nτο ποσό είναι {{amount}}.' },
+    }).html;
+
+    expect(html).toContain('το ποσό είναι 1.240,00');
+    expect(html).toContain('mso-hide:all');
+  });
+});
+
+describe('the Penny wording', () => {
+  it('is its own slot, not the manual one', () => {
+    const penny = renderEmail(null, ctx, {}, 'penny');
+    const manual = renderEmail(null, ctx);
+
+    expect(penny.text).not.toBe(manual.text);
+    expect(penny.subject).not.toBe(manual.subject);
+    // Addressed to a person, so the business salutation must be gone.
+    expect(penny.text).not.toContain('Αγαπητοί συνεργάτες');
+    expect(penny.text).toContain('Γεια σου');
+  });
+
+  it('does not inherit an override written for the manual slot', () => {
+    // Both live under `step is null`. Keying them together would mean editing
+    // the manual reminder silently rewrites the Penny one.
+    const overrides: TemplateOverrides = {
+      'manual:email': { subject: 'Manual subject', body: 'Manual body' },
+    };
+
+    expect(renderEmail(null, ctx, overrides).text).toContain('Manual body');
+    expect(renderEmail(null, ctx, overrides, 'penny').text).not.toContain('Manual body');
+  });
+
+  it('falls back to the plain slot on a channel it does not define', () => {
+    // `penny` is email-only. A manual send to a debtor holding both an address
+    // and a phone renders both channels, and asking for a body that was never
+    // written must not throw on the way to a message the operator expected.
+    expect(() => renderSms(null, ctx, {}, 'penny')).not.toThrow();
+    expect(renderSms(null, ctx, {}, 'penny')).toBe(renderSms(null, ctx));
+  });
+
+  it('keeps its own subject when the manual subject is overridden', () => {
+    const overrides: TemplateOverrides = {
+      'manual:email': { subject: null, body: 'Manual body' },
+    };
+
+    expect(renderEmail(null, ctx, overrides, 'penny').subject).toContain('πληρωμή');
+  });
+});

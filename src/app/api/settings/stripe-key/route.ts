@@ -1,0 +1,97 @@
+import { NextResponse } from 'next/server';
+import Stripe from 'stripe';
+import { z } from 'zod';
+
+import { saveFailed } from '@/lib/errors';
+import { encryptSecret } from '@/lib/crypto';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { writableOrganization } from '@/lib/orgs/active';
+import { getDictionary } from '@/lib/i18n';
+
+export const runtime = 'nodejs';
+
+const schema = z.object({
+  secret_key: z
+    .string()
+    .trim()
+    .min(10)
+    .max(200)
+    .refine((k) => k.startsWith('sk_') || k.startsWith('rk_'), {
+      message: 'stripeKeyPrefix',
+    }),
+});
+
+/**
+ * Stores the tenant's own Stripe secret key.
+ *
+ * A bridge until lefta has a Stripe account of its own to run Connect from.
+ * The key is encrypted with the same envelope as the myDATA and Elorus ones and
+ * is never read back to the browser.
+ *
+ * It is verified before being stored: a key that cannot even read its own
+ * account balance would otherwise fail silently, and the first anyone would
+ * learn of it is a debtor pressing a payment button that breaks.
+ */
+export async function POST(request: Request) {
+  const t = await getDictionary();
+  const org = await writableOrganization();
+  if (!org) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const parsed = schema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? 'Invalid request' },
+      { status: 400 },
+    );
+  }
+
+  const key = parsed.data.secret_key;
+
+  try {
+    const client = new Stripe(key, { apiVersion: '2025-02-24.acacia', typescript: true });
+    await client.balance.retrieve();
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    return NextResponse.json({ error: t.forms.api.stripeRejected(message) }, { status: 400 });
+  }
+
+  const { error } = await createAdminClient()
+    .from('users')
+    .update({ stripe_secret_key_enc: encryptSecret(key) })
+    .eq('id', org.id);
+
+  if (error) {
+    // The store refused, which is ours to fix and nothing the reader can act
+    // on. The provider's own words are still passed on above, where they are
+    // the only true account of why a key was rejected.
+    return NextResponse.json(
+      { error: saveFailed(await getDictionary(), 'settings:stripe', error) },
+      { status: 500 },
+    );
+  }
+
+  // Test keys are obvious from their prefix and worth reflecting back, so
+  // nobody discovers at go-live that the account has been running on one.
+  return NextResponse.json({ ok: true, testMode: key.startsWith('sk_test_') || key.startsWith('rk_test_') });
+}
+
+export async function DELETE() {
+  const org = await writableOrganization();
+  if (!org) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const { error } = await createAdminClient()
+    .from('users')
+    .update({ stripe_secret_key_enc: null })
+    .eq('id', org.id);
+
+  if (error) {
+    // The store refused, which is ours to fix and nothing the reader can act
+    // on. The provider's own words are still passed on above, where they are
+    // the only true account of why a key was rejected.
+    return NextResponse.json(
+      { error: saveFailed(await getDictionary(), 'settings:stripe', error) },
+      { status: 500 },
+    );
+  }
+  return NextResponse.json({ ok: true });
+}

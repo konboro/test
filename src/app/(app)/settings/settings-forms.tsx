@@ -8,12 +8,15 @@ import { Button, Field, inputClass } from '@/components/ui';
 import type { SMS_PACKS } from '@/lib/stripe';
 
 import { updateProfile, type SettingsState } from './actions';
+import { useT } from '@/lib/i18n/provider';
+import { TimezoneField } from './timezone-field';
 
-function Submit({ label = 'Αποθήκευση' }: { label?: string }) {
+function Submit({ label }: { label?: string }) {
+  const t = useT();
   const { pending } = useFormStatus();
   return (
     <Button type="submit" disabled={pending}>
-      {pending ? 'Αποθήκευση…' : label}
+      {pending ? t.fields.saving : (label ?? t.fields.save)}
     </Button>
   );
 }
@@ -25,16 +28,18 @@ export function ProfileForm({
     company_name: string | null;
     vat_number: string | null;
     reply_to_email: string | null;
-    default_payment_terms_days: number;
-    automation_enabled: boolean;
+    business_mode: 'general' | 'landlord';
+    email: string | null;
+    timezone: string;
   };
 }) {
+  const t = useT();
   const [state, action] = useActionState<SettingsState, FormData>(updateProfile, {});
 
   return (
     <form action={action} className="space-y-4 px-5 py-5">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Επωνυμία">
+        <Field label={t.fields.companyName}>
           <input
             name="company_name"
             required
@@ -43,54 +48,46 @@ export function ProfileForm({
           />
         </Field>
 
-        <Field label="ΑΦΜ">
+        <Field label={t.fields.vat}>
           <input name="vat_number" defaultValue={profile.vat_number ?? ''} className={inputClass} />
         </Field>
 
         <Field
-          label="Email απάντησης"
-          hint="Εκεί θα απαντούν οι πελάτες στις υπενθυμίσεις."
+          label={t.fields.replyTo}
+          hint={t.fields.replyToHint}
         >
+          {/* The placeholder is the account address, which is exactly what is
+              used when this is left empty. Stating it here is the difference
+              between an empty field that looks unset and one that shows where
+              replies are going. */}
           <input
             name="reply_to_email"
             type="email"
+            placeholder={profile.email ?? ''}
             defaultValue={profile.reply_to_email ?? ''}
             className={inputClass}
           />
         </Field>
 
-        <Field
-          label="Ημέρες πίστωσης"
-          hint="Το myDATA δεν περιέχει ημερομηνία λήξης· υπολογίζεται από την έκδοση."
-        >
-          <input
-            name="default_payment_terms_days"
-            type="number"
-            min={0}
-            max={365}
-            required
-            defaultValue={profile.default_payment_terms_days}
-            className={inputClass}
-          />
-        </Field>
-      </div>
+        {/* Beside the company details rather than with the reminder settings:
+            it describes where the business is, and everything about dates in
+            the product follows from it. */}
+        <TimezoneField value={profile.timezone} />
 
-      <label className="flex items-start gap-3 rounded-lg border border-ink-200 bg-ink-50 px-4 py-3">
-        <input
-          name="automation_enabled"
-          type="checkbox"
-          defaultChecked={profile.automation_enabled}
-          className="mt-0.5 h-4 w-4 rounded border-ink-300"
-        />
-        <span>
-          <span className="block text-sm font-medium text-ink-900">
-            Ενεργή αυτοματοποίηση υπενθυμίσεων
-          </span>
-          <span className="block text-xs text-ink-500">
-            Όταν είναι απενεργοποιημένη, δεν στέλνεται κανένα μήνυμα σε κανέναν πελάτη.
-          </span>
-        </span>
-      </label>
+        {/* Not a preference but a description of the business, which is why
+            it sits with the company details rather than in a feature list. */}
+        <Field label={t.fields.businessMode} hint={t.fields.businessModeHint}>
+          <select
+            name="business_mode"
+            defaultValue={profile.business_mode}
+            className={inputClass}
+          >
+            <option value="general">{t.fields.modeGeneral}</option>
+            <option value="landlord">{t.fields.modeLandlord}</option>
+          </select>
+        </Field>
+
+      </div>
 
       {state.error ? (
         <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -117,6 +114,7 @@ export function MyDataForm({
   userId: string | null;
   environment: 'production' | 'sandbox';
 }) {
+  const t = useT();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
@@ -145,11 +143,11 @@ export function MyDataForm({
       const body = (await response.json()) as { ok?: boolean; error?: string };
 
       if (!response.ok || !body.ok) {
-        setMessage({ tone: 'error', text: body.error ?? 'Η αποθήκευση απέτυχε.' });
+        setMessage({ tone: 'error', text: body.error ?? t.fields.saveFailed });
         return;
       }
 
-      setMessage({ tone: 'ok', text: 'Τα διαπιστευτήρια επαληθεύτηκαν και αποθηκεύτηκαν.' });
+      setMessage({ tone: 'ok', text: t.fields.credentialsVerified });
       router.refresh();
     } catch (error) {
       setMessage({ tone: 'error', text: error instanceof Error ? error.message : String(error) });
@@ -159,12 +157,12 @@ export function MyDataForm({
   }
 
   async function disconnect() {
-    if (!window.confirm('Να διαγραφούν τα αποθηκευμένα διαπιστευτήρια myDATA;')) return;
+    if (!window.confirm(t.fields.deleteMydataConfirm)) return;
 
     setBusy(true);
     await fetch('/api/settings/mydata', { method: 'DELETE' });
     setBusy(false);
-    setMessage({ tone: 'ok', text: 'Η σύνδεση με το myDATA διακόπηκε.' });
+    setMessage({ tone: 'ok', text: t.fields.mydataDisconnected });
     router.refresh();
   }
 
@@ -181,10 +179,10 @@ export function MyDataForm({
           />
         </Field>
 
-        <Field label="Περιβάλλον">
+        <Field label={t.fields.environment}>
           <select name="environment" defaultValue={environment} className={inputClass}>
-            <option value="production">Παραγωγή (mydatapi.aade.gr)</option>
-            <option value="sandbox">Δοκιμαστικό (mydataapidev.aade.gr)</option>
+            <option value="production">{t.fields.envProduction}</option>
+            <option value="sandbox">{t.fields.envSandbox}</option>
           </select>
         </Field>
 
@@ -193,8 +191,8 @@ export function MyDataForm({
             label="Subscription Key"
             hint={
               connected
-                ? 'Αποθηκευμένο και κρυπτογραφημένο. Αφήστε το κενό για να παραμείνει ως έχει.'
-                : 'Από τον λογαριασμό σας στο myDATA REST API.'
+                ? t.fields.keyStored
+                : t.fields.keyFromAccount
             }
           >
             <input
@@ -221,11 +219,11 @@ export function MyDataForm({
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={busy}>
-          {busy ? 'Έλεγχος…' : 'Επαλήθευση και αποθήκευση'}
+          {busy ? t.fields.verifying : t.fields.verifyAndSave}
         </Button>
         {connected ? (
           <Button type="button" variant="secondary" onClick={disconnect} disabled={busy}>
-            Αποσύνδεση
+            {t.fields.disconnect}
           </Button>
         ) : null}
       </div>
@@ -234,6 +232,7 @@ export function MyDataForm({
 }
 
 export function CreditPacks({ packs }: { packs: typeof SMS_PACKS }) {
+  const t = useT();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -251,7 +250,7 @@ export function CreditPacks({ packs }: { packs: typeof SMS_PACKS }) {
       const body = (await response.json()) as { url?: string; error?: string };
 
       if (!response.ok || !body.url) {
-        setError(body.error ?? 'Δεν ήταν δυνατή η έναρξη της πληρωμής.');
+        setError(body.error ?? t.fields.checkoutFailed);
         return;
       }
 
@@ -280,7 +279,7 @@ export function CreditPacks({ packs }: { packs: typeof SMS_PACKS }) {
               className="mt-3 w-full"
               variant="secondary"
             >
-              {busy === pack.id ? 'Ανακατεύθυνση…' : 'Αγορά'}
+              {busy === pack.id ? t.fields.redirecting : t.fields.buy}
             </Button>
           </div>
         ))}

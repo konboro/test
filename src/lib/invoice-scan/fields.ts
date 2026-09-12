@@ -1,0 +1,908 @@
+import { parseAmountCents, parseDate } from '@/lib/import/parse';
+
+/**
+ * Reading an invoice document into the fields this product needs.
+ *
+ * Text in, fields out, no I/O — the hard part here is judgement about Greek
+ * invoice layouts, and that is worth being able to test without a PDF, an API
+ * key or a network.
+ */
+
+export interface ExtractedInvoice {
+  debtorName: string | null;
+  vatNumber: string | null;
+  invoiceNumber: string | null;
+  series: string | null;
+  issueDate: string | null;
+  dueDate: string | null;
+  amountCents: number | null;
+  currency: string;
+  /** The myDATA MARK, when the document carries one. */
+  mark: string | null;
+  /**
+   * How to reach the customer.
+   *
+   * Not required to raise an invoice, which is why they are not in `missing`,
+   * but without one of them nothing can ever be sent about it — so a document
+   * that carries them should not make somebody type them in again.
+   */
+  email: string | null;
+  phone: string | null;
+}
+
+/**
+ * Without these an invoice cannot be created, so the review screen must ask.
+ *
+ * The customer is one entry rather than two: a document naming either a VAT
+ * number or a company name is enough to find or create one, and demanding both
+ * would flag a perfectly good invoice.
+ */
+export const REQUIRED_FIELDS = ['invoiceNumber', 'amountCents', 'issueDate', 'customer'] as const;
+export type RequiredField = (typeof REQUIRED_FIELDS)[number];
+
+/**
+ * Accent-stripped, sigma-normalised uppercase, for matching only.
+ *
+ * Greek invoices are typeset in every combination of case and accent there is,
+ * and the final sigma ending ΠΕΛΑΤΗΣ is the same letter as the one in the middle
+ * of it. Values are always taken from the original text.
+ */
+function fold(value: string): string {
+  return value
+    .normalize('NFD')
+    // The combining marks NFD just split off. Written as escapes rather than as
+    // the characters themselves, which are invisible in an editor and survive
+    // exactly one careless save.
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/ς/g, 'σ')
+    .toUpperCase()
+    // Ł is a letter in its own right, not L with a mark, so NFD leaves it alone
+    // and every Polish label containing it would miss. PŁATNOŚCI folds to
+    // PLATNOSCI only because of this line.
+    .replace(/Ł/g, 'L');
+}
+
+/** Everything after the first match of `label` on that line. */
+function tail(line: string, label: RegExp): string {
+  const match = label.exec(fold(line));
+  if (!match) return '';
+  return line.slice(match.index + match[0].length).replace(/^[\s:.\-]+/, '').trim();
+}
+
+/**
+ * The value for a label, looking on the label's own line and then below it.
+ *
+ * Both layouts are common and neither is a mistake: a table puts the heading
+ * above the value, a form puts it to the left.
+ */
+function valueFor(lines: string[], label: RegExp): string | null {
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (line === undefined || !label.test(fold(line))) continue;
+
+    // A header row answers from the line beneath, in its own column.
+    const column = columnValue(lines, i, label);
+    if (column) return column;
+
+    const sameLine = tail(line, label);
+    // A value that is itself a label means the line was a heading and this is
+    // the next heading along, not an answer.
+    if (sameLine && !looksLikeLabel(cells(sameLine)[0] ?? sameLine)) return sameLine;
+
+    for (let j = i + 1; j < Math.min(i + 3, lines.length); j += 1) {
+      const below = lines[j]?.trim();
+      if (below && !looksLikeLabel(below)) return below;
+    }
+  }
+
+  return null;
+}
+
+// --- labels ---------------------------------------------------------------
+// Greek and English because that is what the product sells into. Polish,
+// German, French, Italian, Spanish and Romanian because an invoice book does
+// not respect the market a tool was built for — the first real document that
+// arrived here was Polish, and it read as a blank form.
+//
+// Written as regex literals with explicit Unicode lookarounds, never as strings
+// passed to `new RegExp`. Two reasons, both learned the hard way. JavaScript's
+// \b is ASCII-only, so /\bΑΦΜ\b/ and /\bNIP\b/ can never match. And in a string
+// literal '\s' is simply 's', so a pattern built that way turns
+// DATA\s+WYSTAWIENIA into DATAs+WYSTAWIENIA — a regex that compiles, never
+// fires, and looks exactly like a document that did not mention the label.
+
+const VAT_LABEL =
+  /(?<![\p{L}\p{N}])(?:Α\.Φ\.Μ\.?|ΑΦΜ|VAT(?:\s*(?:NO|NUMBER|ID|REG))?|TAX\s*ID|NIP|UST-?IDNR\.?|STEUERNUMMER|TVA|P\.?\s*IVA|PARTITA\s*IVA|CIF|NIF|CUI)(?![\p{L}\p{N}])/u;
+
+// ΠΕΛΑΤΗΣ, not ΠΕΛΑΤΗ. Greek inflects, and a boundary after the stem rejects
+// the nominative outright — the commonest spelling of the word on an invoice.
+const CUSTOMER_MARKER =
+  /(?<![\p{L}\p{N}])(?:ΣΤΟΙΧΕΙΑ\s+ΠΕΛΑΤΗ|ΣΤΟΙΧΕΙΑ\s+ΠΑΡΑΛΗΠΤΗ|ΠΑΡΑΛΗΠΤΗΣ|ΠΑΡΑΛΗΠΤΗ|ΠΕΛΑΤΗΣ|ΠΕΛΑΤΗ|ΕΠΩΝΥΜΙΑ|ΠΡΟΣ|BILL\s*TO|INVOICE\s*TO|CUSTOMER|CLIENT|NABYWCA|ODBIORCA|KUPUJACY|KUNDE|EMPFANGER|CLIENTE|DESTINATARIO|CUMPARATOR)(?![\p{L}\p{N}])/u;
+
+// FROM earns its place the same way ΑΠΟ did: it is what the English half of the
+// same invoicing tool prints over the issuer column. Without it the header row
+// has only one recognised side, the layout does not read as two columns, and
+// "Penny IKE    Jan Geesmann" comes back as one customer name.
+const ISSUER_MARKER =
+  /(?<![\p{L}\p{N}])(?:ΣΤΟΙΧΕΙΑ\s+ΕΚΔΟΤΗ|ΣΤΟΙΧΕΙΑ\s+ΑΠΟΣΤΟΛΕΑ|ΕΚΔΟΤΗΣ|ΕΚΔΟΤΗ|ΠΩΛΗΤΗΣ|ΠΩΛΗΤΗ|ΑΠΟ|BILL\s*FROM|FROM|SUPPLIER|SELLER|VENDOR|ISSUER|SPRZEDAWCA|WYSTAWCA|VERKAUFER|LIEFERANT|FOURNISSEUR|VENDEUR|FORNITORE|PROVEEDOR|FURNIZOR)(?![\p{L}\p{N}])/u;
+
+// `#` earns its place: Elorus, and most invoicing tools that grew out of one,
+// print "ΤΙΜΟΛΟΓΙΟ ΠΑΡΟΧΗΣ ΥΠΗΡΕΣΙΩΝ #10000-42" with no labelled number at all.
+const NUMBER_LABEL =
+  /(?<![\p{L}\p{N}])(?:ΑΡΙΘΜΟΣ\s+ΤΙΜΟΛΟΓΙΟΥ|ΑΡ\.?\s*ΤΙΜΟΛΟΓΙΟΥ|ΑΡ\.?\s*ΠΑΡΑΣΤΑΤΙΚΟΥ|ΑΡΙΘΜΟΣ|INVOICE\s*(?:NO|NUMBER|#)|DOCUMENT\s*(?:NO|NUMBER)|FAKTURA\s*VAT|NR\s*FAKTURY|FAKTURA|RACHUNEK|RECHNUNGSNUMMER|RECHNUNG\s*NR\.?|RECHNUNG|FACTURE\s*N|FATTURA\s*N|FATTURA|FACTURA\s*N|FACTURA)(?![\p{L}\p{N}])|#/u;
+
+const SERIES_LABEL = /(?<![\p{L}\p{N}])(?:ΣΕΙΡΑ|SERIES|SERIA|SERIE)(?![\p{L}\p{N}])/u;
+
+const ISSUE_DATE_LABEL =
+  /(?<![\p{L}\p{N}])(?:ΗΜΕΡΟΜΗΝΙΑ\s+ΕΚΔΟΣΗΣ|ΗΜ\/ΝΙΑ\s+ΕΚΔΟΣΗΣ|ΗΜΕΡΟΜΗΝΙΑ|ΗΜ\/ΝΙΑ|DATA\s+WYSTAWIENIA|RECHNUNGSDATUM|AUSSTELLUNGSDATUM|DATE\s+DE\s+FACTURATION|FECHA\s+DE\s+EMISION|ISSUE\s*DATE|INVOICE\s*DATE|DATA\s+SPRZEDAZY|DATA\s+FATTURA|DATE|DATA|DATUM|FECHA)(?![\p{L}\p{N}])/u;
+
+// ΕΞΟΦΛΗΣΗ ΕΩΣ is what Elorus prints. ΕΩΣ alone is deliberately last: it means
+// "until" and turns up in date ranges that are not a payment deadline.
+const DUE_DATE_LABEL =
+  /(?<![\p{L}\p{N}])(?:ΗΜΕΡΟΜΗΝΙΑ\s+ΛΗΞΗΣ|ΕΞΟΦΛΗΣΗ\s+ΕΩΣ|ΠΛΗΡΩΜΗ\s+ΕΩΣ|ΛΗΞΗ|ΠΡΟΘΕΣΜΙΑ(?:\s+ΠΛΗΡΩΜΗΣ)?|TERMIN\s+PLATNOSCI|TERMIN\s+ZAPLATY|FALLIGKEITSDATUM|ZAHLBAR\s+BIS|DATE\s+ECHEANCE|DUE\s*DATE|PAYMENT\s*DUE|DUE|SCADENZA|VENCIMIENTO|SCADENT)(?![\p{L}\p{N}])/u;
+
+const MARK_LABEL = /(?<![\p{L}\p{N}])(?:Μ\.ΑΡ\.Κ\.?|ΜΑΡΚ|MARK)(?![\p{L}\p{N}])/u;
+
+/**
+ * Words that are a column heading rather than a value.
+ *
+ * Used only to recognise a header row. A line whose segments are all of these
+ * is labelling the line beneath it, not answering it.
+ */
+const HEADING_WORD =
+  /(?<![\p{L}\p{N}])(?:ΩΡΑ|ΣΕΛΙΔΑ|ΕΙΔΟΣ\s+ΠΑΡΑΣΤΑΤΙΚΟΥ|ΚΩΔΙΚΟΣ|ΠΕΡΙΓΡΑΦΗ|ΠΟΣΟΤΗΤΑ|ΜΟΝΑΔΑ|ΠΑΡΑΤΗΡΗΣΕΙΣ|ΕΠΑΓΓΕΛΜΑ|ΔΙΕΥΘΥΝΣΗ|ΠΟΛΗ|ΤΗΛΕΦΩΝΟ|PAGE|QTY|DESCRIPTION|UNIT)(?![\p{L}\p{N}])/u;
+
+/** Whether a cell is a label of some kind rather than a value. */
+function looksLikeLabel(segment: string): boolean {
+  const folded = fold(segment);
+
+  return (
+    HEADING_WORD.test(folded) ||
+    NUMBER_LABEL.test(folded) ||
+    SERIES_LABEL.test(folded) ||
+    ISSUE_DATE_LABEL.test(folded) ||
+    DUE_DATE_LABEL.test(folded) ||
+    VAT_LABEL.test(folded)
+  );
+}
+
+/** A line split into its columns, by the wide gaps the text layer preserves. */
+function cells(line: string): string[] {
+  return line.split(/\s{2,}/).map((cell) => cell.trim()).filter(Boolean);
+}
+
+/**
+ * The value under a heading, when the document is a table rather than a form.
+ *
+ * Greek invoicing systems print the document's own details as two rows: the
+ * headings, then the values beneath them.
+ *
+ *     ΕΙΔΟΣ ΠΑΡΑΣΤΑΤΙΚΟΥ    ΑΡΙΘΜΟΣ    ΣΕΙΡΑ    ΗΜΕΡΟΜΗΝΙΑ    ΩΡΑ    ΣΕΛΙΔΑ
+ *     Τιμολόγιο - Δελτίο…    42830      ΤΔΑ     25/6/2026     13:39  1 / 1
+ *
+ * Read as a form — take whatever follows the label on its line — ΑΡΙΘΜΟΣ
+ * answers "ΣΕΙΡΑ ΗΜΕΡΟΜΗΝΙΑ ΩΡΑ ΣΕΛΙΔΑ", and that is what was arriving as an
+ * invoice number.
+ *
+ * A header row is recognised by the cell after the label being another label.
+ * That is what separates it from a form line like "ΕΠΩΝΥΜΙΑ  PENNY IKE", where
+ * the next cell is the answer and reading down would be wrong.
+ */
+function columnValue(lines: string[], index: number, label: RegExp): string | null {
+  const line = lines[index];
+  if (!line) return null;
+
+  const heads = cells(line);
+  const at = heads.findIndex((cell) => label.test(fold(cell)));
+  if (at < 0) return null;
+
+  const next = heads[at + 1];
+  if (!next || !looksLikeLabel(next)) return null;
+
+  // The row beneath, in the same column.
+  const below = cells(lines[index + 1] ?? '');
+  const value = below[at];
+
+  return value && !looksLikeLabel(value) ? value : null;
+}
+
+/**
+ * Total labels, most specific first.
+ *
+ * The order is the whole design, and a real Greek invoice shows why: it prints
+ * "Συνολική καθαρή αξία: 137,10€", then the tax, then "Τελική αξία: 170,00€".
+ * The net line is the one that reads most like a total, sits above the real one,
+ * and is 24% wrong. What we want is what the customer owes, so a label naming
+ * itself final or payable beats one merely naming a sum.
+ */
+const TOTAL_LABELS: ReadonlyArray<{ pattern: RegExp; vetoComponents: boolean }> = [
+  {
+    pattern:
+      /(?<![\p{L}\p{N}])(?:ΠΛΗΡΩΤΕΟ(?:\s+ΠΟΣΟ)?|ΠΛΗΡΩΤΕΑ\s+ΑΞΙΑ|ΤΕΛΙΚΗ\s+ΑΞΙΑ|ΤΕΛΙΚΟ\s+ΣΥΝΟΛΟ|ΓΕΝΙΚΟ\s+ΣΥΝΟΛΟ|AMOUNT\s*DUE|BALANCE\s*DUE|TOTAL\s*DUE|GRAND\s*TOTAL|DO\s+ZAPLATY|RAZEM\s+DO\s+ZAPLATY|KWOTA\s+DO\s+ZAPLATY|ZAHLBETRAG|GESAMTBETRAG|RECHNUNGSBETRAG|NET\s*A\s*PAYER|TOTALE\s+DA\s+PAGARE|TOTAL\s+A\s+PAGAR|TOTAL\s+DE\s+PLATA)(?![\p{L}\p{N}])/u,
+    vetoComponents: false,
+  },
+  {
+    pattern:
+      /(?<![\p{L}\p{N}])(?:ΣΥΝΟΛΟ\s+ΜΕ\s+ΦΠΑ|ΑΞΙΑ\s+ΜΕ\s+ΦΠΑ|WARTOSC\s+BRUTTO|SUMA\s+BRUTTO|BRUTTO|GESAMT\s+BRUTTO|TOTALE\s+IVA\s+INCLUSA)(?![\p{L}\p{N}])/u,
+    vetoComponents: false,
+  },
+  {
+    pattern:
+      /(?<![\p{L}\p{N}])(?:ΣΥΝΟΛΙΚΟ\s+ΠΟΣΟ|ΣΥΝΟΛΟ|TOTAL|RAZEM|SUMA|GESAMT|TOTALE|IMPORTE)(?![\p{L}\p{N}])/u,
+    vetoComponents: true,
+  },
+];
+
+/**
+ * Lines naming a component of the price rather than the price.
+ *
+ * Consulted only for the generic tier above, where a bare "total" really might
+ * be labelling a subtotal. ΚΑΘΑΡΗ ΑΞΙΑ covers the Greek net line whether or not
+ * ΣΥΝΟΛΙΚΗ precedes it.
+ */
+const NOT_A_TOTAL =
+  /(?<![\p{L}\p{N}])(?:ΚΑΘΑΡΗ\s+ΑΞΙΑ|ΑΞΙΑ\s+ΧΩΡΙΣ|ΜΕΡΙΚΟ\s+ΣΥΝΟΛΟ|ΦΠΑ|ΕΚΠΤΩΣΗ|SUBTOTAL|NET(?:\s+AMOUNT)?|VAT|TAX|DISCOUNT|NETTO|WARTOSC\s+NETTO|PODSTAWA|RABAT|ZWISCHENSUMME|MWST|IMPONIBILE|IVA|TVA)(?![\p{L}\p{N}])/u;
+
+/**
+ * A money amount at the end of a line.
+ *
+ * The inner class admits spaces, because half of Europe groups thousands with
+ * one: "1 230,00" is a single number, and a pattern that stops at the space
+ * reads it as 230,00 — the same invoice, off by a factor of a thousand, with
+ * nothing on screen to suggest anything went wrong. Must end in a digit, so a
+ * trailing separator cannot be swallowed.
+ */
+const TRAILING_AMOUNT = /(-?[\d.,   ]{0,24}\d)\s*(?:€|EUR|ΕΥΡΩ|PLN|ZL|RON|LEI|CZK|HUF|BGN)?\s*$/u;
+
+/** Currency codes we can name, checked against the whole document. */
+const CURRENCIES: ReadonlyArray<{ code: string; pattern: RegExp }> = [
+  { code: 'PLN', pattern: /(?<![\p{L}\p{N}])(?:PLN|ZL|ZLOTY|ZLOTYCH)(?![\p{L}\p{N}])/u },
+  { code: 'RON', pattern: /(?<![\p{L}\p{N}])(?:RON|LEI)(?![\p{L}\p{N}])/u },
+  { code: 'CZK', pattern: /(?<![\p{L}\p{N}])CZK(?![\p{L}\p{N}])/u },
+  { code: 'HUF', pattern: /(?<![\p{L}\p{N}])HUF(?![\p{L}\p{N}])/u },
+  { code: 'BGN', pattern: /(?<![\p{L}\p{N}])BGN(?![\p{L}\p{N}])/u },
+  { code: 'USD', pattern: /(?<![\p{L}\p{N}])USD(?![\p{L}\p{N}])/u },
+  { code: 'GBP', pattern: /(?<![\p{L}\p{N}])GBP(?![\p{L}\p{N}])/u },
+];
+
+function currencyIn(text: string): string {
+  const folded = fold(text);
+  if (/\$/.test(text)) return 'USD';
+  if (/£/.test(text)) return 'GBP';
+
+  for (const { code, pattern } of CURRENCIES) {
+    if (pattern.test(folded)) return code;
+  }
+
+  return 'EUR';
+}
+
+/**
+ * Every tax number on the page, with where on its line each one sits.
+ *
+ * The position matters because an invoice printed in two columns extracts as one
+ * line per row: "NIP 5252445111      NIP 6772391626" is the seller and the buyer
+ * side by side. Reading only the first match per line made the buyer invisible,
+ * left a single candidate standing, and quietly returned the company that issued
+ * the invoice as the one that owes money.
+ */
+function vatCandidates(
+  lines: string[],
+): Array<{ value: string; index: number; offset: number; indented: boolean }> {
+  const found: Array<{ value: string; index: number; offset: number; indented: boolean }> = [];
+  const label = new RegExp(VAT_LABEL.source, 'gu');
+
+  lines.forEach((line, index) => {
+    const hits = [...fold(line).matchAll(label)];
+
+    hits.forEach((hit, k) => {
+      const start = (hit.index ?? 0) + hit[0].length;
+      // Stop at the next label so a number is never read out of the neighbouring
+      // column, which is the seller's.
+      const stop = hits[k + 1]?.index ?? line.length;
+      const sameLine = line.slice(start, stop);
+
+      // A label alone on its line has its number underneath. Only when it is the
+      // line's only label: in a two-column row an empty half means that column
+      // has no number, not that it borrowed the row below.
+      const window =
+        sameLine.trim() === '' && hits.length === 1 ? (lines[index + 1] ?? '') : sameLine;
+
+      const digits = /(?:EL|PL|DE|FR|IT|ES|RO|BG|CZ|HU)?(\d{8,12})(?!\d)/.exec(
+        window.replace(/[\s.-]/g, ''),
+      );
+      if (digits?.[1]) {
+        // Which column the line starts in, for the rows that carry only one
+        // party's number. Two on a line are told apart by offset below; one on
+        // a line has nothing else to place it.
+        found.push({ value: digits[1], index, offset: start, indented: /^s{2,}/.test(line) });
+      }
+    });
+  });
+
+  return found;
+}
+
+type Side = 'left' | 'right';
+
+/**
+ * Which half of the page the customer block occupies, when there are two.
+ *
+ * Polish invoices in particular print Sprzedawca and Nabywca beside each other,
+ * and the text layer flattens that into one line per row. The heading row is the
+ * only place the order is stated, so it decides which half of the rows under it
+ * belongs to the customer. No heading row carrying both means one column, and
+ * the ordinary rules apply.
+ */
+function customerSide(lines: string[]): Side | null {
+  for (const line of lines) {
+    const folded = fold(line);
+    const customer = CUSTOMER_MARKER.exec(folded);
+    const issuer = ISSUER_MARKER.exec(folded);
+    if (customer && issuer) return customer.index > issuer.index ? 'right' : 'left';
+  }
+
+  return null;
+}
+
+/**
+ * The customer's VAT number, out of the two an invoice carries.
+ *
+ * The tenant's own number is the reliable half: we know it, so we can remove it
+ * and stop guessing. The fallbacks after that are ordered by how much they
+ * actually tell us — the customer's column of a two-column row, then a number
+ * under a customer heading and no issuer heading, then merely under a customer
+ * heading, then one that is not under an issuer heading, then the last on the
+ * page, because the letterhead comes first.
+ */
+function customerVat(lines: string[], ownVatNumber?: string | null): string | null {
+  const own = ownVatNumber?.replace(/\D/g, '') ?? '';
+  const all = vatCandidates(lines);
+  const candidates = all.filter((c) => c.value !== own);
+  if (candidates.length === 0) return null;
+
+  /**
+   * Did this line carry both parties before ours was removed?
+   *
+   * It matters for what is left. A row printing the issuer's number and the
+   * customer's is a two-column row, and once our own is filtered out the
+   * survivor is the customer's — however far left it happens to sit. Judged on
+   * the unfiltered set, because after filtering it looks exactly like a line
+   * that only ever had one.
+   */
+  const sharedRow = new Set(
+    all
+      .filter((c) => all.filter((other) => other.index === c.index).length > 1)
+      .map((c) => c.index),
+  );
+
+  // Two numbers sharing a line is the two-column layout. This has to be decided
+  // before the heading rules below, which read downwards and so cannot tell two
+  // columns of the same row apart at all.
+  const side = customerSide(lines);
+  if (side) {
+    for (const candidate of candidates) {
+      const row = candidates
+        .filter((other) => other.index === candidate.index)
+        .sort((a, b) => a.offset - b.offset);
+      if (row.length < 2) continue;
+
+      const pick = side === 'right' ? row[row.length - 1] : row[0];
+      if (pick) return pick.value;
+    }
+  }
+
+  const nearest = (index: number, marker: RegExp) => {
+    for (let i = index; i >= Math.max(0, index - 6); i -= 1) {
+      const line = lines[i];
+      if (line && marker.test(fold(line))) return true;
+    }
+    return false;
+  };
+
+  // Whatever survived a two-party row is the customer's, wherever it sits.
+  const survivor = candidates.find((c) => sharedRow.has(c.index));
+  if (survivor) return survivor.value;
+
+  // A line that only ever carried one number is placed by the column it starts
+  // in. On a two-column invoice where only the issuer has a tax number, the
+  // customer heading is still a line or two above it, so "under a customer
+  // heading" answers yes and hands back the issuer's.
+  if (side) {
+    const onSide = candidates.filter((c) => (side === 'right' ? c.indented : !c.indented));
+    if (onSide.length) return onSide[0]?.value ?? null;
+
+    const opposite = candidates.some((c) => (side === 'right' ? !c.indented : c.indented));
+    if (opposite) return null;
+  }
+
+  const unambiguous = candidates.find(
+    (c) => nearest(c.index, CUSTOMER_MARKER) && !nearest(c.index, ISSUER_MARKER),
+  );
+  if (unambiguous) return unambiguous.value;
+
+
+  const underCustomer = candidates.find((c) => nearest(c.index, CUSTOMER_MARKER));
+  if (underCustomer) return underCustomer.value;
+
+  /**
+   * One number left, and nothing on the page ties it to the customer.
+   *
+   * On a purchase invoice this is the trap: our own number is removed as the
+   * customer's, which leaves the supplier's letterhead as the only candidate
+   * and it is returned as the debtor. A document that names its parties and
+   * still cannot place this number has not told us it is the customer's.
+   */
+  const namesParties = lines.some((line) => {
+    const folded = fold(line);
+    return CUSTOMER_MARKER.test(folded) || ISSUER_MARKER.test(folded);
+  });
+
+  if (candidates.length === 1) {
+    return namesParties ? null : (candidates[0]?.value ?? null);
+  }
+
+  // Only worth applying when the document actually marks an issuer block. With
+  // no headings at all every candidate trivially satisfies "not under an issuer
+  // heading", and the rule would hand back the first number on the page — which
+  // is the letterhead, the one number we are sure is not the customer.
+  const anyIssuerMarked = candidates.some((c) => nearest(c.index, ISSUER_MARKER));
+  if (anyIssuerMarked) {
+    const notIssuer = candidates.find((c) => !nearest(c.index, ISSUER_MARKER));
+    if (notIssuer) return notIssuer.value;
+  }
+
+  return candidates[candidates.length - 1]?.value ?? null;
+}
+
+/**
+ * Where a document says it is listing somebody's contact details.
+ *
+ * Invoicing tools print this as its own section rather than inside either
+ * party's block, and when they do it is the customer's — the issuer's details
+ * are already in the letterhead.
+ */
+const CONTACT_MARKER =
+  /(?<![\p{L}\p{N}])(?:ΠΛΗΡΟΦΟΡΙΕΣ\s+ΕΠΙΚΟΙΝΩΝΙΑΣ|ΣΤΟΙΧΕΙΑ\s+ΕΠΙΚΟΙΝΩΝΙΑΣ|ΕΠΙΚΟΙΝΩΝΙΑ|CONTACT\s+(?:DETAILS|INFORMATION)|CONTACT|DANE\s+KONTAKTOWE|KONTAKT|KONTAKTDATEN)(?![\p{L}\p{N}])/u;
+
+/**
+ * A phone number is only read where the document says it is one.
+ *
+ * Every invoice is full of long digit strings — a VAT number, an IBAN, a MARK,
+ * an authentication hash — and a pattern loose enough to catch a phone catches
+ * all of them. Requiring the label costs the occasional number printed bare and
+ * buys never sending an SMS to the first sixteen digits of an IBAN.
+ */
+const PHONE_LABEL =
+  /(?<![\p{L}\p{N}])(?:ΤΗΛΕΦΩΝΟ|ΤΗΛ|ΚΙΝΗΤΟ|MOBILE|PHONE|TEL(?:EFON)?|KOM|MOB)\.?(?![\p{L}\p{N}])/u;
+
+const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/u;
+
+/** Digits only, so two spellings of one number compare equal. */
+function digitsOf(value: string | null | undefined): string {
+  return (value ?? '').replace(/\D/g, '');
+}
+
+/**
+ * A phone reduced to what identifies it.
+ *
+ * The last nine digits. "+48 22 123 45 67" and "221234567" are one number
+ * written two ways, and comparing them whole says they are different — which is
+ * how a tenant's own letterhead number survived the filter meant to remove it.
+ */
+function phoneKey(value: string | null | undefined): string {
+  const digits = digitsOf(value);
+  return digits.length > 9 ? digits.slice(-9) : digits;
+}
+
+/**
+ * A contact found on the page, with enough context to say whose it is.
+ *
+ * `indented` is the column the line starts in — the text layer keeps that, and
+ * it is the only thing distinguishing the customer's phone from the issuer's
+ * once a two-column row has been flattened into one line.
+ */
+interface ContactCandidate {
+  value: string;
+  index: number;
+  /** Character position on the line, for a row that carries both parties. */
+  offset: number;
+  indented: boolean;
+}
+
+function contactCandidates(
+  lines: string[],
+  find: (line: string) => Array<{ value: string; offset: number }>,
+): ContactCandidate[] {
+  const found: ContactCandidate[] = [];
+
+  lines.forEach((line, index) => {
+    const indented = /^\s{2,}/.test(line);
+    for (const hit of find(line)) found.push({ ...hit, index, indented });
+  });
+
+  return found;
+}
+
+/**
+ * The customer's contact detail, out of however many the page carries.
+ *
+ * Ordered by how much each signal actually tells us: never the tenant's own,
+ * then one the document filed under a contact heading, then the customer's
+ * column of a two-column layout, then one under a customer heading and no
+ * issuer heading, then the last on the page — because the letterhead comes
+ * first, and the letterhead is the one party we know is not the customer.
+ */
+function customerContact(
+  lines: string[],
+  find: (line: string) => Array<{ value: string; offset: number }>,
+  own: string | null | undefined,
+  compare: (value: string) => string,
+): string | null {
+  const ownKey = own ? compare(own) : '';
+  const candidates = contactCandidates(lines, find).filter(
+    (c) => !ownKey || compare(c.value) !== ownKey,
+  );
+
+  if (candidates.length === 0) return null;
+
+  /**
+   * Whether a heading of this kind stands over the line.
+   *
+   * Addresses are removed before looking, because an address contains words.
+   * `kontakt@acme.pl` folds to KONTAKT@ACME.PL and satisfies a contact heading
+   * that is only asking for KONTAKT — so the address declared itself to be its
+   * own heading and was returned as the customer's. The same trap is waiting in
+   * `klient@`, `biuro@` and `sprzedawca@`.
+   */
+  const near = (index: number, marker: RegExp) => {
+    for (let i = index; i >= Math.max(0, index - 6); i -= 1) {
+      const line = lines[i];
+      if (line && marker.test(fold(line.replace(new RegExp(EMAIL.source, 'gu'), ' ')))) return true;
+    }
+    return false;
+  };
+
+  const underContact = candidates.find((c) => near(c.index, CONTACT_MARKER));
+  if (underContact) return underContact.value;
+
+  const side = customerSide(lines);
+  if (side) {
+    // Both parties on one row: the columns are told apart by position, exactly
+    // as the tax numbers are. Reading only the first match per line is what
+    // once returned the seller as the debtor.
+    for (const candidate of candidates) {
+      const row = candidates
+        .filter((other) => other.index === candidate.index)
+        .sort((a, b) => a.offset - b.offset);
+      if (row.length < 2) continue;
+
+      const pick = side === 'right' ? row[row.length - 1] : row[0];
+      if (pick) return pick.value;
+    }
+
+    const onSide = candidates.find((c) => (side === 'right' ? c.indented : !c.indented));
+    if (onSide) return onSide.value;
+  }
+
+  const unambiguous = candidates.find(
+    (c) => near(c.index, CUSTOMER_MARKER) && !near(c.index, ISSUER_MARKER),
+  );
+  if (unambiguous) return unambiguous.value;
+
+  /**
+   * Does this document say who its parties are?
+   *
+   * If it does, a contact that could not be attributed to the customer above is
+   * the issuer's — a letterhead phone, a footer address — and returning it puts
+   * the sender's details on the customer's record. That is exactly what a
+   * purchase invoice produces: the buyer's phone box is printed and empty, the
+   * seller's letterhead is not, and the only contact on the page belongs to the
+   * wrong party.
+   *
+   * A document with no headings at all is the other case: one small invoice
+   * with one address on it, and that address is the one to write to.
+   */
+  const namesParties = lines.some((line) => {
+    const folded = fold(line);
+    return CUSTOMER_MARKER.test(folded) || ISSUER_MARKER.test(folded);
+  });
+
+  if (candidates.length === 1) {
+    const only = candidates[0];
+    if (!only) return null;
+
+    return namesParties ? null : only.value;
+  }
+
+
+  // Nothing on the page says whose these are, and there is no positional
+  // fallback worth taking. The tax numbers can end on "the last one, because
+  // the letterhead comes first"; a contact cannot, because an issuer prints
+  // their address in the footer — last is exactly where the wrong answer sits.
+  //
+  // So ambiguity ends as a blank. Somebody fills a blank in; nobody notices a
+  // reminder that went to the wrong person.
+  return null;
+}
+
+/** The phone on a line, if the line says it is one. */
+function phonesOn(line: string): Array<{ value: string; offset: number }> {
+  const labels = [...fold(line).matchAll(new RegExp(PHONE_LABEL.source, 'gu'))];
+  const found: Array<{ value: string; offset: number }> = [];
+
+  labels.forEach((label, k) => {
+    const start = (label.index ?? 0) + label[0].length;
+    // Stop at the next label, so a number is never read out of the neighbouring
+    // column — which belongs to the other party.
+    const stop = labels[k + 1]?.index ?? line.length;
+
+    const match = /\+?\d[\d\s().-]{6,}\d/.exec(line.slice(start, stop));
+    if (!match) return;
+
+    const value = match[0].trim().replace(/\s{2,}.*$/, '');
+    // Eight digits is the shortest real subscriber number; below that it is a
+    // date, a room number, or the tail of something else.
+    if (digitsOf(value).length >= 8) found.push({ value, offset: start });
+  });
+
+  return found;
+}
+
+function emailsOn(line: string): Array<{ value: string; offset: number }> {
+  const found: Array<{ value: string; offset: number }> = [];
+
+  for (const match of line.matchAll(new RegExp(EMAIL.source, 'gu'))) {
+    found.push({ value: match[0], offset: match.index ?? 0 });
+  }
+
+  return found;
+}
+
+/** A line that is a name rather than a label, a number or a heading. */
+function looksLikeName(line: string): boolean {
+  const trimmed = line.trim();
+  if (trimmed.length < 3 || trimmed.length > 120) return false;
+  if (/^\d/.test(trimmed)) return false;
+
+  const folded = fold(trimmed);
+  if (VAT_LABEL.test(folded)) return false;
+  if (NUMBER_LABEL.test(folded)) return false;
+  if (ISSUE_DATE_LABEL.test(folded)) return false;
+  // A heading is not a name, and "Sprzedawca" reaching this far is how the
+  // seller ends up being dunned for the buyer's debt.
+  if (ISSUER_MARKER.test(folded)) return false;
+  if (CUSTOMER_MARKER.test(folded)) return false;
+  // Every other column heading too. ΚΩΔΙΚΟΣ, ΔΙΕΥΘΥΝΣΗ and their neighbours sit
+  // exactly where a name would in a three-column details table.
+  if (looksLikeLabel(trimmed)) return false;
+
+  return /\p{L}/u.test(trimmed);
+}
+
+function customerName(lines: string[], ownName?: string | null): string | null {
+  const side = customerSide(lines);
+  const own = ownName ? fold(ownName).replace(/\s+/g, ' ').trim() : '';
+
+  const acceptable = (value: string): string | null => {
+    const name = value.trim();
+    if (!looksLikeName(name)) return null;
+    // Whoever uploaded the document is not the one who owes money on it.
+    if (own && fold(name).replace(/\s+/g, ' ').trim() === own) return null;
+    return name;
+  };
+
+  const columns = (line: string) =>
+    line.split(/\s{2,}/).map((part) => part.trim()).filter(Boolean);
+
+  /** The customer's half of a row, once we know the page has two of them. */
+  const half = (line: string): string | null => {
+    if (!side) return acceptable(line);
+
+    const parts = columns(line);
+    // One segment means the gap between the columns did not survive extraction.
+    // Taking the line whole would return the seller glued to the buyer, so this
+    // row is skipped and the next one tried instead.
+    if (parts.length < 2) return null;
+    return acceptable((side === 'right' ? parts[parts.length - 1] : parts[0]) ?? '');
+  };
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (line === undefined || !CUSTOMER_MARKER.test(fold(line))) continue;
+
+    // "Nabywca: Jan Kowalski" — the first column after the heading is the name,
+    // whatever else the row carries to the right of it.
+    const sameLine = columns(tail(line, CUSTOMER_MARKER))[0];
+    const named = sameLine ? acceptable(sameLine) : null;
+    if (named) return named;
+
+    for (let j = i + 1; j < Math.min(i + 4, lines.length); j += 1) {
+      const below = lines[j];
+      const found = below ? half(below) : null;
+      if (found) return found;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Greek month names, by the prefix they all share across their forms.
+ *
+ * An invoice writes the month as a word far more often than as a number, and in
+ * whichever form the template felt like — Αύγ, Αυγ, Αυγούστου. Matching on the
+ * folded prefix covers all of them without listing every declension.
+ *
+ * Longest first, because ΙΟΥΝ and ΙΟΥΛ share three letters with each other.
+ */
+const MONTH_NAMES: ReadonlyArray<[string, number]> = [
+  // Greek. Longest first: ΙΟΥΝ and ΙΟΥΛ share three letters with each other.
+  ['ΙΟΥΝ', 6],
+  ['ΙΟΥΛ', 7],
+  ['ΙΑΝ', 1],
+  ['ΦΕΒ', 2],
+  ['ΜΑΡ', 3],
+  ['ΑΠΡ', 4],
+  ['ΜΑΙ', 5],
+  ['ΑΥΓ', 8],
+  ['ΣΕΠ', 9],
+  ['ΟΚΤ', 10],
+  ['ΝΟΕ', 11],
+  ['ΔΕΚ', 12],
+  // English, because the same invoicing tool prints "Jun 30, 2026" the moment a
+  // tenant switches the document language — and the date then read as nothing.
+  // JUN before JUL for the same reason as above, and MAR before MAY.
+  ['JAN', 1],
+  ['FEB', 2],
+  ['MAR', 3],
+  ['APR', 4],
+  ['MAY', 5],
+  ['JUN', 6],
+  ['JUL', 7],
+  ['AUG', 8],
+  ['SEP', 9],
+  ['OCT', 10],
+  ['NOV', 11],
+  ['DEC', 12],
+];
+
+/**
+ * A date in any form these documents actually use.
+ *
+ * The numeric parser handles what the importer already knew about. This adds the
+ * spelled-out Greek form — "12 Αύγ 2026, 11:42" — which is what the invoicing
+ * tool this product is built around prints, and which the numeric parser reads
+ * as nothing at all. The time is ignored: a due date has no hour.
+ */
+function parseAnyDate(raw: string | null): string | null {
+  if (!raw) return null;
+
+  const numeric = parseDate(raw);
+  if (numeric) return numeric;
+
+  const folded = fold(raw);
+
+  // Both orders, because the same invoicing tool writes "12 Αύγ 2026" in Greek
+  // and "Jun 30, 2026" in English. Day-first is tried first: it is the only one
+  // that can start with a number, so the two cannot be confused.
+  const dayFirst = /(\d{1,2})\s+([\p{L}]{3,})\.?,?\s+(\d{4})/u.exec(folded);
+  const monthFirst = /([\p{L}]{3,})\.?\s+(\d{1,2}),?\s+(\d{4})/u.exec(folded);
+
+  const parts = dayFirst
+    ? { day: dayFirst[1], name: dayFirst[2], year: dayFirst[3] }
+    : monthFirst
+      ? { day: monthFirst[2], name: monthFirst[1], year: monthFirst[3] }
+      : null;
+
+  if (!parts) return null;
+
+  const name = parts.name ?? '';
+  const month = MONTH_NAMES.find(([prefix]) => name.startsWith(prefix))?.[1];
+  if (!month) return null;
+
+  const day = Number(parts.day);
+  const year = Number(parts.year);
+  if (!day || day > 31) return null;
+
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/** The payable amount, preferring labels that name themselves payable. */
+function totalCents(lines: string[]): number | null {
+  for (const { pattern, vetoComponents } of TOTAL_LABELS) {
+    // Read upwards: totals sit at the foot of a document, and a word like
+    // "total" can appear in a column heading far above the number it labels.
+    for (let i = lines.length - 1; i >= 0; i -= 1) {
+      const line = lines[i];
+      if (line === undefined) continue;
+
+      const folded = fold(line);
+      if (!pattern.test(folded)) continue;
+      if (vetoComponents && NOT_A_TOTAL.test(folded)) continue;
+
+      // Folded, because the suffix alternation is uppercase and a Polish invoice
+      // writes its currency as 'zł'. Matching the raw line made every amount that
+      // shared a line with its label invisible.
+      const onLine = TRAILING_AMOUNT.exec(fold(line.trim()));
+      const cents = onLine?.[1] ? parseAmountCents(onLine[1]) : null;
+      if (cents !== null) return cents;
+
+      const below = lines[i + 1]?.trim();
+      const belowCents = below ? parseAmountCents(below) : null;
+      if (belowCents !== null) return belowCents;
+    }
+  }
+
+  return null;
+}
+
+function markIn(lines: string[]): string | null {
+  const raw = valueFor(lines, MARK_LABEL);
+  const digits = raw?.replace(/\D/g, '') ?? '';
+  return digits.length >= 15 ? digits.slice(0, 15) : null;
+}
+
+/**
+ * The document number without the word that introduced it.
+ *
+ * A Polish invoice names its type and then its number: 'FAKTURA VAT nr FV/2026/08/17'.
+ * The label consumes the type and leaves the ordinal word behind, which then
+ * travels into the system as part of the number and onto the reminder the
+ * debtor reads. The separator is required, so a number that genuinely starts
+ * with one of these letters keeps it.
+ */
+function documentNumber(raw: string | null): string | null {
+  if (!raw) return null;
+
+  const cleaned = raw.replace(/^(?:nr|no|n|ar|αρ)[.\s:]+\s*/iu, '').trim();
+  return cleaned === '' ? null : cleaned;
+}
+
+/**
+ * Reads a document's text into invoice fields.
+ *
+ * Never throws, and never guesses past what it found: a field it cannot read
+ * comes back null and is named in `missing`. A confident blank in a review
+ * screen is worse than an obvious gap — the gap gets filled in, the blank gets
+ * confirmed.
+ */
+export function extractInvoiceFields(
+  text: string,
+  options: {
+    ownVatNumber?: string | null;
+    ownName?: string | null;
+    /** The tenant's own contact details, so the reader cannot return them. */
+    ownEmail?: string | null;
+    ownPhone?: string | null;
+  } = {},
+): { fields: ExtractedInvoice; missing: RequiredField[] } {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.replace(/ /g, ' ').trimEnd())
+    .filter((line) => line.trim() !== '');
+
+  const dueDateRaw = valueFor(lines, DUE_DATE_LABEL);
+
+  const fields: ExtractedInvoice = {
+    debtorName: customerName(lines, options.ownName),
+    vatNumber: customerVat(lines, options.ownVatNumber),
+    invoiceNumber: documentNumber(valueFor(lines, NUMBER_LABEL)),
+    series: valueFor(lines, SERIES_LABEL),
+    issueDate: parseAnyDate(valueFor(lines, ISSUE_DATE_LABEL)),
+    dueDate: parseAnyDate(dueDateRaw),
+    amountCents: totalCents(lines),
+    currency: currencyIn(text),
+    mark: markIn(lines),
+    email: customerContact(lines, emailsOn, options.ownEmail, (v) => v.trim().toLowerCase()),
+    phone: customerContact(lines, phonesOn, options.ownPhone, phoneKey),
+  };
+
+  const missing: RequiredField[] = [];
+  if (!fields.invoiceNumber) missing.push('invoiceNumber');
+  if (fields.amountCents === null) missing.push('amountCents');
+  if (!fields.issueDate) missing.push('issueDate');
+  if (!fields.vatNumber && !fields.debtorName) missing.push('customer');
+
+  return { fields, missing };
+}

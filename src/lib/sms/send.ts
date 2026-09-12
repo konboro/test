@@ -1,4 +1,5 @@
-import { optionalEnv } from '@/lib/env';
+import { brevoApiKey, sendViaBrevo } from './brevo';
+import { sendViaTwilio, twilioCredentials } from './twilio';
 
 export interface SmsMessage {
   phone: string;
@@ -35,87 +36,144 @@ export function normalisePhone(raw: string | null | undefined): string | null {
 }
 
 /**
- * GSM-03.38 single-segment limit. Greek text falls back to UCS-2 (70 chars),
- * so templates are kept short enough to stay one segment either way.
+ * The GSM-03.38 default alphabet: the 128 characters a message can carry at
+ * seven bits each.
+ *
+ * It is not ASCII, in either direction. It holds £ ¥ § ¡ ¿, the German and
+ * Nordic vowels, and the ten Greek capitals that do not look like Latin ones;
+ * it lacks the backtick and the curly braces. Treating "non-ASCII" as "needs
+ * UCS-2" is therefore wrong in the expensive direction — see `gsmSeptets`.
+ */
+const GSM_BASIC = new Set(
+  '@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞ\x1bÆæßÉ' +
+    ' !"#¤%&\'()*+,-./0123456789:;<=>?' +
+    '¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§' +
+    '¿abcdefghijklmnopqrstuvwxyzäöñüà',
+);
+
+/**
+ * Reachable only behind the escape byte, so each of these costs two septets.
+ *
+ * The euro sign lives here, and that detail was costing real money: every
+ * English reminder formats its amount as "455,00 €", the old check saw a
+ * non-ASCII byte, and the message went out as UCS-2 — 70 characters to work
+ * with instead of 160, which turned a 94-character reminder into two billed
+ * segments. It is one segment.
+ */
+const GSM_EXTENDED = new Set('\f^{}\\[~]|€');
+
+/**
+ * How many septets the message needs in GSM-03.38, or null if it cannot be
+ * written in it at all.
+ *
+ * Iterating with `for…of` walks code points, so an astral character (an emoji)
+ * arrives whole, matches neither table, and correctly forces UCS-2.
+ */
+function gsmSeptets(message: string): number | null {
+  let septets = 0;
+
+  for (const character of message) {
+    if (GSM_BASIC.has(character)) septets += 1;
+    else if (GSM_EXTENDED.has(character)) septets += 2;
+    else return null;
+  }
+
+  return septets;
+}
+
+/**
+ * Whether the message needs UCS-2 rather than GSM-03.38.
+ *
+ * Every Greek reminder does, and so does most of the world — Cyrillic, Arabic,
+ * Hebrew, Thai, the Indic and CJK scripts, and the Latin languages whose
+ * diacritics the table omits: Polish, Czech, Romanian, Turkish, Portuguese, and
+ * Spanish the moment it needs an "á". What does fit is English, German, Italian,
+ * Dutch and the Nordic languages.
+ *
+ * This drives two separate things — how many segments the message costs, and the
+ * `unicodeEnabled` flag Brevo needs — so it has one definition rather than two
+ * that can drift apart. Brevo takes the flag at its word and encodes what it is
+ * told, which is why a wrong answer here is a doubled bill rather than a wrong
+ * number on a screen. Twilio detects the encoding itself and is unaffected on
+ * the wire, but the count below is what we show the sender.
+ */
+export function usesUnicode(message: string): boolean {
+  return gsmSeptets(message) === null;
+}
+
+/**
+ * How many segments the message will be billed as.
+ *
+ * GSM-7 carries 160 septets alone or 153 when split; UCS-2 carries 70
+ * characters alone or 67 when split. Templates are kept short enough to stay
+ * one segment either way.
  */
 export function segmentCount(message: string): number {
-  const isUnicode = /[^\x00-\x7F]/.test(message);
-  const limit = isUnicode ? 70 : 160;
-  const multipart = isUnicode ? 67 : 153;
-  return message.length <= limit ? 1 : Math.ceil(message.length / multipart);
+  const septets = gsmSeptets(message);
+
+  if (septets === null) {
+    // UCS-2 is billed per UTF-16 code unit, so a surrogate pair counts as two
+    // — which is what `length` already reports, unlike a code-point walk.
+    return message.length <= 70 ? 1 : Math.ceil(message.length / 67);
+  }
+
+  return septets <= 160 ? 1 : Math.ceil(septets / 153);
 }
 
 /**
  * Sends one SMS.
  *
- * The provider is Yuboto (Greek aggregator, https://services.yuboto.com). The
- * transport below is a real HTTP call against their Omni API; swapping in Twilio
- * means replacing only `dispatch` — the rest of the system depends on this
- * module's signature, not on the provider.
+ * The provider is Brevo, chosen to start because credits are sold in packs of
+ * 100 and never expire — the smallest commitment on the market that can still
+ * reach a real Greek handset. Every alternative gates real sending behind either
+ * a larger prepayment or a verification queue.
+ *
+ * Only `dispatch` knows that. Moving to Twilio or a Greek aggregator later means
+ * replacing that one function — the rest of the system depends on this module's
+ * signature, not on the provider.
  */
+/**
+ * Which provider a send would go through.
+ *
+ * Twilio wins when it is configured, Brevo otherwise. That ordering is the
+ * migration: with only Brevo credentials present nothing changes, and the day
+ * Twilio's are added every subsequent message goes through Twilio without a
+ * deploy. Removing them again falls straight back.
+ *
+ * Deliberately not a `SMS_PROVIDER` switch. A name and a set of credentials can
+ * disagree, and the failure — a provider selected but not configured — is a
+ * reminder that silently does not send.
+ */
+export type SmsTransport = 'twilio' | 'brevo';
+
+export function smsTransport(): SmsTransport | null {
+  if (twilioCredentials()) return 'twilio';
+  if (brevoApiKey()) return 'brevo';
+  return null;
+}
+
 export async function sendSms({ phone, message }: SmsMessage): Promise<SmsResult> {
   const to = normalisePhone(phone);
   if (!to) return { ok: false, error: `Unusable phone number: ${phone}` };
 
-  const apiKey = optionalEnv('YUBOTO_API_KEY');
+  const transport = smsTransport();
 
-  if (!apiKey) {
+  if (!transport) {
     if (process.env.NODE_ENV === 'production') {
-      return { ok: false, error: 'YUBOTO_API_KEY is not configured' };
+      return { ok: false, error: 'No SMS provider is configured' };
     }
     console.info('[sms:dry-run]', { to, segments: segmentCount(message), message });
     return { ok: true, messageId: `dry-run-${Date.now()}` };
   }
 
-  return dispatch(apiKey, to, message);
-}
-
-async function dispatch(apiKey: string, to: string, message: string): Promise<SmsResult> {
-  const sender = optionalEnv('SMS_SENDER_ID') ?? 'lefta';
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15_000);
-
-  try {
-    const response = await fetch('https://services.yuboto.com/omni/v1/Send', {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        phonenumbers: [to],
-        channel: 'sms',
-        sms: {
-          sender,
-          text: message,
-          // Reminders are worthless once stale; expire rather than deliver late.
-          validity: 1440,
-          typesms: 'sms',
-        },
-      }),
-      signal: controller.signal,
-    });
-
-    const body = (await response.json().catch(() => null)) as
-      | { ErrorCode?: number; ErrorMessage?: string; Message?: { id?: string }[] }
-      | null;
-
-    if (!response.ok) {
-      return { ok: false, error: `SMS provider responded ${response.status}` };
-    }
-
-    if (body?.ErrorCode && body.ErrorCode !== 0) {
-      return { ok: false, error: body.ErrorMessage ?? `Provider error ${body.ErrorCode}` };
-    }
-
-    return { ok: true, messageId: body?.Message?.[0]?.id };
-  } catch (cause) {
-    if (cause instanceof Error && cause.name === 'AbortError') {
-      return { ok: false, error: 'SMS request timed out' };
-    }
-    return { ok: false, error: cause instanceof Error ? cause.message : String(cause) };
-  } finally {
-    clearTimeout(timer);
+  if (transport === 'twilio') {
+    const credentials = twilioCredentials();
+    // Narrowing only; smsTransport() already established it is there.
+    if (credentials) return sendViaTwilio(credentials, to, message);
   }
+
+  const apiKey = brevoApiKey();
+  if (apiKey) return sendViaBrevo(apiKey, to, message);
+
+  return { ok: false, error: 'No SMS provider is configured' };
 }

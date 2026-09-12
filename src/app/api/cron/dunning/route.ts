@@ -1,7 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { syncBankFeeds } from '@/lib/bank/sync';
 import { safeEqual } from '@/lib/crypto';
 import { runDunningSweep } from '@/lib/dunning/engine';
+import { generateRentCharges } from '@/lib/leases/generate';
+import { reconcileCheckouts } from '@/lib/payments/reconcile';
 import { requireEnv } from '@/lib/env';
 
 export const runtime = 'nodejs';
@@ -28,10 +31,80 @@ async function handle(request: NextRequest) {
 
   const dryRun = request.nextUrl.searchParams.get('dryRun') === '1';
 
+  // Reconciliation on its own, without the chase behind it.
+  //
+  // Asking the payment providers what they already captured writes nothing a
+  // person has to undo — it only closes invoices that are paid in fact. That
+  // makes it the one part of this route worth running on demand: after a
+  // customer says they paid, or to check the path still works, without the
+  // whole nightly sweep going out with it.
+  if (request.nextUrl.searchParams.get('only') === 'checkouts') {
+    const checkouts = await reconcileCheckouts();
+    console.info('[cron:checkouts] on demand', checkouts);
+    return NextResponse.json({ ok: true, checkouts });
+  }
+
   try {
+    // Read the bank first, chase second. An invoice paid by transfer yesterday
+    // has to leave the candidate set *before* the sweep considers it, or the
+    // debtor is chased for money that already arrived.
+    //
+    // A dry run skips it: settling an invoice is a real mutation and "dry" has
+    // to mean nothing changed. And a failure here is logged, never fatal — the
+    // ladder is the product, the feed is an improvement on top of it.
+    // Rent first, then the bank, then the chase: create what is owed, settle
+    // what arrived, chase what is left. Generating before the feed also gives
+    // a tenant who paid early something for the matcher to recognise — the
+    // other order leaves that transfer sitting in the review queue with no
+    // charge to belong to.
+    //
+    // Skipped on a dry run for the same reason the bank sync is: writing a
+    // charge is a real mutation, and "dry" has to mean nothing changed.
+    let rent = null;
+    if (!dryRun) {
+      try {
+        rent = await generateRentCharges();
+        console.info('[cron:rent]', rent);
+      } catch (cause) {
+        // Never fatal. A landlord losing this month’s charge is bad; the whole
+        // sweep failing for every other tenant because of it is worse.
+        console.error('[cron:rent] failed', String(cause));
+      }
+    }
+
+    let bank = null;
+    if (!dryRun) {
+      try {
+        bank = await syncBankFeeds();
+        console.info('[cron:bank]', bank);
+      } catch (cause) {
+        console.error('[cron:bank] failed', String(cause));
+      }
+    }
+
+    // Card payments, for the same reason as the bank feed above — and for a
+    // sharper one. A card payment is recorded only when the debtor's browser
+    // returns from the checkout, and nothing stands in for that: the webhook
+    // needs a secret production does not set, and a Connect account a tenant
+    // paying through their own key does not have. Somebody who paid and shut
+    // the tab stayed open here, and the sweep below chased them for money they
+    // had already handed over.
+    //
+    // Skipped on a dry run, and never fatal: settling is a real mutation, and
+    // the ladder still has to run if a provider is having a bad morning.
+    let checkouts = null;
+    if (!dryRun) {
+      try {
+        checkouts = await reconcileCheckouts();
+        console.info('[cron:checkouts]', checkouts);
+      } catch (cause) {
+        console.error('[cron:checkouts] failed', String(cause));
+      }
+    }
+
     const result = await runDunningSweep({ dryRun });
     console.info('[cron:dunning]', result);
-    return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json({ ok: true, ...result, rent, bank, checkouts });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('[cron:dunning] failed', message);

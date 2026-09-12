@@ -14,6 +14,48 @@ const parser = new XMLParser({
   parseTagValue: false,
 });
 
+/**
+ * Unwraps the envelope AADE's production API actually returns.
+ *
+ * `RequestTransmittedDocs` does not hand back a bare `<RequestedDoc>`. It returns
+ * a WCF string serialisation:
+ *
+ *   <string xmlns="http://schemas.microsoft.com/2003/10/Serialization/">
+ *     &lt;?xml version="1.0"?&gt;&lt;RequestedDoc&gt;…
+ *   </string>
+ *
+ * — the real document, HTML-escaped, as the *text content* of a `<string>`
+ * element. Two things follow from that, and both bit us:
+ *
+ *  1. Parsing the outer document yields `{ string: "<RequestedDoc>…" }`, so the
+ *     lookup for `RequestedDoc` finds nothing and every page looks empty.
+ *  2. A real page contains tens of thousands of escaped entities, which trips
+ *     fast-xml-parser's entity-expansion guard ("76699 > 1000") and aborts the
+ *     parse outright.
+ *
+ * Extracting the payload with a match and decoding it ourselves fixes both: the
+ * inner XML is then ordinary markup with no entity storm to expand. A response
+ * that is already a bare document is passed through untouched, which is what the
+ * sandbox and the unit fixtures return.
+ */
+function unwrapEnvelope(xml: string): string {
+  const match = /<string[^>]*>([\s\S]*)<\/string>/.exec(xml);
+  if (!match?.[1]) return xml;
+
+  return (
+    match[1]
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&apos;', "'")
+      .replaceAll('&#xD;', '\r')
+      .replaceAll('&#xA;', '\n')
+      // Last: decoding it earlier would turn a literal `&amp;lt;` in the data
+      // into a tag delimiter.
+      .replaceAll('&amp;', '&')
+  );
+}
+
 /** Always returns an array — fast-xml-parser collapses single elements. */
 function asArray<T>(value: T | T[] | undefined | null): T[] {
   if (value === undefined || value === null) return [];
@@ -64,7 +106,7 @@ function party(raw: Record<string, unknown> | undefined): MyDataParty {
 export function parseRequestedDoc(xml: string): MyDataPage {
   let root: Record<string, unknown>;
   try {
-    root = parser.parse(xml) as Record<string, unknown>;
+    root = parser.parse(unwrapEnvelope(xml)) as Record<string, unknown>;
   } catch (cause) {
     throw new MyDataError(`myDATA returned XML that could not be parsed: ${String(cause)}`);
   }

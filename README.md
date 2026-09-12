@@ -19,7 +19,7 @@ collection activity.
 | Database  | Supabase — PostgreSQL + Auth + RLS                 |
 | Payments  | Stripe Checkout + webhooks                         |
 | Email     | Resend                                             |
-| SMS       | Yuboto (Greek aggregator)                          |
+| SMS       | Brevo (transactional SMS API)                      |
 | Scheduler | Vercel Cron (any scheduler with a bearer token works) |
 
 ---
@@ -57,7 +57,7 @@ supabase/tests/run.sh # apply migrations to a throwaway Postgres and assert the 
 
 ### Running without provider keys
 
-Leave `RESEND_API_KEY` and `YUBOTO_API_KEY` unset outside production and both senders
+Leave `RESEND_API_KEY` and `BREVO_API_KEY` unset outside production and both senders
 enter **dry-run mode**: the message is logged to the console and recorded in
 `communications_log` exactly as it would have been sent, so the whole workflow is
 exercisable end to end with no third-party accounts. In production a missing key is a
@@ -99,6 +99,12 @@ supabase/migrations/          schema, RLS policies, security-definer functions
 Anything using the admin client and acting for a specific tenant performs its own
 ownership check, standing in for the policy it bypassed (see
 `invoices/actions.ts:markInvoicePaid`).
+
+`server.ts` also sends which company the session is acting for, as a header the
+policies read. Server code takes the company from `requireOrganization()` (or
+`writableOrganization()` in a route handler) and never from `user.id`: the auth
+user is who you are, the company is who you are acting for, and one login can
+work on many. See [docs/multi-company.md](docs/multi-company.md).
 
 ---
 
@@ -179,10 +185,31 @@ every browser-readable projection.
 
 ## Payments
 
-The reminder links to `/pay/<pay_token>` — an opaque 24-byte token, so internal invoice
-ids are never enumerable. The page reads through a `security definer` function exposing
-only the fields it needs, rather than opening the `invoices` table to anonymous access.
-The Checkout amount is always taken from the database, never from the request.
+**Every tenant collects on their own Stripe account** — through Connect where a
+platform account exists, otherwise with their own key stored encrypted against
+their row. Either way the debtor pays the creditor and nothing settles to lefta.
+A return endpoint verifies the Checkout session with Stripe and settles the
+invoice, so payment works before any webhook is configured; the webhook remains
+authoritative where it is.
+
+The reminder links to `lefta.app/<short_code>` — 10 symbols over a 32-symbol alphabet
+(uppercase and digits, without `0`/`O` and `1`/`I`), so internal invoice ids are never
+enumerable and the link survives being read aloud or retyped. The length is a security
+parameter, not cosmetics: the page behind it names the debtor and the amount, and at
+1 000 guesses/s against 10 000 invoices, 10 symbols need ~3 years for a single hit where
+6 would need under two minutes. Both live in `src/lib/pay-code.ts`.
+
+Because the alphabet has no lowercase, a code can never collide with one of the app's own
+routes, which is what makes it safe to serve the link from the domain root. The middleware
+gates on the same test, so `/<code>` is public while `/invoices` stays behind auth.
+
+Older reminders point at `/pay/<pay_token>` — an opaque 24-byte token. That route is kept
+forever: those links are already in debtors' inboxes. `get_invoice_for_payment` accepts
+either credential, and `payPath()` returns a visitor to the URL shape they arrived on.
+
+The page reads through that `security definer` function exposing only the fields it needs,
+rather than opening the `invoices` table to anonymous access. The Checkout amount is
+always taken from the database, never from the request.
 
 `checkout.session.completed` is the only path that marks an invoice paid. It is
 idempotent twice over: the update is guarded on `status = 'pending'`, and SMS credit
@@ -246,7 +273,7 @@ deploys crash on every request:
 | `STRIPE_SECRET_KEY`             | Stripe → Developers → API keys                |
 | `STRIPE_WEBHOOK_SECRET`         | created in step 5                             |
 | `RESEND_API_KEY`, `EMAIL_FROM`  | Resend (required in production)               |
-| `YUBOTO_API_KEY`, `SMS_SENDER_ID` | Yuboto (required in production)             |
+| `BREVO_API_KEY`, `SMS_SENDER_ID` | Brevo (required in production)               |
 
 `ENCRYPTION_KEY` cannot be rotated casually: it decrypts stored myDATA subscription keys,
 so changing it orphans every credential already saved. Generate it once, keep it.
@@ -282,13 +309,20 @@ Then register an account, add a debtor with a real email, create a manual invoic
 
 ## Security notes
 
-- Every table is tenant-scoped by `auth.uid()` through RLS.
+- Every table is scoped by RLS to the company the session is acting for —
+  `user_id = current_org_id()`, where that function resolves the `x-lefta-org`
+  request header against the caller's rows in `organization_members`. A forged
+  header can only ever select among companies the caller already belongs to.
+  Writes carry a second predicate so a `viewer` cannot make them. See
+  [docs/multi-company.md](docs/multi-company.md).
 - The myDATA key column is excluded from the `authenticated` grant entirely, so even a
   compromised anon key cannot read the ciphertext.
-- `pay_token` and all settlement columns are revoked from `authenticated` — only the
-  webhook writes them. Note the revoke is done at **table** level before re-granting the
-  allowed columns: Supabase's default privileges hand `authenticated` a table-wide
-  `UPDATE`, and a column-level `REVOKE` against a table-level grant is silently a no-op.
+- `pay_token`, `short_code` and all settlement columns are revoked from `authenticated` —
+  only the webhook writes them. Note the revoke is done at **table** level before
+  re-granting the allowed columns: Supabase's default privileges hand `authenticated` a
+  table-wide `UPDATE`, and a column-level `REVOKE` against a table-level grant is silently
+  a no-op. Both payment credentials stay outside the re-granted list, so a browser session
+  cannot mint itself a link.
   `supabase/tests/run.sh` asserts this, because it is easy to reintroduce.
 - `communications_log` is append-only, enforced by a trigger that rejects UPDATE and
   DELETE for every role, including the service role.
@@ -305,10 +339,11 @@ reachability, the XML parser, phone normalisation, SMS segmentation, and encrypt
 round-trip/tamper detection.
 
 Not built (out of MVP scope): subscription billing for lefta itself, myDATA
-`RequestMyIncome`, partial payments, multi-user tenants, and any UI language other than
-Greek.
+`RequestMyIncome`, partial payments, and per-member audit — the correspondence
+records which company sent a reminder, not which of its people pressed the
+button.
 
 Integration paths that need live credentials to verify end to end — the AADE endpoint
-shape, Resend/Yuboto delivery, and the Stripe webhook — are implemented against the
+shape, Resend/Brevo delivery, and the Stripe webhook — are implemented against the
 documented contracts and unit-tested at the parsing/logic layer, but have not been run
 against real accounts in this environment.

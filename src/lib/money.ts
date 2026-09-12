@@ -23,14 +23,47 @@ export function daysBetween(from: Date | string, to: Date | string): number {
   );
 }
 
-/** `YYYY-MM-DD` for the given instant in Europe/Athens, the operative timezone. */
-export function athensDate(at: Date = new Date()): string {
+/**
+ * Where a tenant is, until they say otherwise.
+ *
+ * The product was built for Greece and every date in it was Athens. That is a
+ * sensible default and a poor assumption: an invoice raised in Warsaw falls due
+ * on a Warsaw day, and being chased at "nine in the morning" ought to mean nine
+ * where the person reading it lives.
+ */
+export const DEFAULT_TIMEZONE = 'Europe/Athens';
+
+/** Whether a string is a timezone this runtime can actually use. */
+export function isTimezone(value: unknown): value is string {
+  if (typeof value !== 'string' || value === '') return false;
+
+  try {
+    new Intl.DateTimeFormat('en-CA', { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** `YYYY-MM-DD` for the given instant, in the given zone. */
+export function zonedDate(timeZone: string = DEFAULT_TIMEZONE, at: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Athens',
+    timeZone: isTimezone(timeZone) ? timeZone : DEFAULT_TIMEZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
   }).format(at);
+}
+
+/**
+ * The operative calendar day.
+ *
+ * Named for the zone it used to hard-code, and kept because forty-nine callers
+ * ask for "today" without caring whose. The ones that do care — the sweep, and
+ * anything deciding whether an invoice is late — pass a zone.
+ */
+export function athensDate(at: Date = new Date()): string {
+  return zonedDate(DEFAULT_TIMEZONE, at);
 }
 
 export function addDays(isoDate: string, days: number): string {
@@ -39,11 +72,56 @@ export function addDays(isoDate: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * A calendar day, from either a `date` or a `timestamptz`.
+ *
+ * The two are mixed across the schema — due dates are dates, memberships and
+ * invitations are timestamps — and appending a time to a value that already
+ * carried one produced an Invalid Date, which is a crashed page rather than a
+ * wrong-looking one. Taking the leading day makes both work and neither shift.
+ */
+/**
+ * A date for a column that has no room for a year.
+ *
+ * The workflow cell reports the day a step is due, next to an amount and two
+ * badges. "13/09" fits there and "13 Σεπτεμβρίου 2026" does not, and inside a
+ * chase that never runs past 120 days the year carries no information anyway.
+ */
+export function formatDayMonth(isoDate: string, locale = 'el-GR'): string {
+  return new Date(`${isoDate}T00:00:00Z`).toLocaleDateString(locale, {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: 'UTC',
+  });
+}
+
 export function formatDate(isoDate: string, locale = 'el-GR'): string {
   return new Intl.DateTimeFormat(locale, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
     timeZone: 'UTC',
-  }).format(new Date(`${isoDate}T00:00:00Z`));
+  }).format(new Date(`${isoDate.slice(0, 10)}T00:00:00Z`));
+}
+
+/**
+ * The hour, 0–23, for the given instant in Europe/Athens.
+ *
+ * The scenario's send hour is a local hour, and it has to stay local: a cron
+ * firing at a fixed UTC time lands at 09:00 Athens in winter and 10:00 in
+ * summer, so a tenant who chose "morning" would silently be moved an hour twice
+ * a year. Reading the local hour is what makes the choice mean what it says.
+ */
+export function zonedHour(timeZone: string = DEFAULT_TIMEZONE, at: Date = new Date()): number {
+  const hour = new Intl.DateTimeFormat('en-GB', {
+    timeZone: isTimezone(timeZone) ? timeZone : DEFAULT_TIMEZONE,
+    hour: '2-digit',
+    hour12: false,
+  }).format(at);
+
+  return Number(hour);
+}
+
+export function athensHour(at: Date = new Date()): number {
+  return zonedHour(DEFAULT_TIMEZONE, at);
 }

@@ -42,6 +42,22 @@ as $$
   select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
 $$;
 
+-- Storage. Only the bucket registry is needed: the invoice-upload migration
+-- registers a private bucket there, and without this table every migration from
+-- that one onwards fails to apply — which silently took the whole harness with
+-- it, including the checks that run after.
+create schema if not exists storage;
+grant usage on schema storage to anon, authenticated, service_role;
+
+create table storage.buckets (
+  id                 text primary key,
+  name               text not null,
+  public             boolean not null default false,
+  file_size_limit    bigint,
+  allowed_mime_types text[],
+  created_at         timestamptz default now()
+);
+
 grant usage on schema public to anon, authenticated, service_role;
 
 -- Supabase's default privileges in the public schema.
