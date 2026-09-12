@@ -101,10 +101,15 @@ Worth reading before writing anything that matches text or touches grants.
   back as a form to fill in rather than being read.
 - The operator is **Mobimetry sp. z o.o.**, named in `LEGAL_ENTITY`
   (`src/lib/legal.ts`) and from there in the privacy notice, the terms, the
-  site footer and the structured data. Still owed, and rendered as nothing
-  until they arrive: contact email, registered address, registry court, KRS,
-  NIP, share capital — `LEGAL_ENTITY_MISSING` lists them. A sp. z o.o. is
-  expected to publish the last four.
+  site footer and the structured data. On file: registered address (pl.
+  Tadeusza Kościuszki 5 m. 1A, 50-029 Wrocław), KRS 0001265140, NIP
+  8971978439, REGON 545676014 — the last two checksum-verified by the tests.
+  Still owed, and rendered as nothing until they arrive: **contact email**,
+  **registry court** (read it off the KRS extract rather than inferring it
+  from the seat) and **share capital**. `LEGAL_ENTITY_MISSING` lists them.
+- The REGON supplied was `54567601400000`, which is the nine-digit one padded
+  to a fourteen-character field and fails the fourteen-digit checksum. What is
+  published is the nine-digit `545676014`, which passes.
 - The terms still choose **Greek law and the courts of Athens**, decided when
   the operator was assumed to be Greek. It is a lawful choice for a Polish
   company serving Greek businesses, but it is now a choice rather than the

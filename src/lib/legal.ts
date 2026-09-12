@@ -38,6 +38,8 @@ export interface LegalEntity {
   krs: string | null;
   /** Polish tax identification number. */
   nip: string | null;
+  /** Statistical number. Nine digits for a legal entity. */
+  regon: string | null;
   /** Share capital as registered, including the currency. */
   shareCapital: string | null;
   /** Where a data-protection request actually lands. */
@@ -46,10 +48,21 @@ export interface LegalEntity {
 
 export const LEGAL_ENTITY: LegalEntity = {
   name: 'Mobimetry sp. z o.o.',
-  address: null,
+  // As registered, typeset the way Polish addresses are written. Only the
+  // letter case and the comma before the postcode differ from the register's
+  // own all-caps rendering; every component is the registered one.
+  address: 'pl. Tadeusza Kościuszki 5 m. 1A, 50-029 Wrocław, Polska',
+  // Named on the company's KRS extract. Left out until it is read off there
+  // rather than inferred from the seat: a court this notice states wrongly is
+  // worse than a court it does not state at all.
   registryCourt: null,
-  krs: null,
-  nip: null,
+  krs: '0001265140',
+  nip: '8971978439',
+  // Nine digits, which is the REGON of a legal entity. It arrived as
+  // '54567601400000' — that is this number padded to the fourteen-character
+  // field some registers print, and as a fourteen-digit REGON it fails its own
+  // checksum, while these nine pass. The tests re-check both every run.
+  regon: '545676014',
   shareCapital: null,
   email: null,
 };
@@ -63,7 +76,7 @@ export const LEGAL_ENTITY: LegalEntity = {
  * reason to be able to see at a glance what is outstanding.
  */
 export const LEGAL_ENTITY_MISSING: ReadonlyArray<keyof LegalEntity> = (
-  ['email', 'address', 'registryCourt', 'krs', 'nip', 'shareCapital'] as const
+  ['email', 'address', 'registryCourt', 'krs', 'nip', 'regon', 'shareCapital'] as const
 ).filter((field) => LEGAL_ENTITY[field] === null);
 
 const IDENTITY_LABELS: Record<Locale, { court: string; capital: string; email: string }> = {
@@ -88,6 +101,7 @@ export function entityIdentity(locale: Locale): string {
       ? `KRS ${LEGAL_ENTITY.krs}${LEGAL_ENTITY.registryCourt ? ` (${label.court}: ${LEGAL_ENTITY.registryCourt})` : ''}`
       : null,
     LEGAL_ENTITY.nip ? `NIP ${LEGAL_ENTITY.nip}` : null,
+    LEGAL_ENTITY.regon ? `REGON ${LEGAL_ENTITY.regon}` : null,
     LEGAL_ENTITY.shareCapital ? `${label.capital}: ${LEGAL_ENTITY.shareCapital}` : null,
     LEGAL_ENTITY.email ? `${label.email}: ${LEGAL_ENTITY.email}` : null,
   ].filter((part): part is string => Boolean(part));
