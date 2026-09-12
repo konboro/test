@@ -103,10 +103,11 @@ Worth reading before writing anything that matches text or touches grants.
   (`src/lib/legal.ts`) and from there in the privacy notice, the terms, the
   site footer and the structured data. On file: registered address (pl.
   Tadeusza Kościuszki 5 m. 1A, 50-029 Wrocław), KRS 0001265140, NIP
-  8971978439, REGON 545676014 — the last two checksum-verified by the tests.
-  Still owed, and rendered as nothing until they arrive: **contact email**,
-  **registry court** (read it off the KRS extract rather than inferring it
-  from the seat) and **share capital**. `LEGAL_ENTITY_MISSING` lists them.
+  8971978439, REGON 545676014 (the last two checksum-verified by the tests) and
+  the registry court (Wrocław-Fabryczna, VI Wydział Gospodarczy KRS).
+  Still owed, and rendered as nothing until they arrive: **contact email** and
+  **share capital**. `LEGAL_ENTITY_MISSING` lists them. The registered postal
+  address is on the page, so a data subject has a contact channel meanwhile.
 - The REGON supplied was `54567601400000`, which is the nine-digit one padded
   to a fourteen-character field and fails the fourteen-digit checksum. What is
   published is the nine-digit `545676014`, which passes.
