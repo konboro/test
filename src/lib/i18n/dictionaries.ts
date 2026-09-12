@@ -1608,6 +1608,31 @@ const el = {
     reviewLabel: 'Εξέταση',
     reviewButton: 'Εξέταση στο lefta.app',
   },
+  /**
+   * Γιατί ένα παραστατικό δεν θα λάβει υπενθύμιση.
+   *
+   * Οκτώ ανεξάρτητοι τρόποι να σταματήσει ένα μήνυμα, σε τρεις πίνακες. Καθένας
+   * λογικός μόνος του· μαζί έκαναν την ερώτηση «γιατί αυτός ο πελάτης δεν πήρε
+   * τίποτα;» αναπάντητη χωρίς να διαβάσει κανείς τον κώδικα.
+   */
+  blockers: {
+    title: 'Γιατί δεν φεύγει τίποτα',
+    none: 'Τίποτα δεν εμποδίζει αυτό το παραστατικό.',
+    settled: 'Το παραστατικό εξοφλήθηκε — η ροή σταμάτησε μόνη της.',
+    cancelled: 'Το παραστατικό ακυρώθηκε.',
+    writtenOff: 'Το παραστατικό διαγράφηκε ως επισφάλεια.',
+    accountOff: 'Η αυτόματη αποστολή είναι κλειστή για όλο τον λογαριασμό.',
+    noChannels: 'Δεν υπάρχει ενεργό κανάλι: email και SMS είναι και τα δύο κλειστά.',
+    invoicePaused: 'Η αυτοματοποίηση είναι κλειστή για αυτό το παραστατικό.',
+    muted: 'Ο πελάτης είναι σε σίγαση.',
+    snoozed: (date: string) => `Ο πελάτης έχει αναβολή μέχρι ${date}.`,
+    reported: 'Εκκρεμεί δήλωση του πελάτη — το παραστατικό θεωρείται αμφισβητούμενο.',
+    unreachable: 'Ο πελάτης δεν έχει ούτε email ούτε τηλέφωνο.',
+    noProvider: 'Το επόμενο βήμα χρησιμοποιεί κανάλι που δεν είναι διαθέσιμο για αυτόν τον πελάτη.',
+    nothingScheduled: 'Κανένα βήμα του σεναρίου δεν πέφτει σε αυτό το παραστατικό.',
+    noCredits: 'Το επόμενο βήμα είναι SMS και δεν έχετε υπόλοιπο SMS.',
+    fix: 'Ρύθμιση',
+  },
   // Deliberately not `as const`: that would make every string its own literal
   // type and force the English dictionary to repeat the Greek words verbatim.
   // Parity is meant to be on keys, not values.
@@ -3104,6 +3129,24 @@ const en: typeof el = {
     stepOn: (step: string, date: string) => `${step} · ${date}`,
     nothingScheduled: 'No step scheduled',
     notStarted: 'Not started',
+  },
+  blockers: {
+    title: 'Why nothing is going out',
+    none: 'Nothing is holding this invoice back.',
+    settled: 'The invoice is paid — the sequence stopped by itself.',
+    cancelled: 'The invoice was cancelled.',
+    writtenOff: 'The invoice was written off.',
+    accountOff: 'Automatic sending is off for the whole account.',
+    noChannels: 'No channel is on: email and SMS are both switched off.',
+    invoicePaused: 'Automation is off for this invoice.',
+    muted: 'This customer is muted.',
+    snoozed: (date: string) => `This customer is snoozed until ${date}.`,
+    reported: 'The customer has filed a statement — the debt is treated as contested.',
+    unreachable: 'This customer has neither an email address nor a phone number.',
+    noProvider: 'The next step uses a channel that is not available for this customer.',
+    nothingScheduled: 'No step of the scenario falls on this invoice.',
+    noCredits: 'The next step is an SMS and you have no SMS credit left.',
+    fix: 'Settings',
   },
   reportEmail: {
     subjectPaid: (debtor: string, label: string) => `Payment reported: ${debtor} — ${label}`,

@@ -8,6 +8,8 @@ import { loadScenario, stepForInvoice } from '@/lib/dunning/engine';
 import { scenarioWithOverrides } from '@/lib/dunning/scenario';
 import { stepLabels } from '@/lib/dunning/step-labels';
 import { workflowStatus } from '@/lib/dunning/status';
+import { sendBlockers } from '@/lib/dunning/blockers';
+import { smsCreditsEnforced } from '@/lib/limits';
 import { effectiveNoticeTexts } from '@/lib/dunning/template-store';
 import { getDictionary } from '@/lib/i18n';
 import { athensDate, formatDate, formatMoney } from '@/lib/money';
@@ -66,6 +68,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     { data: upload },
     { data: overrides },
     account,
+    { data: tenant },
+    { data: openReport },
   ] = await Promise.all([
     supabase.from('debtors').select('*').eq('id', invoice.debtor_id).maybeSingle(),
     supabase.from('dunning_contacts').select('step').eq('invoice_id', invoice.id),
@@ -77,6 +81,21 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     supabase.from('invoice_uploads').select('id').eq('invoice_id', invoice.id).maybeSingle(),
     supabase.from('invoice_dunning_steps').select('*').eq('invoice_id', invoice.id),
     loadScenario(org.id),
+    // The three switches that live outside this invoice. Loaded here rather
+    // than reasoned about, because the question "why is nothing going out"
+    // cannot be answered from the invoice alone: the company's master switch,
+    // its channel switches and its SMS meter all outrank it.
+    supabase
+      .from('users')
+      .select('automation_enabled, email_enabled, sms_enabled, sms_credits')
+      .eq('id', org.id)
+      .maybeSingle(),
+    supabase
+      .from('invoice_reports')
+      .select('id')
+      .eq('invoice_id', invoice.id)
+      .eq('status', 'open')
+      .maybeSingle(),
   ]);
 
   // The wording the quick editor prefills: the invoice's own where it has one,
@@ -147,6 +166,35 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       ? null
       : stepForInvoice(invoice.due_date, today, scenario);
 
+  // Everything standing between this invoice and a message, in the order the
+  // sweep checks them.
+  const blockers = sendBlockers({
+    invoice,
+    debtor: debtor ?? { email: null, phone: null },
+    tenant: tenant ?? {},
+    reported: Boolean(openReport),
+    smsMetered: smsCreditsEnforced(),
+    scenario,
+    completed,
+    today,
+  });
+
+  /** Where each reason is undone, for the ones that have a single obvious place. */
+  const FIX: Partial<Record<(typeof blockers)[number]['code'], string>> = {
+    accountOff: '/settings/reminders#automation',
+    noChannels: '/settings/reminders#automation',
+    noProvider: '/settings/reminders#automation',
+    nothingScheduled: '/settings/reminders#scenario',
+    noCredits: '/settings/reminders#credits',
+    ...(debtor ? { muted: `/debtors/${debtor.id}`, snoozed: `/debtors/${debtor.id}` } : {}),
+    reported: '/invoices?filter=reported',
+  };
+
+  const blockerText = (blocker: (typeof blockers)[number]) =>
+    blocker.code === 'snoozed'
+      ? t.blockers.snoozed(blocker.until ? formatDate(blocker.until) : '—')
+      : t.blockers[blocker.code];
+
   const number = [invoice.series, invoice.invoice_number].filter(Boolean).join(' ');
 
   return (
@@ -214,6 +262,37 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           </div>
         ) : null}
       </div>
+
+      {/* Why nothing is going out.
+          Eight independent switches across three tables could each stop a
+          reminder, and the only way to find out which one had was to read the
+          sweep. Shown only when something is actually in the way: a card that
+          says "nothing is wrong" on every healthy invoice is a card nobody
+          reads by the time one of them is not. */}
+      {blockers.length ? (
+        <Card>
+          <CardHeader title={t.blockers.title} />
+          <ul className="divide-y divide-ink-100">
+            {blockers.map((blocker) => {
+              const href = FIX[blocker.code];
+
+              return (
+                <li
+                  key={blocker.code}
+                  className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3 text-sm text-ink-700 sm:px-5"
+                >
+                  <span>{blockerText(blocker)}</span>
+                  {href ? (
+                    <Link href={href} className={`text-sm ${linkClass}`}>
+                      {t.blockers.fix}
+                    </Link>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader title={t.invoiceScenario.title} />
