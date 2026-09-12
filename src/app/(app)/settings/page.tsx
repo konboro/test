@@ -278,10 +278,23 @@ export default async function SettingsPage({
   // RLS scopes this to the tenant. A slot with no row keeps the built-in copy.
   const { data: templates } = await supabase
     .from('message_templates')
-    .select('step, channel, subject, body');
+    .select('step, channel, variant, subject, body');
 
+  // `variant` has to come back and has to reach slotKey, because a variant is
+  // part of a slot's identity: without it a named wording — the personal-debtor
+  // email, step null, variant 'penny' — keys to the same `manual:email` as the
+  // plain manual template. Two rows, one key, last one wins. The editor then
+  // showed one slot's text under the other's heading, and pressing Save there
+  // wrote it over the template the operator had not been looking at. The write
+  // path has always stored the variant; only this read dropped it.
+  //
   // Not `t` — that is the dictionary in this scope.
-  const overrides = new Map((templates ?? []).map((row) => [slotKey(row.step, row.channel), row]));
+  const overrides = new Map(
+    (templates ?? []).map((row) => [
+      slotKey(row.step, row.channel, row.variant === 'penny' ? 'penny' : null),
+      row,
+    ]),
+  );
 
   // A rung's heading is its position in the ladder, which the app can say in
   // the reader's language; only the named wordings carry a label of their own.
