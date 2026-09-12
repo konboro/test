@@ -32,6 +32,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import type { DebtorRow, InvoiceRow, TemplateStep, UserRow } from '@/types/database';
 
 import { dispatchContact, templateContext } from './dispatch';
+import { channelSwitchedOn, type ChannelSwitches } from './channel-policy';
 import { isSnoozed } from './snooze';
 import { loadTemplateOverrides } from './template-store';
 import { renderEmail, renderSms, type TemplateVariant } from './templates';
@@ -199,17 +200,24 @@ export function narrowChannels(available: Channel[], only: ChannelChoice): Chann
 /** Which channels can carry a message right now, and why the others cannot. */
 function resolveChannels(
   debtor: DebtorRow,
+  tenant: ChannelSwitches,
   t: Dictionary,
 ): { channels: Channel[]; notes: string[] } {
   const notes: string[] = [];
   const channels: Channel[] = [];
 
+  // Three separate reasons a channel cannot carry this message, and the
+  // reader is told which. The account switch was missing here, so a preview
+  // promised an SMS the send would not make, and the send then reported
+  // success with nothing delivered.
   if (!debtor.email) notes.push(t.manual.noEmail);
+  else if (!channelSwitchedOn(tenant, 'email')) notes.push(t.manual.emailSwitchedOff);
   else if (!channelAvailable('email')) notes.push(t.manual.noEmailProvider);
   else channels.push('email');
 
   const phone = normalisePhone(debtor.phone);
   if (!phone) notes.push(t.manual.noPhone);
+  else if (!channelSwitchedOn(tenant, 'sms')) notes.push(t.manual.smsSwitchedOff);
   else if (!channelAvailable('sms')) notes.push(t.manual.noSmsProvider);
   else channels.push('sms');
 
@@ -267,7 +275,7 @@ export async function previewManualReminder(params: {
     locale,
   );
 
-  const { channels: available, notes } = resolveChannels(debtor, t);
+  const { channels: available, notes } = resolveChannels(debtor, tenant, t);
   // What the operator asked for, narrowed to what is actually possible.
   const channels = narrowChannels(available, params.only ?? 'both');
 
@@ -306,7 +314,7 @@ export async function sendManualReminder(params: {
   }
 
   const { tenant, debtor, invoice } = loaded.target;
-  const { channels: available, notes } = resolveChannels(debtor, t);
+  const { channels: available, notes } = resolveChannels(debtor, tenant, t);
   // What the operator asked for, narrowed to what is actually possible.
   const channels = narrowChannels(available, params.only ?? 'both');
 

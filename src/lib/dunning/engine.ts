@@ -14,6 +14,7 @@ import {
   type Scenario,
   sendWindowOpen,
 } from './scenario';
+import { enabledChannels } from './channel-policy';
 import { sweepIssueNotices } from './issue-notice';
 import { isSnoozed } from './snooze';
 import { loadTemplateOverrides } from './template-store';
@@ -370,7 +371,12 @@ async function processTenant(
     // irreversible — (invoice_id, step) is unique — so a step whose providers
     // are missing must be left untouched rather than claimed and then recorded
     // as failed. It will fire on a later run, once the keys exist.
-    const reachable = reachableChannels(rung.channels, debtor);
+    // The account switch belongs here, beside the other two reasons a channel
+    // cannot carry this message. Applied only at delivery it was worse than
+    // useless: the step was still claimed, nothing went out, the claim was
+    // handed back, and the same step was retried on every run for as long as
+    // the window stayed open.
+    const reachable = enabledChannels(reachableChannels(rung.channels, debtor), tenant);
     const deliverable = reachable.filter(channelAvailable);
 
     if (deliverable.length === 0) {

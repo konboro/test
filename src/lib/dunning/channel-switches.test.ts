@@ -5,27 +5,22 @@ import { describe, expect, it } from 'vitest';
 // the engine into a test that deliberately runs without one.
 import type { CommChannel as Channel } from '@/types/database';
 
+import { enabledChannels as allowed } from './channel-policy';
+
 /**
  * The account-wide channel switches.
  *
  * `dispatchContact` narrows the step's channels by them, and every send in the
  * product goes through that function — the nightly sweep, the notice when an
  * invoice is raised, and the button an operator presses. This is the rule it
- * applies, kept here so it can be checked without a database or a mail provider.
+ * applies, and so does the engine before it claims a contact row — which is
+ * the point that matters: applied only at delivery, the step was claimed, nothing
+ * went out, and it was retried on every run.
  *
  * Written as the same expression dispatch uses. If that changes, this fails,
  * which is the point: a switch that stops meaning anything on one of the three
  * paths is the failure worth catching.
  */
-function allowed(
-  channels: ReadonlyArray<Channel>,
-  tenant: { email_enabled?: boolean; sms_enabled?: boolean },
-): Channel[] {
-  return channels.filter((channel) =>
-    channel === 'email' ? tenant.email_enabled !== false : tenant.sms_enabled !== false,
-  );
-}
-
 const both: Channel[] = ['email', 'sms'];
 
 describe('narrowing a step to the account’s channels', () => {

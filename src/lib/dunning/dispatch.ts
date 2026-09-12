@@ -24,6 +24,7 @@ import {
 import { payPath } from '@/lib/pay-code';
 import { smsCreditsEnforced } from '@/lib/limits';
 import { emailAvailable, smsAvailable, type Channel } from '@/lib/providers';
+import { enabledChannels } from './channel-policy';
 import { normalisePhone, sendSms } from '@/lib/sms/send';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { DebtorRow, InvoiceRow, TemplateStep, UserRow } from '@/types/database';
@@ -115,9 +116,7 @@ export async function dispatchContact(params: {
   // Applied per send rather than by rewriting the scenario, because switching a
   // channel back on has to restore the steps as they were rather than leave the
   // tenant to rebuild them.
-  const channels = params.channels.filter((channel) =>
-    channel === 'email' ? tenant.email_enabled !== false : tenant.sms_enabled !== false,
-  );
+  const channels = enabledChannels(params.channels, tenant);
 
   const authoredIn = tenantLocale(tenant);
   const locale = params.locale ?? resolveDebtorLocale(debtor, authoredIn);

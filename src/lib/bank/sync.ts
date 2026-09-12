@@ -29,6 +29,8 @@ export interface BankSyncResult {
   creditsNew: number;
   settled: number;
   queued: number;
+  /** Connections left alone because an unattended read was not due yet. */
+  throttled: number;
   expired: string[];
   errors: Array<{ connectionId: string; error: string }>;
 }
@@ -47,6 +49,35 @@ const FIRST_RUN_DAYS = 90;
 /** Enough for a very busy 90-day window; a backstop, not a real limit. */
 const MAX_PAGES = 20;
 
+/**
+ * How long an unattended read must leave between calls.
+ *
+ * PSD2 caps how often a provider may read an account with nobody present.
+ * Enable Banking allows four a day and answers the fifth with "The access on
+ * the account has been exceeding the consented multiplicity per day".
+ *
+ * The sweep was reading on every invocation — the daily Vercel cron plus the
+ * hourly GitHub workflow, which lands roughly six times a day — so most of the
+ * day's reads were refused, the feed stopped seeing incoming transfers, and the
+ * only trace was an error inside a JSON body nobody reads. Measured on the
+ * production logs before this was written: three of the last five runs refused.
+ *
+ * Six hours is four reads a day: the whole allowance and no more. An attended
+ * read is exempt under the same rules, because the customer is there to
+ * authorise it, so the operator pressing Sync is never throttled here.
+ */
+const UNATTENDED_MIN_HOURS = 6;
+
+/** Whether an unattended read of this connection is due. */
+function unattendedReadDue(lastSyncedAt: string | null): boolean {
+  if (!lastSyncedAt) return true;
+
+  const last = new Date(lastSyncedAt).getTime();
+  if (Number.isNaN(last)) return true;
+
+  return Date.now() - last >= UNATTENDED_MIN_HOURS * 60 * 60 * 1000;
+}
+
 export async function syncBankFeeds(
   options: { userId?: string; psu?: PsuContext | null } = {},
 ): Promise<BankSyncResult> {
@@ -57,6 +88,7 @@ export async function syncBankFeeds(
     creditsNew: 0,
     settled: 0,
     queued: 0,
+    throttled: 0,
     expired: [],
     errors: [],
   };
@@ -87,6 +119,14 @@ export async function syncBankFeeds(
     if (connection.consent_expires_at && new Date(connection.consent_expires_at) <= new Date()) {
       await supabase.from('bank_connections').update({ status: 'expired' }).eq('id', connection.id);
       result.expired.push(connection.id);
+      continue;
+    }
+
+    // Nobody is present, so the bank counts this against a daily allowance.
+    // Asking again before it is due does not fetch anything — it spends a
+    // read on a 429 and leaves the rest of the day with none.
+    if (!options.psu && !unattendedReadDue(connection.last_synced_at)) {
+      result.throttled += 1;
       continue;
     }
 
