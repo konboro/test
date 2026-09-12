@@ -441,9 +441,9 @@ const el = {
     repeatEvery: 'Κάθε (ημέρες)',
     repeatMax: 'Μέγιστες επαναλήψεις',
     repeatHint:
-      'Ελάχιστο διάστημα 7 ημέρες και το πολύ 6 επαναλήψεις — τα όρια επιβάλλονται στη βάση. Η δίωξη σταματά οριστικά στις 120 ημέρες καθυστέρησης.',
+      'Ελάχιστο διάστημα 7 ημέρες και το πολύ 6 επαναλήψεις — τα όρια επιβάλλονται στη βάση.',
     guarantee:
-      'Ανεξάρτητα από το σενάριο: ένας πελάτης δέχεται το πολύ μία επικοινωνία ανά ημέρα.',
+      'Ανεξάρτητα από το σενάριο: πελάτης σε σίγαση δεν δέχεται ποτέ επικοινωνία, και η ροή σταματά μόλις εξοφληθεί το παραστατικό.',
     save: 'Αποθήκευση σεναρίου',
   },
   forms: {
@@ -625,10 +625,10 @@ const el = {
       'και οι πληρωμές εισπράττονται εκεί. Η lefta.app δεν βρίσκεται ποτέ στη ροή του χρήματος, δεν κρατά προμήθεια και δεν εμφανίζεται στη συναλλαγή. Δεν περιμένετε κανέναν να σας επιστρέψει τα δικά σας χρήματα.',
     complianceTitle: 'Πάροχος λογισμικού, όχι εισπρακτική εταιρεία',
     complianceIntro:
-      'Η lefta.app διαβιβάζει υπενθυμίσεις για λογαριασμό σας. Δεν αναλαμβάνει απαιτήσεις, δεν διαπραγματεύεται οφειλές και δεν ασκεί πίεση. Ο ρυθμός είναι ορισμένος, με όριο',
-    complianceLimit: 'μία επαφή ανά πελάτη ανά ημέρα',
+      'Η lefta.app διαβιβάζει υπενθυμίσεις για λογαριασμό σας. Δεν αναλαμβάνει απαιτήσεις, δεν διαπραγματεύεται οφειλές και δεν ασκεί πίεση. Τον ρυθμό τον ορίζετε εσείς, μπορείτε να',
+    complianceLimit: 'θέσετε σε σίγαση οποιονδήποτε πελάτη ανά πάσα στιγμή',
     complianceRest:
-      ', κάθε μήνυμα καταγράφεται σε αρχείο που δεν επιδέχεται τροποποίηση, και μπορείτε να σταματήσετε έναν πελάτη ανά πάσα στιγμή.',
+      ', κάθε μήνυμα καταγράφεται σε αρχείο που δεν επιδέχεται τροποποίηση, και η ροή σταματά μόλις εξοφληθεί το παραστατικό.',
     pricingTeaserTitle: 'Δωρεάν — πληρώνετε μόνο τα SMS',
     pricingTeaserBody:
       'Καμία συνδρομή, καμία δέσμευση και κανένα ποσοστό στις εισπράξεις σας. Οι υπενθυμίσεις με email δεν χρεώνονται καθόλου.',
@@ -692,7 +692,7 @@ const el = {
       },
       {
         q: 'Είστε εισπρακτική εταιρεία;',
-        a: 'Όχι. Η lefta.app διαβιβάζει υπενθυμίσεις για λογαριασμό σας ως πάροχος λογισμικού. Δεν αναλαμβάνει απαιτήσεις, δεν διαπραγματεύεται οφειλές και δεν ασκεί πίεση. Κάθε πελάτης δέχεται το πολύ μία επικοινωνία ανά ημερολογιακή ημέρα, η αλληλουχία σταματά μόνη της και μπορείτε να τη διακόψετε ανά πάσα στιγμή.',
+        a: 'Όχι. Η lefta.app διαβιβάζει υπενθυμίσεις για λογαριασμό σας ως πάροχος λογισμικού. Δεν αναλαμβάνει απαιτήσεις, δεν διαπραγματεύεται οφειλές και δεν ασκεί πίεση. Τον ρυθμό τον ορίζετε εσείς, κάθε μήνυμα καταγράφεται, και μπορείτε να θέσετε έναν πελάτη σε σίγαση ανά πάσα στιγμή.',
       },
       {
         q: 'Από πού έρχονται τα τιμολόγια;',
@@ -712,7 +712,7 @@ const el = {
       },
       {
         q: 'Πόσο συχνά στέλνονται υπενθυμίσεις;',
-        a: 'Εσείς ορίζετε το σενάριο: πόσες ημέρες πριν ή μετά τη λήξη στέλνεται κάθε βήμα και από ποιο κανάλι. Ανεξάρτητα από τη ρύθμιση, ένας πελάτης δέχεται το πολύ μία επικοινωνία την ημέρα και οι αυτόματες υπενθυμίσεις σταματούν όταν η οφειλή ξεπεράσει τις 120 ημέρες.',
+        a: 'Εσείς ορίζετε το σενάριο: πόσες ημέρες πριν ή μετά τη λήξη στέλνεται κάθε βήμα και από ποιο κανάλι. Τα βήματα επαναλαμβάνονται με ελάχιστο διάστημα 7 ημερών, έως 6 φορές, και η ροή σταματά μόλις εξοφληθεί το παραστατικό.',
       },
       {
         q: 'Χρειάζεται σύμβαση ή δέσμευση;',
@@ -1483,17 +1483,6 @@ const el = {
     templatesTitle: 'Κείμενα μηνυμάτων',
     templatesHint:
       'Το περιεχόμενο είναι δικό σας. Το πλαίσιο του email (κουμπί πληρωμής και υποσέλιδο πλατφόρμας) παραμένει σταθερό.',
-    flowTitle: 'Ροή υπενθυμίσεων',
-    flowHint:
-      'Ο χρονισμός είναι σταθερός και μη παραμετροποιήσιμος — παραμετροποιήσιμο είναι μόνο το κείμενο. Το lefta.app λειτουργεί αποκλειστικά ως πάροχος λογισμικού.',
-    beforeDue: (n: number) => `${n} ημέρες πριν τη λήξη`,
-    afterDue: (n: number) => `${n} ημέρες μετά τη λήξη`,
-    rateLimitLabel: 'Όριο συχνότητας:',
-    rateLimitBody:
-      'κάθε πελάτης λαμβάνει το πολύ μία επαφή ανά ημερολογιακή ημέρα, ανεξάρτητα από το πλήθος των ανεξόφλητων παραστατικών του. Το όριο επιβάλλεται στη βάση δεδομένων.',
-    autoStopLabel: 'Αυτόματη διακοπή:',
-    autoStopBody:
-      'μόλις ένα παραστατικό σημανθεί ως εξοφλημένο, η ροή σταματά αμέσως για αυτό.',
     saved: 'Οι ρυθμίσεις αποθηκεύτηκαν.',
   },
 
@@ -1992,8 +1981,9 @@ const en: typeof el = {
     repeatEvery: 'Every (days)',
     repeatMax: 'Most repeats',
     repeatHint:
-      'At least 7 days apart and at most 6 repeats — the limits are enforced in the database. Chasing stops for good at 120 days overdue.',
-    guarantee: 'Whatever the scenario says: a customer receives at most one contact per day.',
+      'At least 7 days apart and at most 6 repeats — the limits are enforced in the database.',
+    guarantee:
+      'Whatever the scenario says: a muted customer is never contacted, and the flow stops the moment an invoice is paid.',
     save: 'Save scenario',
   },
   forms: {
@@ -2175,10 +2165,10 @@ const en: typeof el = {
       'account and payments are collected there. lefta.app never sits in the flow of money, takes no commission and does not appear in the transaction. You are not waiting on anyone to pass your own money back to you.',
     complianceTitle: 'A software provider, not a collections agency',
     complianceIntro:
-      'lefta.app passes on reminders for you. It does not take over claims, negotiate debts or apply pressure. The cadence is fixed, capped at',
-    complianceLimit: 'one contact per customer per day',
+      'lefta.app passes on reminders for you. It does not take over claims, negotiate debts or apply pressure. You set the cadence yourself, you can',
+    complianceLimit: 'mute any customer at any moment',
     complianceRest:
-      ', every message is written to a complete, tamper-proof record, and you can mute a customer at any moment.',
+      ', every message is written to a complete, tamper-proof record, and the flow stops the moment an invoice is paid.',
     pricingTeaserTitle: 'Free — you pay only for SMS',
     pricingTeaserBody:
       'No subscription, no commitment and no cut of what you collect. Email reminders are not charged at all.',
@@ -2242,7 +2232,7 @@ const en: typeof el = {
       },
       {
         q: 'Are you a collections agency?',
-        a: 'No. lefta.app passes on reminders for you, as a software provider. It does not take over claims, negotiate debts or apply pressure. Every customer receives at most one contact per calendar day, the sequence stops by itself, and you can mute it at any moment.',
+        a: 'No. lefta.app passes on reminders for you, as a software provider. It does not take over claims, negotiate debts or apply pressure. You set the cadence yourself, every message is recorded, and you can mute a customer at any moment.',
       },
       {
         q: 'Where do the invoices come from?',
@@ -2262,7 +2252,7 @@ const en: typeof el = {
       },
       {
         q: 'How often are reminders sent?',
-        a: 'You set the scenario: how many days before or after the due date each step goes out, and on which channel. Whatever you choose, a customer receives at most one contact per day, and automatic reminders stop once a debt passes 120 days.',
+        a: 'You set the scenario: how many days before or after the due date each step goes out, and on which channel. Steps repeat at least 7 days apart, up to 6 times, and the flow stops the moment the invoice is paid.',
       },
       {
         q: 'Is there a contract or a commitment?',
@@ -3003,16 +2993,6 @@ const en: typeof el = {
     templatesTitle: 'Message copy',
     templatesHint:
       'The wording is yours. The email frame — payment button and platform footer — stays fixed.',
-    flowTitle: 'Reminder flow',
-    flowHint:
-      'The timing is fixed and not configurable — only the wording is. lefta.app operates strictly as a software provider.',
-    beforeDue: (n: number) => `${n} days before the due date`,
-    afterDue: (n: number) => `${n} days after the due date`,
-    rateLimitLabel: 'Rate limit:',
-    rateLimitBody:
-      'each customer receives at most one contact per calendar day, however many unpaid invoices they have. The limit is enforced in the database.',
-    autoStopLabel: 'Auto-stop:',
-    autoStopBody: 'the moment an invoice is marked paid, its flow stops immediately.',
     saved: 'Settings saved.',
   },
 
