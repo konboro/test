@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 
 import { appUrl } from '@/lib/env';
 import { getDictionary, getLocale } from '@/lib/i18n';
+import { LocaleProvider } from '@/lib/i18n/provider';
 
 import './globals.css';
 
@@ -57,7 +58,21 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const locale = await getLocale();
   return (
     <html lang={locale}>
-      <body>{children}</body>
+      {/* Every client component reads its strings from here, so it belongs at
+          the root rather than on the screens somebody remembered.
+
+          It used to sit only on the signed-in layout and on the invite page,
+          which left login and registration outside it — and the context
+          defaults to Greek. The heading on those pages is server-rendered and
+          came out in English, while the submit button beside it is a client
+          component and came out in Greek, on the same screen, for a reader who
+          had explicitly chosen English.
+
+          The inner providers stay where they are: a nested one wins, which is
+          what the invite page needs when its language is not the visitor's. */}
+      <body>
+        <LocaleProvider locale={locale}>{children}</LocaleProvider>
+      </body>
     </html>
   );
 }
