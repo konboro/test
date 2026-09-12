@@ -533,19 +533,54 @@ async function deliver(
   for (const reason of sent.skipped) result.skipped.push({ invoiceId: invoice.id, reason });
   for (const error of sent.errors) result.errors.push({ invoiceId: invoice.id, error });
 
-  // Nothing left the building, so the rung was not spent. Hand the claim back.
-  //
-  // The claim is what grants the right to contact, and (invoice_id, step, cycle)
-  // is unique — so a rung consumed by a provider outage is consumed for good.
-  // Twenty minutes of a mail provider returning 500 would silently retire that
-  // step for every invoice that reached it in the window, and the debtor would
-  // never receive it: not that day, not ever. Only an unconfigured provider was
-  // guarded against, which is the case that never reaches here.
   if (sent.emailsSent === 0 && sent.smsSent === 0) {
-    await supabase.from('dunning_contacts').delete().eq('id', contact.id);
+    // Two different outcomes hide behind "nothing sent", and they need opposite
+    // answers. The difference is whether a provider was actually asked.
+    //
+    // No errors means no attempt was made: every channel was skipped for a
+    // stated reason, so nothing can have reached the debtor and the rung is
+    // safe to hand back. Errors mean a provider was asked and did not confirm
+    // — and a send that fails after the provider accepted it looks exactly the
+    // same from here. Handing the claim back then is what turns one bad
+    // minute into a message resent on every run for the rest of the day, now
+    // that the one-a-day index is gone and nothing else caps it.
+    //
+    // So a failed attempt keeps its claim. The cost is a rung that may have
+    // been missed and will not be retried; the alternative cost is a customer
+    // receiving the same demand fifteen times. The failure is written to
+    // communications_log either way, so it is visible in the message history
+    // and the operator can send by hand.
+    const attempted = sent.errors.length > 0;
 
-    result.contactsMade -= 1;
-    result.skipped.push({ invoiceId: invoice.id, reason: 'nothing delivered — step left unspent' });
+    if (!attempted) {
+      const { error: handBack } = await supabase
+        .from('dunning_contacts')
+        .delete()
+        .eq('id', contact.id);
+
+      if (handBack) {
+        // The row survived, so the rung stays consumed whatever this says. Report
+        // it as the failure it is rather than as a step left unspent.
+        result.errors.push({
+          invoiceId: invoice.id,
+          error: `could not release the unspent claim: ${handBack.message}`,
+        });
+        return 'skipped';
+      }
+
+      result.contactsMade -= 1;
+      result.skipped.push({
+        invoiceId: invoice.id,
+        reason: 'nothing attempted — step left unspent',
+      });
+
+      return 'skipped';
+    }
+
+    result.skipped.push({
+      invoiceId: invoice.id,
+      reason: 'delivery failed — step kept, not retried automatically',
+    });
 
     return 'skipped';
   }
