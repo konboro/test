@@ -4,6 +4,7 @@ import { LeftaLogo } from '@/components/logo';
 import { LocaleSwitch } from '@/components/locale-switch';
 import { ButtonLink } from '@/components/ui';
 import type { Dictionary } from '@/lib/i18n';
+import { LEGAL_ENTITY } from '@/lib/legal';
 
 /**
  * The frame around every page a stranger — or a crawler — can reach.
@@ -141,7 +142,13 @@ export function PublicFooter({ t }: { t: Dictionary }) {
         </div>
 
         <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-ink-100 pt-6">
-          <p className="text-xs text-ink-400">© {new Date().getFullYear()} lefta.app</p>
+          {/* The brand is lefta.app; the company behind it is what a copyright
+              line is for, and what a customer needs to know before they enter
+              a contract. The identity line carries whichever registration
+              details are on file — see lib/legal. */}
+          <p className="text-xs text-ink-400">
+            © {new Date().getFullYear()} {LEGAL_ENTITY.name} · lefta.app
+          </p>
           {/* Quiet by design, and in the bottom row rather than in a column of
               its own: nobody comes to the site for these, but the person who
               wants them should not have to hunt. */}

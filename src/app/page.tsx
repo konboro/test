@@ -5,6 +5,7 @@ import { PublicFooter, PublicHeader } from '@/components/public-chrome';
 import { ButtonLink } from '@/components/ui';
 import { appUrl } from '@/lib/env';
 import { getDictionary } from '@/lib/i18n';
+import { LEGAL_ENTITY } from '@/lib/legal';
 
 export default async function HomePage() {
   const t = await getDictionary();
@@ -29,6 +30,10 @@ export default async function HomePage() {
       {
         '@type': 'Organization',
         name: 'lefta.app',
+        // The brand is what people search for; the registered company is what
+        // identifies who is behind it. Both belong here — `legalName` is the
+        // field schema.org has for exactly this distinction.
+        legalName: LEGAL_ENTITY.name,
         url: appUrl(),
         logo: `${appUrl()}/icon.svg`,
         areaServed: 'GR',

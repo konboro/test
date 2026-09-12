@@ -5,6 +5,7 @@ import { LeftaLogo } from '@/components/logo';
 import { ButtonLink, subtleLinkClass } from '@/components/ui';
 import { appUrl } from '@/lib/env';
 import { findGuide, GUIDES } from '@/lib/guides';
+import { LEGAL_ENTITY } from '@/lib/legal';
 import { formatDate } from '@/lib/money';
 
 /** Statically known, so each article is rendered once at build rather than per visit. */
@@ -45,7 +46,12 @@ export default async function GuidePage({ params }: { params: Promise<{ slug: st
     inLanguage: 'el',
     mainEntityOfPage: `${appUrl()}/odigos/${guide.slug}`,
     author: { '@type': 'Organization', name: 'lefta.app', url: appUrl() },
-    publisher: { '@type': 'Organization', name: 'lefta.app', url: appUrl() },
+    publisher: {
+      '@type': 'Organization',
+      name: 'lefta.app',
+      legalName: LEGAL_ENTITY.name,
+      url: appUrl(),
+    },
   };
 
   return (

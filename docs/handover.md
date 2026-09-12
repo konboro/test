@@ -99,4 +99,13 @@ Worth reading before writing anything that matches text or touches grants.
   first time — it has not been tested.
 - `ANTHROPIC_API_KEY` is not set, so scanned invoices with no text layer come
   back as a form to fill in rather than being read.
-- `LEGAL_ENTITY` in `src/lib/legal.ts` still holds placeholders.
+- The operator is **Mobimetry sp. z o.o.**, named in `LEGAL_ENTITY`
+  (`src/lib/legal.ts`) and from there in the privacy notice, the terms, the
+  site footer and the structured data. Still owed, and rendered as nothing
+  until they arrive: contact email, registered address, registry court, KRS,
+  NIP, share capital — `LEGAL_ENTITY_MISSING` lists them. A sp. z o.o. is
+  expected to publish the last four.
+- The terms still choose **Greek law and the courts of Athens**, decided when
+  the operator was assumed to be Greek. It is a lawful choice for a Polish
+  company serving Greek businesses, but it is now a choice rather than the
+  obvious default — worth a lawyer's eye before the first dispute.
