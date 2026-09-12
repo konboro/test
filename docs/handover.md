@@ -115,3 +115,13 @@ Worth reading before writing anything that matches text or touches grants.
   the operator was assumed to be Greek. It is a lawful choice for a Polish
   company serving Greek businesses, but it is now a choice rather than the
   obvious default — worth a lawyer's eye before the first dispute.
+- Costs are collected in `docs/costs.md`, written as the input to repricing.
+  Two findings there need acting on rather than reading: **every Greek SMS is
+  billed as two segments** (UCS-2 caps a single segment at 70 characters and all
+  five Greek templates exceed it), which is 86% of the marginal cost of a chased
+  invoice and halves with a rewrite that is proven to fit; and **registering the
+  alphanumeric sender ID with EETT is mandatory** — Greek networks reject an
+  unregistered sender, so the SMS channel does not work until it is filed.
+  The two figures I could not get are the cheapest Greek wholesale SMS route
+  (Brevo's pricing page 403s, local carriers quote on request) and Enable
+  Banking's actual price — together up to €600/mo of uncertainty.
