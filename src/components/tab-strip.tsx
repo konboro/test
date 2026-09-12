@@ -3,37 +3,47 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-export interface SettingsTab {
+export interface Tab {
   href: string;
   label: string;
 }
 
 /**
- * The settings tab strip.
+ * A row of tabs over sibling routes.
  *
- * Links rather than state, because each tab is its own route. That is what
- * makes the Stripe and bank round trips able to come back to the card that
- * started them, what keeps find-in-page working over everything on screen, and
- * what stops a visit to change the company name from also fetching the list of
- * Greek banks from the aggregator.
+ * Links rather than state, because each tab is its own page. That is what lets
+ * a Stripe or a bank round trip come back to the card that started it, what
+ * keeps find-in-page working over everything on screen, and what stops a visit
+ * to one tab loading the data of the other four.
  *
  * Horizontally scrollable below the small breakpoint: five Greek labels do not
  * fit across a phone, and wrapping them onto two rows pushes the content of
- * every settings screen down by a line that says nothing.
+ * every screen down by a line that says nothing.
  */
-export function SettingsTabs({ tabs }: { tabs: readonly SettingsTab[] }) {
+export function TabStrip({
+  tabs,
+  label,
+  /**
+   * Which tab is the section's index, matched exactly rather than by prefix.
+   * Without it the first tab lights up on every other tab as well, since every
+   * sibling path starts with it.
+   */
+  indexHref,
+}: {
+  tabs: readonly Tab[];
+  label: string;
+  indexHref?: string;
+}) {
   const pathname = usePathname();
 
   return (
     <nav
-      aria-label="Settings"
+      aria-label={label}
       className="-mx-4 flex gap-1 overflow-x-auto border-b border-ink-200 px-4 sm:mx-0 sm:px-0"
     >
       {tabs.map((tab) => {
-        // The first tab is the index, so it has to match exactly or it would
-        // light up on every other tab as well.
         const active =
-          tab.href === '/settings' ? pathname === '/settings' : pathname.startsWith(tab.href);
+          tab.href === indexHref ? pathname === tab.href : pathname.startsWith(tab.href);
 
         return (
           <Link

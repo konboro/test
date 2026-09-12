@@ -81,13 +81,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       ? [{ href: '/leases', label: t.nav.leases }]
       : []),
     { href: '/debtors', label: t.nav.debtors },
-    { href: '/bank', label: t.nav.bank },
-    { href: '/logs', label: t.nav.logs },
-    // The portfolio totals, its shape by age, the reminder funnel and the
-    // balance per customer. All of it used to be stacked on the dashboard,
-    // which reported the same money four times before it reached anything a
-    // person could act on.
-    { href: '/statistics', label: t.nav.statistics },
+    // One line for three screens. The portfolio's shape, the record of what was
+    // sent and the money that arrived are all read rather than worked on, and
+    // as three separate entries they were most of a navigation that had grown
+    // to ten. They keep their own URLs and share a tab strip.
+    { href: '/statistics', label: t.nav.insights },
     // Only once there is more than one: for a single company the portfolio and
     // the dashboard answer the same question, and a navigation item that
     // duplicates the one beside it is noise.

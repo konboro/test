@@ -26,7 +26,17 @@ export interface NavItem {
 }
 
 /** Which of the navigation entries earn a place in the bar, in order. */
-const PRIMARY = ['/dashboard', '/invoices', '/debtors', '/bank'];
+/**
+ * The order screens earn a place in the bar, most deserving first.
+ *
+ * A preference rather than a fixed four, because which screens exist depends on
+ * the company: a landlord has `/leases`, and it is the screen they work from —
+ * but the list was written out by hand, so leases never made the bar and sat
+ * under "more" while a read-only bank feed held a thumb-sized button. The first
+ * four that exist are taken, so a general company keeps exactly the bar it had.
+ */
+const PREFERENCE = ['/dashboard', '/invoices', '/leases', '/debtors', '/statistics'];
+const SLOTS = 4;
 
 function Icon({ href, className }: { href: string; className: string }) {
   // Stroked, 1.75, no fill: at 22px a filled glyph turns into a blob, and the
@@ -73,12 +83,20 @@ function Icon({ href, className }: { href: string; className: string }) {
     );
   }
 
-  if (href === '/bank') {
+  if (href === '/leases') {
     return (
       <svg {...common}>
-        <path d="M3 9.5 12 4l9 5.5" />
-        <path d="M5 10v8M10 10v8M14 10v8M19 10v8" />
-        <path d="M3 20.5h18" />
+        <path d="M4 10.5 12 4l8 6.5" />
+        <path d="M6 10v10h12V10" />
+        <path d="M10 20v-5h4v5" />
+      </svg>
+    );
+  }
+
+  if (href === '/statistics') {
+    return (
+      <svg {...common}>
+        <path d="M4 20V10M10 20V4M16 20v-7M20 20H3.5" />
       </svg>
     );
   }
@@ -101,10 +119,12 @@ export function MobileNav({ items }: { items: ReadonlyArray<NavItem> }) {
   // and covers the page it just sent you to.
   useEffect(() => setOpen(false), [pathname]);
 
-  const primary = PRIMARY.map((href) => items.find((item) => item.href === href)).filter(
-    (item): item is NavItem => Boolean(item),
-  );
-  const rest = items.filter((item) => !PRIMARY.includes(item.href));
+  const primary = PREFERENCE.map((href) => items.find((item) => item.href === href))
+    .filter((item): item is NavItem => Boolean(item))
+    .slice(0, SLOTS);
+
+  const inBar = new Set(primary.map((item) => item.href));
+  const rest = items.filter((item) => !inBar.has(item.href));
 
   const active = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   const restActive = rest.some((item) => active(item.href));

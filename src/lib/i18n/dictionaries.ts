@@ -900,6 +900,8 @@ const el = {
     settings: 'Ρυθμίσεις',
     bank: 'Εισπράξεις',
     statistics: 'Στατιστικά',
+    /** Ο τίτλος πάνω από τις τρεις οθόνες που διαβάζονται αντί να δουλεύονται. */
+    insights: 'Αναφορές',
     /** Εμφανίζεται μόνο σε όποιον διαχειρίζεται περισσότερες από μία. */
     companies: 'Εταιρείες',
     smsCredits: 'SMS',
@@ -1013,48 +1015,23 @@ const el = {
   },
 
   dashboard: {
-    // Σίγαση, όχι παύση: η παύση έχει ημερομηνία λήξης, η σίγαση όχι.
-    muted: 'σε σίγαση',
-    noContact: 'χωρίς στοιχεία',
     title: 'Επισκόπηση',
     lastSync: (when: string) => `Τελευταίος συγχρονισμός myDATA: ${when}`,
     neverSynced: 'Δεν έχει γίνει ακόμη συγχρονισμός με το myDATA.',
     unreachable: (count: number) =>
       `${count} ${count === 1 ? 'πελάτης' : 'πελάτες'} με ανεξόφλητα παραστατικά δεν έχουν email ή τηλέφωνο — δεν μπορούν να λάβουν υπενθύμιση.`,
     fixContacts: 'Συμπλήρωση στοιχείων',
-    outstanding: 'Ανοιχτό υπόλοιπο',
     outstandingHint: (count: number) => `${count} ενεργά παραστατικά`,
-    overdue: 'Ληξιπρόθεσμα',
-    overdueHint: (count: number) => `${count} παραστατικά`,
     collected: 'Εισπράχθηκαν',
     collectedHint: 'Μέσω lefta.app',
-    smsBalance: 'Υπόλοιπο SMS',
     addTitle: 'Νέο παραστατικό',
     addHint:
       'Αφήστε το αρχείο εδώ και διαβάζεται μόνο του — ή καταχωρήστε το με το χέρι.',
-    smsLow: 'Χαμηλό υπόλοιπο',
-    smsOk: 'Διαθέσιμα μηνύματα',
     aging: 'Δομή ανοιχτού υπολοίπου',
-    agingHint: 'Πόσο από το υπόλοιπο είναι εμπρόθεσμο και πόσο έχει ήδη καθυστερήσει.',
     agingNotDue: 'Δεν έχει λήξει',
     agingLate: (from: number, to: number) => `${from}–${to} ημέρες καθυστέρηση`,
     agingLatePlus: (from: number) => `${from}+ ημέρες καθυστέρηση`,
-    agingInvoices: (n: number) => `${n} ${n === 1 ? 'παραστατικό' : 'παραστατικά'}`,
-    openBalances: 'Πελάτες με ανοιχτά υπόλοιπα',
-    openBalancesHint: 'Η κατάσταση αφορά το παλαιότερο ανεξόφλητο παραστατικό κάθε πελάτη.',
-    allCustomers: 'Όλοι οι πελάτες',
-    emptyTitle: 'Κανένα ανοιχτό υπόλοιπο',
-    emptyBody: 'Μόλις συγχρονίσετε τα παραστατικά σας από το myDATA, θα εμφανιστούν εδώ.',
-    colCustomer: 'Πελάτης',
-    colInvoices: 'Παραστατικά',
-    colBalance: 'Υπόλοιπο',
-    colOldestDue: 'Λήξη (παλαιότερο)',
-    colWorkflow: 'Κατάσταση ροής',
-    colLastContact: 'Τελευταία επαφή',
     funnel: 'Απόδοση υπενθυμίσεων',
-    funnelHint:
-      'Τελευταίες 30 ημέρες, ανά κανάλι. Μετράει παραστατικά, όχι μηνύματα: ένα παραστατικό που υπενθυμίστηκε τρεις φορές μετράει μία. Ο αριθμός των μηνυμάτων είναι στο ιστορικό επικοινωνίας. Εξόφληση = πληρωμή έως 7 ημέρες μετά την υπενθύμιση — ένα έμβασμα μετά από SMS μετράει, ας μην πατήθηκε ποτέ ο σύνδεσμος.',
-    funnelChannel: 'Κανάλι',
     funnelSent: 'Παραστατικά με υπενθύμιση',
     funnelOpened: 'Άνοιξαν τον σύνδεσμο',
     funnelCheckout: 'Ξεκίνησαν πληρωμή',
@@ -1062,18 +1039,7 @@ const el = {
     funnelEmptyTitle: 'Δεν υπάρχουν ακόμη μετρήσεις',
     funnelEmptyBody:
       'Μόλις σταλούν οι πρώτες υπενθυμίσεις, εδώ θα φαίνεται πόσοι άνοιξαν τον σύνδεσμο πληρωμής, πόσοι ξεκίνησαν πληρωμή και πόσοι εξόφλησαν — ανά κανάλι.',
-    funnelUntagged: (n: number) =>
-      `${n} ${n === 1 ? 'επίσκεψη' : 'επισκέψεις'} στον σύνδεσμο χωρίς ετικέτα καναλιού (πληκτρολογημένος ή προωθημένος σύνδεσμος).`,
-    activityTitle: 'Ποιος άνοιξε και ποιος πλήρωσε',
-    activityOpened: 'Άνοιξε',
-    activityStarted: 'Ξεκίνησε πληρωμή',
-    activityPaid: 'Εξοφλήθηκε',
-    activityDirect: 'Απευθείας',
-    activityMore: (n: number) => `και άλλες ${n} εγγραφές`,
 
-    /** Ο τίτλος και το νόημα της σελίδας στην οποία μετακόμισαν τα παραπάνω. */
-    statsTitle: 'Στατιστικά',
-    statsHint: 'Όλο το χαρτοφυλάκιο, η δομή του και η απόδοση των υπενθυμίσεων.',
 
     // Ένα ποσό, όχι τέσσερα. Το «ανοιχτό υπόλοιπο» και τα «ληξιπρόθεσμα»
     // έδειχναν το ίδιο νούμερο δύο φορές δίπλα-δίπλα όσο κάθε ανοιχτό
@@ -1118,6 +1084,52 @@ const el = {
     feedEmptyTitle: 'Καμία κίνηση ακόμη',
     feedEmptyBody: 'Εδώ θα φαίνονται οι πληρωμές και οι υπενθυμίσεις μόλις αρχίσουν.',
   },
+  /**
+   * Το ίδιο χαρτοφυλάκιο, σε βάθος.
+   *
+   * Ό,τι διαβάζει μόνο η οθόνη στατιστικών. Τα νούμερα που μοιράζεται με τον
+   * πίνακα ελέγχου μένουν στο `dashboard`, γιατί είναι κυριολεκτικά τα ίδια
+   * λόγια για τα ίδια ποσά — δύο αντίγραφα θα αποκλίνανε.
+   */
+  statistics: {
+    // Σίγαση, όχι παύση: η παύση έχει ημερομηνία λήξης, η σίγαση όχι.
+    muted: 'σε σίγαση',
+    noContact: 'χωρίς στοιχεία',
+    outstanding: 'Ανοιχτό υπόλοιπο',
+    overdue: 'Ληξιπρόθεσμα',
+    overdueHint: (count: number) => `${count} παραστατικά`,
+    smsBalance: 'Υπόλοιπο SMS',
+    smsLow: 'Χαμηλό υπόλοιπο',
+    smsOk: 'Διαθέσιμα μηνύματα',
+    agingHint: 'Πόσο από το υπόλοιπο είναι εμπρόθεσμο και πόσο έχει ήδη καθυστερήσει.',
+    agingInvoices: (n: number) => `${n} ${n === 1 ? 'παραστατικό' : 'παραστατικά'}`,
+    openBalances: 'Πελάτες με ανοιχτά υπόλοιπα',
+    openBalancesHint: 'Η κατάσταση αφορά το παλαιότερο ανεξόφλητο παραστατικό κάθε πελάτη.',
+    allCustomers: 'Όλοι οι πελάτες',
+    emptyTitle: 'Κανένα ανοιχτό υπόλοιπο',
+    emptyBody: 'Μόλις συγχρονίσετε τα παραστατικά σας από το myDATA, θα εμφανιστούν εδώ.',
+    colCustomer: 'Πελάτης',
+    colInvoices: 'Παραστατικά',
+    colBalance: 'Υπόλοιπο',
+    colOldestDue: 'Λήξη (παλαιότερο)',
+    colWorkflow: 'Κατάσταση ροής',
+    colLastContact: 'Τελευταία επαφή',
+    funnelHint:
+      'Τελευταίες 30 ημέρες, ανά κανάλι. Μετράει παραστατικά, όχι μηνύματα: ένα παραστατικό που υπενθυμίστηκε τρεις φορές μετράει μία. Ο αριθμός των μηνυμάτων είναι στο ιστορικό επικοινωνίας. Εξόφληση = πληρωμή έως 7 ημέρες μετά την υπενθύμιση — ένα έμβασμα μετά από SMS μετράει, ας μην πατήθηκε ποτέ ο σύνδεσμος.',
+    funnelChannel: 'Κανάλι',
+    funnelUntagged: (n: number) =>
+      `${n} ${n === 1 ? 'επίσκεψη' : 'επισκέψεις'} στον σύνδεσμο χωρίς ετικέτα καναλιού (πληκτρολογημένος ή προωθημένος σύνδεσμος).`,
+    activityTitle: 'Ποιος άνοιξε και ποιος πλήρωσε',
+    activityOpened: 'Άνοιξε',
+    activityStarted: 'Ξεκίνησε πληρωμή',
+    activityPaid: 'Εξοφλήθηκε',
+    activityDirect: 'Απευθείας',
+    activityMore: (n: number) => `και άλλες ${n} εγγραφές`,
+    /** Ο τίτλος και το νόημα της σελίδας στην οποία μετακόμισαν τα παραπάνω. */
+    statsTitle: 'Στατιστικά',
+    statsHint: 'Όλο το χαρτοφυλάκιο, η δομή του και η απόδοση των υπενθυμίσεων.',
+  },
+
 
   invoices: {
     bulk: {
@@ -2439,6 +2451,8 @@ const en: typeof el = {
     settings: 'Settings',
     bank: 'Payments in',
     statistics: 'Statistics',
+    /** The heading over the three screens you read rather than work on. */
+    insights: 'Reports',
     /** Only shown to someone who works on more than one. */
     companies: 'Companies',
     smsCredits: 'SMS',
@@ -2552,46 +2566,22 @@ const en: typeof el = {
   },
 
   dashboard: {
-    muted: 'muted',
-    noContact: 'no contact details',
     title: 'Overview',
     lastSync: (when: string) => `Last myDATA sync: ${when}`,
     neverSynced: 'No myDATA sync has run yet.',
     unreachable: (count: number) =>
       `${count} ${count === 1 ? 'customer' : 'customers'} with unpaid invoices have neither an email nor a phone number — they cannot be reminded.`,
     fixContacts: 'Add contact details',
-    outstanding: 'Outstanding',
     outstandingHint: (count: number) => `${count} open invoices`,
-    overdue: 'Overdue',
-    overdueHint: (count: number) => `${count} invoices`,
     collected: 'Collected',
     collectedHint: 'Through lefta.app',
-    smsBalance: 'SMS balance',
     addTitle: 'Add an invoice',
     addHint: 'Drop the file here and it reads itself — or enter one by hand.',
-    smsLow: 'Running low',
-    smsOk: 'Messages available',
     aging: 'Outstanding by age',
-    agingHint: 'How much of the balance is current, and how much is already overdue.',
     agingNotDue: 'Not yet due',
     agingLate: (from: number, to: number) => `${from}–${to} days overdue`,
     agingLatePlus: (from: number) => `${from}+ days overdue`,
-    agingInvoices: (n: number) => `${n} ${n === 1 ? 'invoice' : 'invoices'}`,
-    openBalances: 'Customers with open balances',
-    openBalancesHint: "Status refers to each customer's oldest unpaid invoice.",
-    allCustomers: 'All customers',
-    emptyTitle: 'No open balances',
-    emptyBody: 'Once you sync your invoices from myDATA they will appear here.',
-    colCustomer: 'Customer',
-    colInvoices: 'Invoices',
-    colBalance: 'Balance',
-    colOldestDue: 'Due (oldest)',
-    colWorkflow: 'Workflow',
-    colLastContact: 'Last contact',
     funnel: 'Reminder performance',
-    funnelHint:
-      'Last 30 days, per channel. It counts invoices, not messages: an invoice reminded three times counts once. For the number of messages, see the message history. Paid = settled within 7 days of a reminder — a transfer after an SMS counts, even though no link was ever clicked.',
-    funnelChannel: 'Channel',
     funnelSent: 'Invoices reminded',
     funnelOpened: 'Opened the link',
     funnelCheckout: 'Started paying',
@@ -2599,18 +2589,7 @@ const en: typeof el = {
     funnelEmptyTitle: 'No measurements yet',
     funnelEmptyBody:
       'As soon as the first reminders go out, this shows how many opened the payment link, started paying, and settled — per channel.',
-    funnelUntagged: (n: number) =>
-      `${n} ${n === 1 ? 'visit' : 'visits'} to the link carried no channel tag (typed or forwarded link).`,
-    activityTitle: 'Who opened and who paid',
-    activityOpened: 'Opened',
-    activityStarted: 'Started paying',
-    activityPaid: 'Settled',
-    activityDirect: 'Direct',
-    activityMore: (n: number) => `and ${n} more`,
 
-    /** The screen the blocks above moved to, and what it is for. */
-    statsTitle: 'Statistics',
-    statsHint: 'The whole book, its shape, and how the reminders are performing.',
 
     // One figure, not four. "Outstanding" and "Overdue" printed the same
     // number twice side by side for as long as every open invoice was also
@@ -2655,6 +2634,51 @@ const en: typeof el = {
     feedEmptyTitle: 'Nothing has happened yet',
     feedEmptyBody: 'Payments and reminders will show up here as soon as they start.',
   },
+  /**
+   * The same portfolio, in depth.
+   *
+   * Everything only the statistics screen reads. The figures it shares with the
+   * dashboard stay under `dashboard`, because they are literally the same words
+   * about the same money — two copies would drift apart.
+   */
+  statistics: {
+    muted: 'muted',
+    noContact: 'no contact details',
+    outstanding: 'Outstanding',
+    overdue: 'Overdue',
+    overdueHint: (count: number) => `${count} invoices`,
+    smsBalance: 'SMS balance',
+    smsLow: 'Running low',
+    smsOk: 'Messages available',
+    agingHint: 'How much of the balance is current, and how much is already overdue.',
+    agingInvoices: (n: number) => `${n} ${n === 1 ? 'invoice' : 'invoices'}`,
+    openBalances: 'Customers with open balances',
+    openBalancesHint: "Status refers to each customer's oldest unpaid invoice.",
+    allCustomers: 'All customers',
+    emptyTitle: 'No open balances',
+    emptyBody: 'Once you sync your invoices from myDATA they will appear here.',
+    colCustomer: 'Customer',
+    colInvoices: 'Invoices',
+    colBalance: 'Balance',
+    colOldestDue: 'Due (oldest)',
+    colWorkflow: 'Workflow',
+    colLastContact: 'Last contact',
+    funnelHint:
+      'Last 30 days, per channel. It counts invoices, not messages: an invoice reminded three times counts once. For the number of messages, see the message history. Paid = settled within 7 days of a reminder — a transfer after an SMS counts, even though no link was ever clicked.',
+    funnelChannel: 'Channel',
+    funnelUntagged: (n: number) =>
+      `${n} ${n === 1 ? 'visit' : 'visits'} to the link carried no channel tag (typed or forwarded link).`,
+    activityTitle: 'Who opened and who paid',
+    activityOpened: 'Opened',
+    activityStarted: 'Started paying',
+    activityPaid: 'Settled',
+    activityDirect: 'Direct',
+    activityMore: (n: number) => `and ${n} more`,
+    /** The screen the blocks above moved to, and what it is for. */
+    statsTitle: 'Statistics',
+    statsHint: 'The whole book, its shape, and how the reminders are performing.',
+  },
+
 
   invoices: {
     bulk: {

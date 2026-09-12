@@ -38,7 +38,7 @@ function money(totals: ReturnType<typeof totalsByCurrency>): string {
 }
 
 export async function generateMetadata() {
-  return { title: (await getDictionary()).dashboard.statsTitle };
+  return { title: (await getDictionary()).statistics.statsTitle };
 }
 
 export const dynamic = 'force-dynamic';
@@ -218,8 +218,8 @@ export default async function StatisticsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-ink-900">{t.dashboard.statsTitle}</h1>
-        <p className="mt-1 text-sm text-ink-500">{t.dashboard.statsHint}</p>
+        <h1 className="text-xl font-semibold text-ink-900">{t.statistics.statsTitle}</h1>
+        <p className="mt-1 text-sm text-ink-500">{t.statistics.statsHint}</p>
       </div>
 
       {/* The portfolio in full, including the two figures the overview no longer
@@ -231,14 +231,14 @@ export default async function StatisticsPage() {
         }`}
       >
         <Stat
-          label={t.dashboard.outstanding}
+          label={t.statistics.outstanding}
           value={money(outstandingTotals)}
           hint={t.dashboard.outstandingHint(pending.length)}
         />
         <Stat
-          label={t.dashboard.overdue}
+          label={t.statistics.overdue}
           value={money(overdueTotals)}
-          hint={t.dashboard.overdueHint(overdue.length)}
+          hint={t.statistics.overdueHint(overdue.length)}
           tone={overdueCents > 0 ? 'warning' : 'default'}
         />
         <Stat
@@ -249,9 +249,9 @@ export default async function StatisticsPage() {
         />
         {smsCreditsEnforced() ? (
           <Stat
-            label={t.dashboard.smsBalance}
+            label={t.statistics.smsBalance}
             value={String(profile?.sms_credits ?? 0)}
-            hint={(profile?.sms_credits ?? 0) < 20 ? t.dashboard.smsLow : t.dashboard.smsOk}
+            hint={(profile?.sms_credits ?? 0) < 20 ? t.statistics.smsLow : t.statistics.smsOk}
             tone={(profile?.sms_credits ?? 0) < 20 ? 'warning' : 'default'}
           />
         ) : null}
@@ -259,7 +259,7 @@ export default async function StatisticsPage() {
 
       {outstandingCents > 0 ? (
         <Card>
-          <CardHeader title={t.dashboard.aging} subtitle={t.dashboard.agingHint} />
+          <CardHeader title={t.dashboard.aging} subtitle={t.statistics.agingHint} />
           <div className="px-5 py-5">
             {/* One stacked strip; the 2px gaps are the card surface doing the
                 separating, so no segment needs a border. */}
@@ -290,7 +290,7 @@ export default async function StatisticsPage() {
                   <dd className="tabular text-sm font-semibold text-ink-900">
                     {formatMoney(bucket.cents, stripCurrency)}
                   </dd>
-                  <dd className="text-xs text-ink-400">{t.dashboard.agingInvoices(bucket.count)}</dd>
+                  <dd className="text-xs text-ink-400">{t.statistics.agingInvoices(bucket.count)}</dd>
                 </div>
               ))}
             </dl>
@@ -299,7 +299,7 @@ export default async function StatisticsPage() {
       ) : null}
 
       <Card>
-        <CardHeader title={t.dashboard.funnel} subtitle={t.dashboard.funnelHint} />
+        <CardHeader title={t.dashboard.funnel} subtitle={t.statistics.funnelHint} />
 
         {!funnelHasData ? (
           <EmptyState title={t.dashboard.funnelEmptyTitle} body={t.dashboard.funnelEmptyBody} />
@@ -346,7 +346,7 @@ export default async function StatisticsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-500">
-                    <th className="px-5 py-2.5 font-medium">{t.dashboard.funnelChannel}</th>
+                    <th className="px-5 py-2.5 font-medium">{t.statistics.funnelChannel}</th>
                     <th className="px-5 py-2.5 text-right font-medium">{t.dashboard.funnelSent}</th>
                     <th className="px-5 py-2.5 text-right font-medium">
                       {t.dashboard.funnelOpened}
@@ -391,7 +391,7 @@ export default async function StatisticsPage() {
 
             {untaggedViews > 0 ? (
               <p className="border-t border-ink-100 px-5 py-3 text-xs text-ink-500">
-                {t.dashboard.funnelUntagged(untaggedViews)}
+                {t.statistics.funnelUntagged(untaggedViews)}
               </p>
             ) : null}
 
@@ -401,7 +401,7 @@ export default async function StatisticsPage() {
             {activity.length ? (
               <div id="activity" className="border-t border-ink-200 scroll-mt-20">
                 <p className="px-5 pb-1 pt-4 text-xs font-medium uppercase tracking-wide text-ink-400">
-                  {t.dashboard.activityTitle}
+                  {t.statistics.activityTitle}
                 </p>
                 {/* Five columns, two of them dates that are usually a dash. On a
                     phone each row becomes one line of prose: who, on what, and
@@ -431,16 +431,16 @@ export default async function StatisticsPage() {
                             ? t.common.sms
                             : row.channel === 'email'
                               ? t.common.email
-                              : t.dashboard.activityDirect}
+                              : t.statistics.activityDirect}
                         </Badge>
                         {row.opened ? (
                           <span className="tabular">
-                            {t.dashboard.activityOpened}: {formatDate(row.opened.slice(0, 10))}
+                            {t.statistics.activityOpened}: {formatDate(row.opened.slice(0, 10))}
                           </span>
                         ) : null}
                         {row.started ? (
                           <span className="tabular">
-                            {t.dashboard.activityStarted}: {formatDate(row.started.slice(0, 10))}
+                            {t.statistics.activityStarted}: {formatDate(row.started.slice(0, 10))}
                           </span>
                         ) : null}
                       </div>
@@ -454,9 +454,9 @@ export default async function StatisticsPage() {
                       <tr className="border-b border-ink-100 text-left text-xs uppercase tracking-wide text-ink-500">
                         <th className="px-5 py-2 font-medium">{t.invoices.colCustomer}</th>
                         <th className="px-5 py-2 font-medium">{t.invoices.colInvoice}</th>
-                        <th className="px-5 py-2 font-medium">{t.dashboard.activityOpened}</th>
-                        <th className="px-5 py-2 font-medium">{t.dashboard.activityStarted}</th>
-                        <th className="px-5 py-2 font-medium">{t.dashboard.activityPaid}</th>
+                        <th className="px-5 py-2 font-medium">{t.statistics.activityOpened}</th>
+                        <th className="px-5 py-2 font-medium">{t.statistics.activityStarted}</th>
+                        <th className="px-5 py-2 font-medium">{t.statistics.activityPaid}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -469,7 +469,7 @@ export default async function StatisticsPage() {
                                 ? t.common.sms
                                 : row.channel === 'email'
                                   ? t.common.email
-                                  : t.dashboard.activityDirect}
+                                  : t.statistics.activityDirect}
                             </Badge>
                           </td>
                           <td className="tabular px-5 py-2.5 text-ink-600">{row.label}</td>
@@ -496,7 +496,7 @@ export default async function StatisticsPage() {
 
                 {activity.length > 20 ? (
                   <p className="px-5 py-2.5 text-xs text-ink-500">
-                    {t.dashboard.activityMore(activity.length - 20)}
+                    {t.statistics.activityMore(activity.length - 20)}
                   </p>
                 ) : null}
               </div>
@@ -507,17 +507,17 @@ export default async function StatisticsPage() {
 
       <Card>
         <CardHeader
-          title={t.dashboard.openBalances}
-          subtitle={t.dashboard.openBalancesHint}
+          title={t.statistics.openBalances}
+          subtitle={t.statistics.openBalancesHint}
           action={
             <Link href="/debtors" className={`text-sm ${linkClass}`}>
-              {t.dashboard.allCustomers}
+              {t.statistics.allCustomers}
             </Link>
           }
         />
 
         {rows.length === 0 ? (
-          <EmptyState title={t.dashboard.emptyTitle} body={t.dashboard.emptyBody} />
+          <EmptyState title={t.statistics.emptyTitle} body={t.statistics.emptyBody} />
         ) : (
           <>
             {/* Six columns do not survive a phone. Below `md` the same rows are
@@ -536,7 +536,7 @@ export default async function StatisticsPage() {
                         {debtor.name}
                       </Link>
                       <p className="mt-0.5 text-xs text-ink-500">
-                        {t.dashboard.colInvoices}: {count}
+                        {t.statistics.colInvoices}: {count}
                       </p>
                     </div>
                     <span className="tabular shrink-0 text-base font-semibold text-ink-900">
@@ -546,21 +546,21 @@ export default async function StatisticsPage() {
 
                   <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                     {status ? <Badge tone={status.tone}>{status.label}</Badge> : null}
-                    {debtor.muted ? <Badge tone="neutral">{t.dashboard.muted}</Badge> : null}
+                    {debtor.muted ? <Badge tone="neutral">{t.statistics.muted}</Badge> : null}
                     {!debtor.email && !debtor.phone ? (
-                      <Badge tone="danger">{t.dashboard.noContact}</Badge>
+                      <Badge tone="danger">{t.statistics.noContact}</Badge>
                     ) : null}
                   </div>
 
                   <dl className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1 text-xs text-ink-500">
                     <div className="flex gap-1.5">
-                      <dt>{t.dashboard.colOldestDue}:</dt>
+                      <dt>{t.statistics.colOldestDue}:</dt>
                       <dd className="tabular text-ink-700">
                         {oldest ? formatDate(oldest.due_date) : '—'}
                       </dd>
                     </div>
                     <div className="flex gap-1.5">
-                      <dt>{t.dashboard.colLastContact}:</dt>
+                      <dt>{t.statistics.colLastContact}:</dt>
                       <dd className="tabular text-ink-700">
                         {lastContact ? formatDate(lastContact) : '—'}
                       </dd>
@@ -574,12 +574,12 @@ export default async function StatisticsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-500">
-                    <th className="px-5 py-2.5 font-medium">{t.dashboard.colCustomer}</th>
-                    <th className="px-5 py-2.5 font-medium">{t.dashboard.colInvoices}</th>
-                    <th className="px-5 py-2.5 text-right font-medium">{t.dashboard.colBalance}</th>
-                    <th className="px-5 py-2.5 font-medium">{t.dashboard.colOldestDue}</th>
-                    <th className="px-5 py-2.5 font-medium">{t.dashboard.colWorkflow}</th>
-                    <th className="px-5 py-2.5 font-medium">{t.dashboard.colLastContact}</th>
+                    <th className="px-5 py-2.5 font-medium">{t.statistics.colCustomer}</th>
+                    <th className="px-5 py-2.5 font-medium">{t.statistics.colInvoices}</th>
+                    <th className="px-5 py-2.5 text-right font-medium">{t.statistics.colBalance}</th>
+                    <th className="px-5 py-2.5 font-medium">{t.statistics.colOldestDue}</th>
+                    <th className="px-5 py-2.5 font-medium">{t.statistics.colWorkflow}</th>
+                    <th className="px-5 py-2.5 font-medium">{t.statistics.colLastContact}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -598,9 +598,9 @@ export default async function StatisticsPage() {
                               {t.debtors.vat} {debtor.vat_number}
                             </span>
                           ) : null}
-                          {debtor.muted ? <Badge tone="neutral">{t.dashboard.muted}</Badge> : null}
+                          {debtor.muted ? <Badge tone="neutral">{t.statistics.muted}</Badge> : null}
                           {!debtor.email && !debtor.phone ? (
-                            <Badge tone="danger">{t.dashboard.noContact}</Badge>
+                            <Badge tone="danger">{t.statistics.noContact}</Badge>
                           ) : null}
                         </div>
                       </td>

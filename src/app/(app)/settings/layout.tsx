@@ -1,6 +1,5 @@
+import { TabStrip } from '@/components/tab-strip';
 import { getDictionary } from '@/lib/i18n';
-
-import { SettingsTabs } from './tabs';
 
 /**
  * The frame every settings screen shares: the title, and the tabs.
@@ -26,7 +25,9 @@ export default async function SettingsLayout({ children }: { children: React.Rea
         <p className="mt-0.5 text-sm text-ink-500">{t.settings.subtitle}</p>
       </div>
 
-      <SettingsTabs
+      <TabStrip
+        label={t.settings.title}
+        indexHref="/settings"
         tabs={[
           { href: '/settings', label: t.settings.tabs.business },
           { href: '/settings/reminders', label: t.settings.tabs.reminders },
