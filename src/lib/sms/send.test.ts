@@ -72,6 +72,56 @@ describe('encoding', () => {
     expect(segmentCount('α'.repeat(70))).toBe(1);
     expect(segmentCount('α'.repeat(71))).toBe(2);
   });
+
+  it('keeps the euro sign in GSM-7, where the standard puts it', () => {
+    // This one had a price on it. Every English reminder formats its amount as
+    // "455,00 €", the old check saw a byte above ASCII and declared UCS-2, and
+    // Brevo — which believes the flag — sent a 94-character message as two
+    // segments. The euro sign is in the GSM-7 extension table.
+    expect(usesUnicode('Invoice 1042, 455,00 € overdue.')).toBe(false);
+    expect(segmentCount('Invoice 1042, 455,00 € overdue.')).toBe(1);
+  });
+
+  it('charges extension-table characters two septets each', () => {
+    // 80 euro signs fill a segment exactly; the eighty-first starts a second.
+    expect(segmentCount('€'.repeat(80))).toBe(1);
+    expect(segmentCount('€'.repeat(81))).toBe(2);
+  });
+
+  it('keeps the languages GSM-7 actually covers out of UCS-2', () => {
+    // Worth an explicit list: on these markets a reminder has 160 characters to
+    // work with, not 70, and mistaking that halves the useful length.
+    expect(usesUnicode('Rechnung 1042 überfällig')).toBe(false); // niemiecki
+    expect(usesUnicode('La fattura 1042 è scaduta')).toBe(false); // włoski
+    expect(usesUnicode('Faktura 1042 har förfallit')).toBe(false); // szwedzki
+    expect(usesUnicode('Facture 1042 échue')).toBe(false); // francuski
+    expect(usesUnicode('Factuur 1042 is verlopen')).toBe(false); // niderlandzki
+  });
+
+  it('sends the rest of the world UCS-2, because the table has no room', () => {
+    expect(usesUnicode('Faktura 1042 zaległa')).toBe(true); // polski, ł
+    expect(usesUnicode('La factura 1042 está vencida')).toBe(true); // hiszpański, á
+    expect(usesUnicode('Factura 1042 este scadentă')).toBe(true); // rumuński, ă
+    expect(usesUnicode('1042 fatura gecikmiş')).toBe(true); // turecki, ı ş
+    expect(usesUnicode('A fatura 1042 está em atraso')).toBe(true); // portugalski
+    expect(usesUnicode('Reçu manquant')).toBe(true); // francuski, ç minuskuła
+    expect(usesUnicode('счёт 1042 просрочен')).toBe(true); // rosyjski
+    expect(usesUnicode('請求 1042 期限超過')).toBe(true); // japoński
+  });
+
+  it('treats an emoji as UCS-2 and bills its surrogate pair as two', () => {
+    expect(usesUnicode('Paid 👍')).toBe(true);
+    // 35 emoji are 70 UTF-16 code units — exactly one segment, not 35 of 70.
+    expect(segmentCount('👍'.repeat(35))).toBe(1);
+    expect(segmentCount('👍'.repeat(36))).toBe(2);
+  });
+
+  it('keeps the ten Greek capitals GSM-7 does carry', () => {
+    // Δ Φ Γ Λ Ω Π Ψ Σ Θ Ξ are in the default alphabet; Κ and Ρ are not, because
+    // they are meant to be typed as Latin K and P.
+    expect(usesUnicode('ΔΦΓΛΩΠΨΣΘΞ')).toBe(false);
+    expect(usesUnicode('Κ')).toBe(true);
+  });
 });
 
 describe('sendSms without credentials', () => {

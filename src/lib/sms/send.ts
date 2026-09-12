@@ -36,25 +36,88 @@ export function normalisePhone(raw: string | null | undefined): string | null {
 }
 
 /**
- * Whether the message needs UCS-2 rather than GSM-03.38.
+ * The GSM-03.38 default alphabet: the 128 characters a message can carry at
+ * seven bits each.
  *
- * Every Greek reminder does. This drives two separate things — how many segments
- * the message costs, and the `unicodeEnabled` flag Brevo needs — so it has one
- * definition rather than two that can drift apart.
+ * It is not ASCII, in either direction. It holds £ ¥ § ¡ ¿, the German and
+ * Nordic vowels, and the ten Greek capitals that do not look like Latin ones;
+ * it lacks the backtick and the curly braces. Treating "non-ASCII" as "needs
+ * UCS-2" is therefore wrong in the expensive direction — see `gsmSeptets`.
  */
-export function usesUnicode(message: string): boolean {
-  return /[^\x00-\x7F]/.test(message);
+const GSM_BASIC = new Set(
+  '@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞ\x1bÆæßÉ' +
+    ' !"#¤%&\'()*+,-./0123456789:;<=>?' +
+    '¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§' +
+    '¿abcdefghijklmnopqrstuvwxyzäöñüà',
+);
+
+/**
+ * Reachable only behind the escape byte, so each of these costs two septets.
+ *
+ * The euro sign lives here, and that detail was costing real money: every
+ * English reminder formats its amount as "455,00 €", the old check saw a
+ * non-ASCII byte, and the message went out as UCS-2 — 70 characters to work
+ * with instead of 160, which turned a 94-character reminder into two billed
+ * segments. It is one segment.
+ */
+const GSM_EXTENDED = new Set('\f^{}\\[~]|€');
+
+/**
+ * How many septets the message needs in GSM-03.38, or null if it cannot be
+ * written in it at all.
+ *
+ * Iterating with `for…of` walks code points, so an astral character (an emoji)
+ * arrives whole, matches neither table, and correctly forces UCS-2.
+ */
+function gsmSeptets(message: string): number | null {
+  let septets = 0;
+
+  for (const character of message) {
+    if (GSM_BASIC.has(character)) septets += 1;
+    else if (GSM_EXTENDED.has(character)) septets += 2;
+    else return null;
+  }
+
+  return septets;
 }
 
 /**
- * GSM-03.38 single-segment limit. Greek text falls back to UCS-2 (70 chars),
- * so templates are kept short enough to stay one segment either way.
+ * Whether the message needs UCS-2 rather than GSM-03.38.
+ *
+ * Every Greek reminder does, and so does most of the world — Cyrillic, Arabic,
+ * Hebrew, Thai, the Indic and CJK scripts, and the Latin languages whose
+ * diacritics the table omits: Polish, Czech, Romanian, Turkish, Portuguese, and
+ * Spanish the moment it needs an "á". What does fit is English, German, Italian,
+ * Dutch and the Nordic languages.
+ *
+ * This drives two separate things — how many segments the message costs, and the
+ * `unicodeEnabled` flag Brevo needs — so it has one definition rather than two
+ * that can drift apart. Brevo takes the flag at its word and encodes what it is
+ * told, which is why a wrong answer here is a doubled bill rather than a wrong
+ * number on a screen. Twilio detects the encoding itself and is unaffected on
+ * the wire, but the count below is what we show the sender.
+ */
+export function usesUnicode(message: string): boolean {
+  return gsmSeptets(message) === null;
+}
+
+/**
+ * How many segments the message will be billed as.
+ *
+ * GSM-7 carries 160 septets alone or 153 when split; UCS-2 carries 70
+ * characters alone or 67 when split. Templates are kept short enough to stay
+ * one segment either way.
  */
 export function segmentCount(message: string): number {
-  const unicode = usesUnicode(message);
-  const limit = unicode ? 70 : 160;
-  const multipart = unicode ? 67 : 153;
-  return message.length <= limit ? 1 : Math.ceil(message.length / multipart);
+  const septets = gsmSeptets(message);
+
+  if (septets === null) {
+    // UCS-2 is billed per UTF-16 code unit, so a surrogate pair counts as two
+    // — which is what `length` already reports, unlike a code-point walk.
+    return message.length <= 70 ? 1 : Math.ceil(message.length / 67);
+  }
+
+  return septets <= 160 ? 1 : Math.ceil(septets / 153);
 }
 
 /**
