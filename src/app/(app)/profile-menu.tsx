@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
 import { signOut } from '@/app/auth/actions';
-import { switchLocale } from '@/lib/i18n/actions';
-import { LOCALES } from '@/lib/i18n/dictionaries';
+import { LocaleMenu } from '@/components/locale-menu';
+import { localeOptions } from '@/lib/i18n/dictionaries';
 import { useLocale, useT } from '@/lib/i18n/provider';
 
 /**
@@ -126,28 +126,9 @@ export function ProfileMenu({
               breakpoint up; on a phone it does not, and a control that exists
               only on desktop is a control a phone user cannot reach. The action
               is the same one, so both places behave identically. */}
-          <form
-            action={switchLocale}
-            className="flex items-center justify-between gap-3 border-t border-ink-100 px-4 py-3 sm:hidden"
-          >
-            <span className="text-xs text-ink-500">{t.nav.language}</span>
-            <span className="flex items-center gap-0.5 rounded-lg border border-ink-200 p-0.5">
-              {LOCALES.map((code) => (
-                <button
-                  key={code}
-                  type="submit"
-                  name="locale"
-                  value={code}
-                  aria-current={code === locale ? 'true' : undefined}
-                  className={`min-h-9 rounded-md px-2.5 text-xs font-semibold uppercase tracking-wide transition ${
-                    code === locale ? 'bg-ink-900 text-white' : 'text-ink-500'
-                  }`}
-                >
-                  {code}
-                </button>
-              ))}
-            </span>
-          </form>
+          <div className="border-t border-ink-100 px-2 py-2 sm:hidden">
+            <LocaleMenu current={locale} options={localeOptions()} panel="inline" />
+          </div>
 
           <div className="flex items-center justify-end border-t border-ink-100 px-4 py-3">
             <form action={signOut}>

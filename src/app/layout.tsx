@@ -11,7 +11,7 @@ import './globals.css';
  * are copy like any other, and a static object cannot read the locale.
  */
 export async function generateMetadata(): Promise<Metadata> {
-  const [t, locale] = await Promise.all([getDictionary(), getLocale()]);
+  const t = await getDictionary();
 
   return {
     // `template` keeps the wordmark in the tab title on every page without each
@@ -33,8 +33,11 @@ export async function generateMetadata(): Promise<Metadata> {
       description: t.common.appDescription,
       url: '/',
       siteName: 'lefta.app',
-      // The market is Greek; the interface also speaks English.
-      locale: locale === 'en' ? 'en_GB' : 'el_GR',
+      // Open Graph spells the tag with an underscore, and it is otherwise the
+      // same tag the language already formats its dates with. Derived rather
+      // than matched against a list, so a language added later cannot go on
+      // quietly advertising itself to Facebook as Greek.
+      locale: t.dateTimeTag.replace('-', '_'),
       type: 'website',
     },
 

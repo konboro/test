@@ -6,6 +6,8 @@
  * two in sync when you add a migration.
  */
 
+import type { Locale } from '@/lib/i18n/dictionaries';
+
 export type InvoiceStatus = 'pending' | 'paid' | 'cancelled' | 'written_off';
 export type CommChannel = 'email' | 'sms';
 export type CommStatus = 'sent' | 'failed' | 'skipped';
@@ -40,8 +42,15 @@ export type VivaEstate = 'demo' | 'production';
 /** Revolut runs two estates too; a Merchant key belongs to exactly one. */
 export type RevolutEstate = 'sandbox' | 'production';
 export type PaymentProviderName = 'stripe' | 'viva' | 'revolut';
-/** Portal interface language. Reminder copy is unaffected. */
-export type UserLocale = 'el' | 'en';
+/**
+ * Portal interface language. Reminder copy is unaffected.
+ *
+ * An alias rather than a union of its own. It was written out as `'el' | 'en'`
+ * a second time here, and a second list of the languages is a list that will
+ * eventually be one language behind the first: adding a language would compile
+ * everywhere, and the column that stores the choice would refuse the value.
+ */
+export type UserLocale = Locale;
 /** What a person may do in a company they belong to. */
 export type MemberRole = 'owner' | 'member' | 'viewer';
 

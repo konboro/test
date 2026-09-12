@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { Button, Field, inputClass, linkClass } from '@/components/ui';
+import { localeOptions } from '@/lib/i18n/dictionaries';
 import type { DebtorRow } from '@/types/database';
 
 import { createDebtor, updateDebtor, type DebtorFormState } from './actions';
@@ -39,8 +40,11 @@ function Fields({ debtor }: { debtor?: DebtorRow }) {
       <Field label={t.fields.debtorLocale} hint={t.fields.debtorLocaleHint}>
         <select name="locale" defaultValue={debtor?.locale ?? ''} className={inputClass}>
           <option value="">{t.fields.localeAuto}</option>
-          <option value="el">{t.fields.localeEl}</option>
-          <option value="en">{t.fields.localeEn}</option>
+          {localeOptions().map((option) => (
+            <option key={option.code} value={option.code}>
+              {option.name}
+            </option>
+          ))}
         </select>
       </Field>
       <div className="sm:col-span-2">

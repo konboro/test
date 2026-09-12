@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { JsonLd, PublicFooter, PublicHeader } from '@/components/public-chrome';
 import { ButtonLink, linkClass } from '@/components/ui';
 import { appUrl } from '@/lib/env';
-import { getDictionary, getLocale } from '@/lib/i18n';
+import { getDictionary } from '@/lib/i18n';
 import { formatMoney } from '@/lib/money';
 import { SMS_PACKS } from '@/lib/stripe';
 
@@ -34,14 +34,16 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function PricingPage() {
   const t = await getDictionary();
-  const locale = await getLocale();
 
   const packs = SMS_PACKS.map((pack) => ({
     ...pack,
-    price: formatMoney(pack.amountCents, 'EUR', locale === 'el' ? 'el-GR' : 'en-IE'),
+    // The dictionary's own tag, not a match on the locale: a price rendered
+    // with the wrong grouping is the one number on this page a visitor will
+    // stop at, and every language added would otherwise need remembering here.
+    price: formatMoney(pack.amountCents, 'EUR', t.dateTimeTag),
     // Rounded to the cent it is actually billed at rather than to three
     // decimals: a per-message figure nobody is ever charged reads as a trick.
-    unit: formatMoney(Math.round(pack.amountCents / pack.credits), 'EUR', locale === 'el' ? 'el-GR' : 'en-IE'),
+    unit: formatMoney(Math.round(pack.amountCents / pack.credits), 'EUR', t.dateTimeTag),
   }));
 
   return (

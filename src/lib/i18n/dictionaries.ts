@@ -8,6 +8,30 @@
  * `en` is typed as `typeof el`, so a key added to one language and forgotten in
  * the other is a compile error rather than a Greek string surfacing in the
  * English interface.
+ *
+ * ## Adding a language
+ *
+ * Three edits here:
+ *
+ *   1. Add the code to `LOCALES`.
+ *   2. Write `const xx: typeof el = { … }`. Every missing key is a compile
+ *      error, so a half-translated language cannot ship by accident. Its
+ *      `dateTimeTag` is the tag that dates, prices and the Open Graph locale
+ *      are all formatted from; its `languageName` is what the language calls
+ *      itself, which is what every language menu shows.
+ *   3. Add it to `DICTIONARIES`, which `Record<Locale, …>` then demands.
+ *
+ * Then `tsc` names the rest. No interface list needs finding by hand — the
+ * language menu, the customer language selector, the batch send, `UserLocale`
+ * and the `lang` on the document all derive from `LOCALES`, and the database
+ * checks the *shape* of a language tag rather than keeping its own copy of the
+ * list (see `20260912110000_locale_any_language.sql`). What the compiler does
+ * stop on is the three places that need writing rather than wiring, and they
+ * are exactly the places where an untranslated fallback would be visible to
+ * somebody outside the company: the reminder copy customers receive
+ * (`dunning/templates.ts`), the privacy policy and terms (`lib/legal.ts`), and
+ * the word the payment chat's Greek prompt uses for the language
+ * (`reports/chat.ts`).
  */
 
 export const LOCALES = ['el', 'en'] as const;
@@ -114,8 +138,6 @@ const el = {
     automationOn: 'Ενεργή αυτοματοποίηση υπενθυμίσεων',
     automationHint: 'Όταν είναι απενεργοποιημένη, δεν στέλνεται κανένα μήνυμα σε κανέναν πελάτη.',
     localeAuto: 'Αυτόματα',
-    localeEl: 'Ελληνικά',
-    localeEn: 'Αγγλικά',
     debtorLocale: 'Γλώσσα υπενθυμίσεων',
     debtorLocaleHint: 'Αυτόματα: από τον κωδικό χώρας του τηλεφώνου. Χωρίς κωδικό χώρας, ελληνικά.',
     environment: 'Περιβάλλον',
@@ -1623,8 +1645,6 @@ const en: typeof el = {
     automationOn: 'Reminder automation on',
     automationHint: 'While it is off, no message goes to any customer.',
     localeAuto: 'Automatic',
-    localeEl: 'Greek',
-    localeEn: 'English',
     debtorLocale: 'Reminder language',
     debtorLocaleHint: 'Automatic: from the country code on the phone number. With no country code, Greek.',
     environment: 'Environment',
@@ -3003,3 +3023,26 @@ const en: typeof el = {
 
 export const DICTIONARIES: Record<Locale, typeof el> = { el, en };
 export type Dictionary = typeof el;
+
+/**
+ * Every language on offer, with the name each one calls itself.
+ *
+ * Endonyms — 'Ελληνικά', not 'Greek' — rather than a name per language written
+ * in every other language. Partly because the reader who most needs a language
+ * list is the one who cannot read the page they are looking at, and the only
+ * entry they are certain to recognise is their own language's name for itself.
+ * Partly because the alternative grows as the square of the list: six languages
+ * would mean thirty-six names to write and keep correct, for a control that is
+ * read once per visitor.
+ *
+ * Every language menu in the product is built from this, so adding a language is
+ * adding a dictionary — no list of options anywhere else to remember.
+ */
+export function localeOptions(): { code: Locale; name: string }[] {
+  return LOCALES.map((code) => ({ code, name: DICTIONARIES[code].languageName }));
+}
+
+/** What one language calls itself, for naming it inside a sentence. */
+export function languageName(locale: Locale): string {
+  return DICTIONARIES[locale].languageName;
+}

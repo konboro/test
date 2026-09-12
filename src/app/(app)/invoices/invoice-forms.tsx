@@ -9,6 +9,7 @@ import type { ReminderPreview } from '@/lib/dunning/manual';
 import { REMINDER_CHOICES } from '@/lib/dunning/templates';
 import { Switch } from '@/components/switch';
 import { DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from '@/lib/currency';
+import { languageName, localeOptions } from '@/lib/i18n/dictionaries';
 import { useT } from '@/lib/i18n/provider';
 import { payPath } from '@/lib/pay-code';
 
@@ -287,13 +288,14 @@ export function RemindButton({ invoiceId, label }: { invoiceId: string; label: s
             >
               <option value="auto">
                 {preview?.locale
-                  ? t.reminder.languageAuto(
-                      preview.locale === 'el' ? t.fields.localeEl : t.fields.localeEn,
-                    )
+                  ? t.reminder.languageAuto(languageName(preview.locale))
                   : t.fields.localeAuto}
               </option>
-              <option value="el">{t.fields.localeEl}</option>
-              <option value="en">{t.fields.localeEn}</option>
+              {localeOptions().map((option) => (
+                <option key={option.code} value={option.code}>
+                  {option.name}
+                </option>
+              ))}
             </select>
           </Field>
 

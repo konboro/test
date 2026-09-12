@@ -7,6 +7,7 @@ import { displayName } from '@/lib/debtors';
 import { workflowStatus } from '@/lib/dunning/status';
 import { REMINDER_CHOICES } from '@/lib/dunning/templates';
 import { getDictionary, getLocale } from '@/lib/i18n';
+import { localeOptions } from '@/lib/i18n/dictionaries';
 import { athensDate, formatDate, formatMoney } from '@/lib/money';
 import { settlementMethod } from '@/lib/payments/settlement';
 import { createClient } from '@/lib/supabase/server';
@@ -428,8 +429,11 @@ export default async function InvoicesPage({
                 className="min-h-11 rounded-lg border border-ink-300 bg-white px-3 text-base text-ink-800 outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:min-h-0 sm:py-1.5 sm:text-sm"
               >
                 <option value="auto">{t.fields.localeAuto}</option>
-                <option value="el">{t.fields.localeEl}</option>
-                <option value="en">{t.fields.localeEn}</option>
+                {localeOptions().map((option) => (
+                  <option key={option.code} value={option.code}>
+                    {option.name}
+                  </option>
+                ))}
               </select>
                 <BulkActions
                   sendLabel={t.invoices.bulk.send}
