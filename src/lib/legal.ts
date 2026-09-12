@@ -52,10 +52,11 @@ export const LEGAL_ENTITY: LegalEntity = {
   // letter case and the comma before the postcode differ from the register's
   // own all-caps rendering; every component is the registered one.
   address: 'pl. Tadeusza Kościuszki 5 m. 1A, 50-029 Wrocław, Polska',
-  // Named on the company's KRS extract. Left out until it is read off there
-  // rather than inferred from the seat: a court this notice states wrongly is
-  // worse than a court it does not state at all.
-  registryCourt: null,
+  // From the company's KRS extract, not inferred from the seat: the city gives
+  // you the court but not the division, and there are two that keep the
+  // register in Wrocław.
+  registryCourt:
+    'Sąd Rejonowy dla Wrocławia-Fabrycznej we Wrocławiu, VI Wydział Gospodarczy Krajowego Rejestru Sądowego',
   krs: '0001265140',
   nip: '8971978439',
   // Nine digits, which is the REGON of a legal entity. It arrived as
