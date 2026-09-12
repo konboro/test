@@ -13,20 +13,93 @@ import type { Locale } from './i18n/dictionaries';
  * be broken by stray markup.
  *
  * ---------------------------------------------------------------------------
- * THE PLACEHOLDERS BELOW MUST BE FILLED IN.
+ * The operator is a Polish company, and the identifiers it must publish are
+ * Polish ones: KRS with its registry court, NIP, and share capital — what the
+ * Commercial Companies Code asks of a sp. z o.o. on its commercial
+ * communications. The Greek ΑΦΜ this record used to hold was never going to be
+ * the right field.
  *
- * A privacy notice that does not name its controller identifies nobody, and a
- * set of terms with no legal entity behind them binds nobody. They are left
- * obvious on purpose: an unfilled bracket on a live page is embarrassing, which
- * is the point — a quietly wrong company name would not be noticed at all.
+ * Anything still unknown is null, and null renders as nothing at all rather
+ * than as a bracketed placeholder. The pages then say the things that are
+ * true — the company's name — and stay silent about the rest, which is better
+ * on a live page than "[ΑΦΜ]" and far better than a number somebody guessed.
+ * `LEGAL_ENTITY_MISSING` is what keeps that from going quiet: it names what is
+ * still owed, and the tests fail if the company itself is ever unnamed again.
  * ---------------------------------------------------------------------------
  */
-export const LEGAL_ENTITY = {
-  name: '[ΕΠΩΝΥΜΙΑ ΕΤΑΙΡΕΙΑΣ]',
-  vatNumber: '[ΑΦΜ]',
-  address: '[ΔΙΕΥΘΥΝΣΗ]',
-  email: '[EMAIL ΕΠΙΚΟΙΝΩΝΙΑΣ]',
-} as const;
+export interface LegalEntity {
+  /** Full legal name, exactly as registered. */
+  name: string;
+  /** Registered office: street, postcode, city, country. */
+  address: string | null;
+  /** The registry court holding the company file. */
+  registryCourt: string | null;
+  /** Companies-register number (Krajowy Rejestr Sądowy). */
+  krs: string | null;
+  /** Polish tax identification number. */
+  nip: string | null;
+  /** Share capital as registered, including the currency. */
+  shareCapital: string | null;
+  /** Where a data-protection request actually lands. */
+  email: string | null;
+}
+
+export const LEGAL_ENTITY: LegalEntity = {
+  name: 'Mobimetry sp. z o.o.',
+  address: null,
+  registryCourt: null,
+  krs: null,
+  nip: null,
+  shareCapital: null,
+  email: null,
+};
+
+/**
+ * What the identity block still needs before these documents are complete.
+ *
+ * A notice with no contact channel gives a data subject nowhere to exercise a
+ * right, and a sp. z o.o. that publishes no KRS or NIP is short of its own
+ * disclosure duty. Neither is a reason to invent a value, and both are a
+ * reason to be able to see at a glance what is outstanding.
+ */
+export const LEGAL_ENTITY_MISSING: ReadonlyArray<keyof LegalEntity> = (
+  ['email', 'address', 'registryCourt', 'krs', 'nip', 'shareCapital'] as const
+).filter((field) => LEGAL_ENTITY[field] === null);
+
+const IDENTITY_LABELS: Record<Locale, { court: string; capital: string; email: string }> = {
+  el: { court: 'Δικαστήριο μητρώου', capital: 'Μετοχικό κεφάλαιο', email: 'Email' },
+  en: { court: 'Registry court', capital: 'Share capital', email: 'Email' },
+};
+
+/**
+ * The company's identity, as one line, from whatever is actually known.
+ *
+ * One function rather than four hand-written sentences: the same line closes
+ * the privacy notice, the terms and the site footer, and a company detail that
+ * arrives later has to reach all three or none.
+ */
+export function entityIdentity(locale: Locale): string {
+  const label = IDENTITY_LABELS[locale];
+
+  const parts = [
+    LEGAL_ENTITY.name,
+    LEGAL_ENTITY.address,
+    LEGAL_ENTITY.krs
+      ? `KRS ${LEGAL_ENTITY.krs}${LEGAL_ENTITY.registryCourt ? ` (${label.court}: ${LEGAL_ENTITY.registryCourt})` : ''}`
+      : null,
+    LEGAL_ENTITY.nip ? `NIP ${LEGAL_ENTITY.nip}` : null,
+    LEGAL_ENTITY.shareCapital ? `${label.capital}: ${LEGAL_ENTITY.shareCapital}` : null,
+    LEGAL_ENTITY.email ? `${label.email}: ${LEGAL_ENTITY.email}` : null,
+  ].filter((part): part is string => Boolean(part));
+
+  const line = parts.join(', ');
+
+  // "sp. z o.o." already ends in a full stop, and a sentence closer after it
+  // renders as "Mobimetry sp. z o.o..". Abbreviated company forms are the rule
+  // rather than the exception — sp. z o.o., S.A., Ltd., A.E. — so the closer is
+  // conditional rather than the name being special-cased.
+  return line.endsWith('.') ? line : `${line}.`;
+}
 
 export interface LegalSection {
   heading: string;
@@ -46,7 +119,7 @@ const PRIVACY_EL: LegalDocument = {
   title: 'Πολιτική απορρήτου',
   summary:
     'Ποια δεδομένα επεξεργάζεται το lefta.app, για ποιον, με ποια βάση και για πόσο.',
-  updated: '2026-08-20',
+  updated: '2026-09-12',
   sections: [
     {
       heading: 'Δύο ρόλοι, όχι ένας',
@@ -101,9 +174,14 @@ const PRIVACY_EL: LegalDocument = {
       heading: 'Δικαιώματα',
       paragraphs: [
         'Πρόσβαση, διόρθωση, διαγραφή, περιορισμός, φορητότητα και εναντίωση.',
-        `Αν είστε πελάτης του lefta.app, απευθυνθείτε σε ${LEGAL_ENTITY.email}.`,
+        LEGAL_ENTITY.email
+          ? `Αν είστε πελάτης του lefta.app, απευθυνθείτε σε ${LEGAL_ENTITY.email}.`
+          : `Αν είστε πελάτης του lefta.app, απευθυνθείτε στην ${LEGAL_ENTITY.name} με τα στοιχεία που αναφέρονται στο τέλος του παρόντος.`,
         'Αν λάβατε υπενθύμιση από κάποιον που χρησιμοποιεί το lefta.app, υπεύθυνος επεξεργασίας είναι εκείνος και όχι εμείς. Απαντήστε στο μήνυμα ή επικοινωνήστε μαζί του απευθείας· εμείς μπορούμε μόνο να προωθήσουμε το αίτημα.',
-        'Έχετε επίσης δικαίωμα καταγγελίας στην Αρχή Προστασίας Δεδομένων Προσωπικού Χαρακτήρα.',
+        // The controller is established in Poland, so its own supervisory
+        // authority is the Polish one. That does not narrow anybody's rights:
+        // a complaint may always be lodged where the person lives or works.
+        'Η εταιρεία είναι εγκατεστημένη στην Πολωνία και εποπτική αρχή της είναι ο Πρόεδρος της Αρχής Προστασίας Δεδομένων Προσωπικού Χαρακτήρα της Πολωνίας (UODO). Μπορείτε να υποβάλετε καταγγελία είτε στην αρχή της χώρας σας — στην Ελλάδα, στην Αρχή Προστασίας Δεδομένων Προσωπικού Χαρακτήρα — είτε στην UODO.',
       ],
     },
     {
@@ -115,7 +193,7 @@ const PRIVACY_EL: LegalDocument = {
     {
       heading: 'Επικοινωνία',
       paragraphs: [
-        `${LEGAL_ENTITY.name}, ΑΦΜ ${LEGAL_ENTITY.vatNumber}, ${LEGAL_ENTITY.address}. Email: ${LEGAL_ENTITY.email}.`,
+        entityIdentity('el'),
       ],
     },
   ],
@@ -124,7 +202,7 @@ const PRIVACY_EL: LegalDocument = {
 const TERMS_EL: LegalDocument = {
   title: 'Όροι χρήσης',
   summary: 'Τι κάνει το lefta.app, τι δεν κάνει, και ποιος ευθύνεται για τι.',
-  updated: '2026-08-20',
+  updated: '2026-09-12',
   sections: [
     {
       heading: 'Τι είναι η υπηρεσία',
@@ -183,8 +261,13 @@ const TERMS_EL: LegalDocument = {
     {
       heading: 'Εφαρμοστέο δίκαιο',
       paragraphs: [
+        // Written when the operator was assumed to be Greek. A Polish company
+        // may lawfully choose Greek law for business customers (Rome I, Art.
+        // 3), so this stays as it is rather than being flipped on a guess —
+        // but it is now a decision, and a decision with a cost attached.
+        // Flagged in docs/handover.md for a lawyer, not changed here.
         'Ελληνικό δίκαιο. Αρμόδια τα δικαστήρια των Αθηνών.',
-        `${LEGAL_ENTITY.name}, ΑΦΜ ${LEGAL_ENTITY.vatNumber}, ${LEGAL_ENTITY.address}. Email: ${LEGAL_ENTITY.email}.`,
+        entityIdentity('el'),
       ],
     },
   ],
@@ -193,7 +276,7 @@ const TERMS_EL: LegalDocument = {
 const PRIVACY_EN: LegalDocument = {
   title: 'Privacy notice',
   summary: 'What lefta.app processes, on whose behalf, on what basis, and for how long.',
-  updated: '2026-08-20',
+  updated: '2026-09-12',
   sections: [
     {
       heading: 'Two roles, not one',
@@ -248,9 +331,11 @@ const PRIVACY_EN: LegalDocument = {
       heading: 'Rights',
       paragraphs: [
         'Access, rectification, erasure, restriction, portability and objection.',
-        `If you are a lefta.app customer, write to ${LEGAL_ENTITY.email}.`,
+        LEGAL_ENTITY.email
+          ? `If you are a lefta.app customer, write to ${LEGAL_ENTITY.email}.`
+          : `If you are a lefta.app customer, write to ${LEGAL_ENTITY.name} using the details at the end of this notice.`,
         'If you received a reminder from someone using lefta.app, the controller is them, not us. Reply to the message or contact them directly; we can only pass a request on.',
-        'You may also complain to the Hellenic Data Protection Authority.',
+        'The company is established in Poland, so its supervisory authority is the President of the Polish Data Protection Authority (UODO). That narrows nothing: you may lodge a complaint either with the authority of your own country — in Greece, the Hellenic Data Protection Authority — or with UODO.',
       ],
     },
     {
@@ -262,7 +347,7 @@ const PRIVACY_EN: LegalDocument = {
     {
       heading: 'Contact',
       paragraphs: [
-        `${LEGAL_ENTITY.name}, VAT ${LEGAL_ENTITY.vatNumber}, ${LEGAL_ENTITY.address}. Email: ${LEGAL_ENTITY.email}.`,
+        entityIdentity('en'),
       ],
     },
   ],
@@ -271,7 +356,7 @@ const PRIVACY_EN: LegalDocument = {
 const TERMS_EN: LegalDocument = {
   title: 'Terms of use',
   summary: 'What lefta.app does, what it does not do, and who is answerable for what.',
-  updated: '2026-08-20',
+  updated: '2026-09-12',
   sections: [
     {
       heading: 'What the service is',
@@ -330,8 +415,9 @@ const TERMS_EN: LegalDocument = {
     {
       heading: 'Governing law',
       paragraphs: [
+        // See the note on the Greek version: a choice now, not a default.
         'Greek law. The courts of Athens have jurisdiction.',
-        `${LEGAL_ENTITY.name}, VAT ${LEGAL_ENTITY.vatNumber}, ${LEGAL_ENTITY.address}. Email: ${LEGAL_ENTITY.email}.`,
+        entityIdentity('en'),
       ],
     },
   ],
