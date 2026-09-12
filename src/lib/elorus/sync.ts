@@ -190,6 +190,23 @@ export async function syncElorusForUser(user: UserRow): Promise<ElorusSyncResult
     }
 
     const gross = toCents(Number(invoice.total));
+
+    // What Elorus has already collected against this document.
+    //
+    // This was read only when the document was already fully paid, so a
+    // partially-paid invoice arrived at full face value: the customer was then
+    // chased for the whole amount and the payment link charged it, taking money
+    // they had already handed over and creating a refund to make.
+    //
+    // A dunning product chases what is outstanding, so that is what the row
+    // carries. The collected figure is kept beside it rather than discarded, so
+    // the document can still be reconciled against its source.
+    const collected = Number.isFinite(Number(invoice.paid))
+      ? Math.max(0, toCents(Number(invoice.paid)))
+      : 0;
+
+    const outstanding = Math.max(0, gross - collected);
+
     if (!(gross > 0)) {
       result.skipped += 1;
       continue;
@@ -227,20 +244,28 @@ export async function syncElorusForUser(user: UserRow): Promise<ElorusSyncResult
       result.debtorsCreated += 1;
     }
 
+    // Elorus can still call a document issued or overdue after the last payment
+    // lands. Nothing is outstanding, so nothing is owed — and a zero-value
+    // receivable left open would be chased for nothing.
+    const settled = status === 'paid' || outstanding === 0;
+
     const fields = {
       debtor_id: debtor.id,
       invoice_number: documentNumber(invoice),
-      amount_cents: gross,
+      amount_cents: settled ? gross : outstanding,
       currency: invoice.currency_code || 'EUR',
       issue_date: invoice.date,
       // The whole reason for this integration: a real due date instead of one
       // guessed from a fixed payment-terms setting.
       due_date: invoice.due_date || invoice.date,
-      status,
+      status: settled ? ('paid' as const) : status,
       mark: invoice.mydata_latest_mark,
       elorus_invoice_id: invoice.id,
       source: 'elorus' as const,
-      ...(status === 'paid' ? { paid_amount_cents: toCents(Number(invoice.paid)) } : {}),
+      // On a settled document this is what was taken. On an open one it is what
+      // has been taken so far, which is why `amount_cents` above is the
+      // remainder rather than the face value.
+      ...(collected > 0 ? { paid_amount_cents: collected } : {}),
     };
 
     const { data: byId } = await supabase

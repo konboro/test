@@ -2,7 +2,7 @@ import { cache } from 'react';
 
 import type { Locale } from '@/lib/i18n';
 import { resolveDebtorLocale, tenantLocale } from '@/lib/i18n/message-locale';
-import { isPayCode, payCredentialColumn, PAY_CODE_LENGTH } from '@/lib/pay-code';
+import { payCredentialColumn } from '@/lib/pay-code';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 /** Greek, because that is the market the product sells into. */
@@ -49,23 +49,3 @@ export const payLocaleFor = cache(async (credential: string): Promise<Locale> =>
     return DEFAULT_PAY_LOCALE;
   }
 });
-
-/**
- * The payment credential a request path carries, if it is a payment page.
- *
- * The root layout renders `<html lang>` and has no other way to learn which
- * route it is wrapping, so the path arrives as a request header the middleware
- * sets. Anything that is not one of the two payment routes returns null and the
- * document keeps the operator's language.
- */
-export function payCredentialFromPath(path: string | null | undefined): string | null {
-  if (!path) return null;
-
-  const long = path.match(/^\/pay\/([A-Za-z0-9]{20,128})\/?$/)?.[1];
-  if (long) return long;
-
-  const short = path.match(new RegExp(`^/([A-Za-z0-9]{${PAY_CODE_LENGTH}})/?$`))?.[1];
-  if (short && isPayCode(short)) return short;
-
-  return null;
-}

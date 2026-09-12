@@ -101,19 +101,30 @@ insert into public.dunning_contacts (user_id, debtor_id, invoice_id, step, conta
 values ('11111111-1111-1111-1111-111111111111', 'aaaaaaaa-0000-0000-0000-000000000001',
         'bbbbbbbb-0000-0000-0000-000000000001', 'overdue_2', '2026-08-15');
 
+-- The one-a-day rule was removed at the operator's decision, along with its
+-- unique index (20260911093000). A second contact to the same debtor on the
+-- same day is now allowed on purpose, and this block used to assert the
+-- refusal — so the whole suite failed on it. It asserts the new behaviour
+-- instead, because the decision is worth pinning down as much as the rule was.
+insert into public.dunning_contacts (user_id, debtor_id, invoice_id, step, contact_on)
+values ('11111111-1111-1111-1111-111111111111', 'aaaaaaaa-0000-0000-0000-000000000001',
+        'bbbbbbbb-0000-0000-0000-000000000002', 'pre_due', '2026-08-15');
+\echo '  ok  a second contact to the same debtor on the same day is allowed'
+
 do $$
 begin
-  -- Same debtor, same day, a DIFFERENT invoice and step: must still be refused.
+  -- What did NOT go with it: the same rung still fires at most once for one
+  -- invoice, so a missed cron run is caught up rather than replayed.
   begin
     insert into public.dunning_contacts (user_id, debtor_id, invoice_id, step, contact_on)
     values ('11111111-1111-1111-1111-111111111111', 'aaaaaaaa-0000-0000-0000-000000000001',
-            'bbbbbbbb-0000-0000-0000-000000000002', 'pre_due', '2026-08-15');
-    raise exception 'FAIL: daily contact limit was not enforced';
+            'bbbbbbbb-0000-0000-0000-000000000001', 'overdue_2', '2026-08-16');
+    raise exception 'FAIL: the same step fired twice for one invoice';
   exception when unique_violation then
     null;
   end;
 end $$;
-\echo '  ok  second contact to the same debtor on the same day is refused'
+\echo '  ok  the same step is still refused twice for one invoice'
 
 do $$
 begin
