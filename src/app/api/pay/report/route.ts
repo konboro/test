@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server';
 
 import { dictionaryFor } from '@/lib/i18n';
 import { resolveDebtorLocale, tenantLocale } from '@/lib/i18n/message-locale';
+import { athensDate } from '@/lib/money';
 import { payCredentialColumn } from '@/lib/pay-code';
 import {
   chatConfigured,
+  CHAT_TURNS_PER_DAY,
   chatTurn,
   closingFor,
   closingTurn,
@@ -139,6 +141,31 @@ export async function POST(request: Request) {
   }
 
   if (!chatConfigured()) return NextResponse.json({ mode: 'form' });
+
+  // One turn out of this invoice's allowance for the day, claimed before the
+  // model is called rather than counted after it — an increment that happens
+  // after the spend is a record, not a limit.
+  //
+  // Refused sends the visitor to the plain form: the same door they get when no
+  // model is configured at all, filing through the same code path. Somebody
+  // with a real statement to make is never turned away; only the model stops.
+  //
+  // A failure to check is not a failure to serve. The counter lives behind a
+  // migration, and deploys and migrations do not land together — refusing every
+  // conversation because the table is not there yet would be a worse outage
+  // than the spending this prevents.
+  const budget = await admin.rpc('claim_pay_chat_turn', {
+    p_invoice: invoice.id,
+    p_limit: CHAT_TURNS_PER_DAY,
+    p_day: athensDate(),
+  });
+
+  if (budget.error) {
+    console.error('[reports] chat budget unavailable', budget.error.message);
+  } else if (budget.data === false) {
+    console.warn('[reports] chat allowance spent for invoice', invoice.id);
+    return NextResponse.json({ mode: 'form' });
+  }
 
   const chatInvoice: ChatInvoice = {
     invoice_number: label,

@@ -770,6 +770,12 @@ export interface Database {
         Args: { p_user_id: string };
         Returns: boolean;
       };
+      // Spends one turn of the public chat's daily allowance for an invoice and
+      // says whether there was one to spend. Service role only.
+      claim_pay_chat_turn: {
+        Args: { p_invoice: string; p_limit: number; p_day: string };
+        Returns: boolean;
+      };
       grant_sms_credits: {
         Args: {
           p_user_id: string;

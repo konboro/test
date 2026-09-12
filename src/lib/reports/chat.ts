@@ -21,6 +21,16 @@ import type { ChatMessage } from './validate';
 const MODEL = 'claude-haiku-4-5';
 
 /**
+ * How many model turns one invoice's payment page may spend in a day.
+ *
+ * A genuine exchange is four or five turns: what happened, when, how much, file
+ * it. This is the ceiling for somebody who is not having an exchange. Past it
+ * the panel falls back to the plain form, which files the same report through
+ * the same code path — so the visitor is never turned away, only the model is.
+ */
+export const CHAT_TURNS_PER_DAY = 30;
+
+/**
  * Language names as the prompt below refers to them.
  *
  * The prompt is authored in Greek, so the languages it names are too — telling
