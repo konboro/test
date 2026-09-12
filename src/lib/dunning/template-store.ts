@@ -1,5 +1,5 @@
+import { tenantLocale } from '@/lib/i18n/message-locale';
 import { createAdminClient } from '@/lib/supabase/admin';
-import type { UserLocale } from '@/types/database';
 
 import type { InvoiceMessageInput, NoticeTexts } from './invoice-messages';
 import { defaultTemplateFor, slotKey, type TemplateOverrides, type TemplateVariant } from './templates';
@@ -14,6 +14,23 @@ import { defaultTemplateFor, slotKey, type TemplateOverrides, type TemplateVaria
  * A tenant with no overrides yields an empty object, and every render falls back
  * to the built-in copy.
  */
+/**
+ * The language a company's own wording is written in.
+ *
+ * Read with the service role because every caller here already is: this runs
+ * inside the sweep as well as behind the panel, and the sweep has no session to
+ * resolve a policy against.
+ */
+async function accountLocale(userId: string) {
+  const { data } = await createAdminClient()
+    .from('users')
+    .select('locale')
+    .eq('id', userId)
+    .maybeSingle();
+
+  return tenantLocale({ locale: data?.locale ?? null });
+}
+
 export async function loadTemplateOverrides(userId: string): Promise<TemplateOverrides> {
   const { data } = await createAdminClient()
     .from('message_templates')
@@ -69,15 +86,27 @@ export async function loadInvoiceMessages(invoiceId: string): Promise<InvoiceMes
 
 /**
  * The account's effective wording for the notice on issue: the tenant's
- * override where one exists, the built-in copy in the reader's language where
- * not. This is what the quick editor prefills, and what a submission is
+ * override where one exists, the built-in copy in the account's own language
+ * where not. This is what the quick editor prefills, and what a submission is
  * compared against to decide whether it is an override at all.
+ *
+ * The language is read here rather than passed in, and it is the language
+ * stored on the company — not the one in the reader's cookie. Every caller used
+ * to hand over `getLocale()`, which is the person's interface language, and the
+ * two part company exactly where this product expects them to: an accountant
+ * working in English inside a Greek client's books.
+ *
+ * What went wrong when they parted: the editor prefilled the English built-in
+ * text, so anything the accountant typed counted as an override and was stored.
+ * At send time the gate is `tenantLocale` — the account's language — so
+ * `overridesForLocale` saw copy authored in another language and discarded it.
+ * The built-in Greek went out instead, and the screen had said "saved".
  */
-export async function effectiveNoticeTexts(
-  userId: string,
-  locale: UserLocale,
-): Promise<NoticeTexts> {
-  const overrides = await loadTemplateOverrides(userId);
+export async function effectiveNoticeTexts(userId: string): Promise<NoticeTexts> {
+  const [overrides, locale] = await Promise.all([
+    loadTemplateOverrides(userId),
+    accountLocale(userId),
+  ]);
 
   const email = overrides['on_issue:email'] ?? defaultTemplateFor('on_issue:email', locale);
   const sms = overrides['on_issue:sms'] ?? defaultTemplateFor('on_issue:sms', locale);

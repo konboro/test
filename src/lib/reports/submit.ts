@@ -1,6 +1,8 @@
 import { escapeHtml } from '@/lib/html';
 import { sendEmail } from '@/lib/email/send';
 import { appUrl } from '@/lib/env';
+import { dictionaryFor } from '@/lib/i18n';
+import { tenantLocale } from '@/lib/i18n/message-locale';
 import { formatDate, formatMoney } from '@/lib/money';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { ReportBankHint, ReportDetails, ReportKind } from '@/types/database';
@@ -90,51 +92,62 @@ async function notifyCreditor(
   const admin = createAdminClient();
   const { data: creditor } = await admin
     .from('users')
-    .select('email, company_name')
+    .select('email, company_name, locale')
     .eq('id', target.userId)
     .maybeSingle();
 
   if (!creditor?.email) return;
 
+  // The creditor's own language, not the visitor's: this email is addressed to
+  // the company, and the person filing the report has no say in what language
+  // its accounts desk reads. The money and the dates follow it too — a figure
+  // grouped the Greek way in an English sentence is a figure read twice.
+  const copy = dictionaryFor(tenantLocale({ locale: creditor.locale ?? null }));
+  const t = copy.reportEmail;
+  const money = (cents: number) => formatMoney(cents, 'EUR', copy.dateTimeTag);
+  const day = (iso: string) => formatDate(iso, copy.dateTimeTag);
+
   const subject =
     kind === 'paid_claim'
-      ? `Δήλωση πληρωμής: ${target.debtorName} — ${target.invoiceLabel}`
-      : `Αμφισβήτηση παραστατικού: ${target.debtorName} — ${target.invoiceLabel}`;
+      ? t.subjectPaid(target.debtorName, target.invoiceLabel)
+      : t.subjectDispute(target.debtorName, target.invoiceLabel);
 
   const lines = [
     kind === 'paid_claim'
-      ? `Ο πελάτης ${target.debtorName} δηλώνει ότι έχει εξοφλήσει το παραστατικό ${target.invoiceLabel}.`
-      : `Ο πελάτης ${target.debtorName} δηλώνει πρόβλημα με το παραστατικό ${target.invoiceLabel}.`,
+      ? t.leadPaid(target.debtorName, target.invoiceLabel)
+      : t.leadDispute(target.debtorName, target.invoiceLabel),
     '',
-    details.summary ? `Δήλωση: ${details.summary}` : null,
-    details.claimed_paid_on ? `Ημερομηνία πληρωμής: ${formatDate(details.claimed_paid_on)}` : null,
-    details.claimed_amount_cents
-      ? `Ποσό: ${formatMoney(details.claimed_amount_cents)}`
-      : null,
-    details.reference ? `Στοιχείο πληρωμής: ${details.reference}` : null,
-    details.dispute_reason ? `Αιτία: ${details.dispute_reason}` : null,
-    details.contact ? `Επικοινωνία: ${details.contact}` : null,
+    details.summary ? t.statement(details.summary) : null,
+    details.claimed_paid_on ? t.paidOn(day(details.claimed_paid_on)) : null,
+    details.claimed_amount_cents ? t.amount(money(details.claimed_amount_cents)) : null,
+    details.reference ? t.reference(details.reference) : null,
+    details.dispute_reason ? t.reason(details.dispute_reason) : null,
+    details.contact ? t.contact(details.contact) : null,
     '',
     bankMatch?.length
-      ? `Πιθανή αντιστοίχιση στον τραπεζικό σας λογαριασμό: ${bankMatch
-          .map((hint) => `${formatMoney(hint.amount_cents)} στις ${formatDate(hint.booked_on)}`)
-          .join(' · ')}`
+      ? t.bankMatch(
+          bankMatch
+            .map((hint) => t.bankHint(money(hint.amount_cents), day(hint.booked_on)))
+            .join(' · '),
+        )
       : null,
-    'Οι υπενθυμίσεις για αυτό το παραστατικό έχουν ανασταλεί μέχρι να το εξετάσετε.',
-    '',
-    `Εξέταση: ${appUrl()}/invoices`,
+    t.paused,
   ].filter((line): line is string => line !== null);
 
-  const text = lines.join('\n');
+  // The call to action is built separately rather than pushed onto `lines` and
+  // recognised again by its own first word. That is how it used to work, and it
+  // only ever worked in Greek: translating the label would have turned the
+  // button into an ordinary paragraph with a bare URL in it, silently.
+  const reviewUrl = `${appUrl()}/invoices`;
+
+  const text = [...lines, '', `${t.reviewLabel}: ${reviewUrl}`].join('\n');
   const html = `<div style="font-family:sans-serif;font-size:14px;line-height:1.6;color:#1a202c">${lines
     .map((line) =>
-      line === ''
-        ? '<br>'
-        : line.startsWith('Εξέταση:')
-          ? `<p><a href="${appUrl()}/invoices" style="display:inline-block;background:#4c6ef5;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Εξέταση στο lefta.app</a></p>`
-          : `<p style="margin:2px 0">${escapeHtml(line)}</p>`,
+      line === '' ? '<br>' : `<p style="margin:2px 0">${escapeHtml(line)}</p>`,
     )
-    .join('')}</div>`;
+    .join('')}<p><a href="${reviewUrl}" style="display:inline-block;background:#4c6ef5;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">${escapeHtml(
+    t.reviewButton,
+  )}</a></p></div>`;
 
   const sent = await sendEmail({ to: creditor.email, subject, text, html });
   if (!sent.ok) console.error('[reports] notification email failed', sent.error);

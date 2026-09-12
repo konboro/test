@@ -19,7 +19,7 @@ import { reconcileCheckouts } from '@/lib/payments/reconcile';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { saveFailed } from '@/lib/errors';
-import { formError, getDictionary, getLocale } from '@/lib/i18n';
+import { formError, getDictionary } from '@/lib/i18n';
 import { redirect } from 'next/navigation';
 import { automationPaused, loadScenario, missingColumn, stepForInvoice } from '@/lib/dunning/engine';
 import { noticeOnIssue } from '@/lib/dunning/issue-notice';
@@ -230,7 +230,6 @@ export async function markInvoicePaid(formData: FormData) {
   revalidatePath('/statistics');
 }
 
-
 /**
  * Deletes one invoice.
  *
@@ -396,7 +395,7 @@ export async function createInvoice(
   // notice keeps following the account template.
   const messages = parseInvoiceMessages(
     formData,
-    await effectiveNoticeTexts(org.id, await getLocale()),
+    await effectiveNoticeTexts(org.id),
   );
 
   const base = {
@@ -470,7 +469,6 @@ export async function createInvoice(
   revalidatePath('/statistics');
   return { success: t.forms.success.invoiceCreated };
 }
-
 
 /**
  * How long one press may spend sending before it stops and reports the rest.
@@ -660,7 +658,6 @@ export async function sendBulkReminder(formData: FormData): Promise<void> {
     }),
   );
 }
-
 
 /**
  * Sends whatever the scenario says is due today, for each selected invoice.

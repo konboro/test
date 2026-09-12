@@ -15,7 +15,7 @@ import {
 import { displayName } from '@/lib/debtors';
 import { loadScenario } from '@/lib/dunning/engine';
 import { effectiveNoticeTexts } from '@/lib/dunning/template-store';
-import { getDictionary, getLocale } from '@/lib/i18n';
+import { getDictionary } from '@/lib/i18n';
 import { athensDate, daysBetween, formatMoney } from '@/lib/money';
 import { requireOrganization } from '@/lib/orgs/active';
 import { createClient } from '@/lib/supabase/server';
@@ -69,7 +69,7 @@ export default async function DashboardPage() {
   const org = await requireOrganization();
   const scenario = await loadScenario(org.id);
   // For the quick wording editor beside the cadence in the create form.
-  const notice = await effectiveNoticeTexts(org.id, await getLocale());
+  const notice = await effectiveNoticeTexts(org.id);
 
   // RLS scopes every one of these to the company this session is acting for.
   const [

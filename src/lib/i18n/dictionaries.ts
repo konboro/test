@@ -1590,6 +1590,35 @@ const el = {
     nothingScheduled: 'Χωρίς βήμα',
     notStarted: 'Δεν ξεκίνησε',
   },
+  /**
+   * The email a creditor gets when their customer says "I already paid" or
+   * "this document is wrong" on the payment page.
+   *
+   * It was written straight into reports/submit.ts in Greek — subject, body and
+   * the two formatters' default locale — so a company working in English was
+   * told about a contested debt in a language it had not chosen. This is a
+   * message that leaves the product, not a label on a screen.
+   */
+  reportEmail: {
+    subjectPaid: (debtor: string, label: string) => `Δήλωση πληρωμής: ${debtor} — ${label}`,
+    subjectDispute: (debtor: string, label: string) =>
+      `Αμφισβήτηση παραστατικού: ${debtor} — ${label}`,
+    leadPaid: (debtor: string, label: string) =>
+      `Ο πελάτης ${debtor} δηλώνει ότι έχει εξοφλήσει το παραστατικό ${label}.`,
+    leadDispute: (debtor: string, label: string) =>
+      `Ο πελάτης ${debtor} δηλώνει πρόβλημα με το παραστατικό ${label}.`,
+    statement: (text: string) => `Δήλωση: ${text}`,
+    paidOn: (date: string) => `Ημερομηνία πληρωμής: ${date}`,
+    amount: (money: string) => `Ποσό: ${money}`,
+    reference: (text: string) => `Στοιχείο πληρωμής: ${text}`,
+    reason: (text: string) => `Αιτία: ${text}`,
+    contact: (text: string) => `Επικοινωνία: ${text}`,
+    bankMatch: (hints: string) => `Πιθανή αντιστοίχιση στον τραπεζικό σας λογαριασμό: ${hints}`,
+    bankHint: (money: string, date: string) => `${money} στις ${date}`,
+    paused: 'Οι υπενθυμίσεις για αυτό το παραστατικό έχουν ανασταλεί μέχρι να το εξετάσετε.',
+    reviewLabel: 'Εξέταση',
+    reviewButton: 'Εξέταση στο lefta.app',
+  },
   // Deliberately not `as const`: that would make every string its own literal
   // type and force the English dictionary to repeat the Greek words verbatim.
   // Parity is meant to be on keys, not values.
@@ -3097,6 +3126,25 @@ const en: typeof el = {
     stepOn: (step: string, date: string) => `${step} · ${date}`,
     nothingScheduled: 'No step scheduled',
     notStarted: 'Not started',
+  },
+  reportEmail: {
+    subjectPaid: (debtor: string, label: string) => `Payment reported: ${debtor} — ${label}`,
+    subjectDispute: (debtor: string, label: string) => `Invoice disputed: ${debtor} — ${label}`,
+    leadPaid: (debtor: string, label: string) =>
+      `${debtor} says invoice ${label} has already been paid.`,
+    leadDispute: (debtor: string, label: string) =>
+      `${debtor} reports a problem with invoice ${label}.`,
+    statement: (text: string) => `What they said: ${text}`,
+    paidOn: (date: string) => `Paid on: ${date}`,
+    amount: (money: string) => `Amount: ${money}`,
+    reference: (text: string) => `Payment reference: ${text}`,
+    reason: (text: string) => `Reason: ${text}`,
+    contact: (text: string) => `Contact: ${text}`,
+    bankMatch: (hints: string) => `Possible match on your bank account: ${hints}`,
+    bankHint: (money: string, date: string) => `${money} on ${date}`,
+    paused: 'Reminders for this invoice are on hold until you review it.',
+    reviewLabel: 'Review',
+    reviewButton: 'Review on lefta.app',
   },
 };
 

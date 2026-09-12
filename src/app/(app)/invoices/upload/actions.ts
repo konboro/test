@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 
 import { revalidatePath } from 'next/cache';
 
-import { getDictionary, getLocale } from '@/lib/i18n';
+import { getDictionary } from '@/lib/i18n';
 import { commitImport } from '@/lib/import/commit';
 import { parseAmountCents, type ImportRow } from '@/lib/import/parse';
 import { readInvoiceDocument } from '@/lib/invoice-scan/read';
@@ -313,7 +313,7 @@ export async function commitUpload(_prev: UploadState, formData: FormData): Prom
   if (created?.id) {
     const messages = parseInvoiceMessages(
       formData,
-      await effectiveNoticeTexts(org.id, await getLocale()),
+      await effectiveNoticeTexts(org.id),
     );
 
     if (messages.length) {

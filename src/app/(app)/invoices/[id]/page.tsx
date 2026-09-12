@@ -9,7 +9,7 @@ import { scenarioWithOverrides } from '@/lib/dunning/scenario';
 import { stepLabels } from '@/lib/dunning/step-labels';
 import { workflowStatus } from '@/lib/dunning/status';
 import { effectiveNoticeTexts } from '@/lib/dunning/template-store';
-import { getDictionary, getLocale } from '@/lib/i18n';
+import { getDictionary } from '@/lib/i18n';
 import { athensDate, formatDate, formatMoney } from '@/lib/money';
 import { requireOrganization } from '@/lib/orgs/active';
 import { createClient } from '@/lib/supabase/server';
@@ -83,7 +83,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   // the account's effective text where not. The account text is also what a
   // save compares against, so reverting the words by hand deletes the override.
   const [accountNotice, { data: ownMessages }] = await Promise.all([
-    effectiveNoticeTexts(org.id, await getLocale()),
+    effectiveNoticeTexts(org.id),
     supabase.from('invoice_messages').select('*').eq('invoice_id', invoice.id),
   ]);
 

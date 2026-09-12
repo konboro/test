@@ -7,7 +7,7 @@ import { displayName } from '@/lib/debtors';
 import { automationPaused } from '@/lib/dunning/engine';
 import { workflowStatus } from '@/lib/dunning/status';
 import { REMINDER_CHOICES } from '@/lib/dunning/templates';
-import { getDictionary, getLocale } from '@/lib/i18n';
+import { getDictionary } from '@/lib/i18n';
 import { localeOptions } from '@/lib/i18n/dictionaries';
 import { athensDate, formatDate, formatMoney } from '@/lib/money';
 import { settlementMethod } from '@/lib/payments/settlement';
@@ -87,7 +87,7 @@ export default async function InvoicesPage({
   const org = await requireOrganization();
   const scenario = await loadScenario(org.id);
   // For the quick wording editor beside the cadence in the create form.
-  const notice = await effectiveNoticeTexts(org.id, await getLocale());
+  const notice = await effectiveNoticeTexts(org.id);
 
   // Customer is not a column here — it lives on the debtor row — so that one
   // sort is applied after the join below. The rest the database can do.

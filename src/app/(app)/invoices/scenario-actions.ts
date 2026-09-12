@@ -7,7 +7,7 @@ import { parseInvoiceMessages } from '@/lib/dunning/invoice-messages';
 import { invoiceScenarioProblem, parseInvoiceScenario } from '@/lib/dunning/invoice-scenario';
 import { effectiveNoticeTexts } from '@/lib/dunning/template-store';
 import { saveFailed } from '@/lib/errors';
-import { getDictionary, getLocale } from '@/lib/i18n';
+import { getDictionary } from '@/lib/i18n';
 import { writableOrganization } from '@/lib/orgs/active';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -54,7 +54,7 @@ export async function saveInvoiceScenario(
   // the account's effective template is not an override and is not stored.
   const messages = parseInvoiceMessages(
     formData,
-    await effectiveNoticeTexts(org.id, await getLocale()),
+    await effectiveNoticeTexts(org.id),
   );
 
   const { error: modeError } = await admin
