@@ -57,7 +57,7 @@ async function decide(id: string, status: 'approved' | 'rejected'): Promise<Scan
 
   if (error) return { error: error.message };
 
-  revalidatePath('/settings');
+  revalidatePath('/settings/reminders');
   return { success: status === 'approved' ? t.scanRules.approved : t.scanRules.rejected };
 }
 
@@ -100,6 +100,6 @@ export async function withdrawScanRule(id: string): Promise<ScanRuleState> {
 
   if (error) return { error: error.message };
 
-  revalidatePath('/settings');
+  revalidatePath('/settings/reminders');
   return { success: t.scanRules.withdrawn };
 }

@@ -10,7 +10,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 function back(status: string) {
-  return NextResponse.redirect(`${appUrl()}/settings?stripe=${status}#stripe`);
+  return NextResponse.redirect(`${appUrl()}/settings/payments?stripe=${status}#stripe`);
 }
 
 /** Completes the Connect handshake and stores the tenant's account id. */

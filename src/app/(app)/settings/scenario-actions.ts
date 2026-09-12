@@ -148,7 +148,7 @@ export async function saveScenario(
   const failure = stepError ?? settingsError;
   if (failure) return { error: saveFailed(t, 'settings:scenario', failure) };
 
-  revalidatePath('/settings');
+  revalidatePath('/settings/reminders');
   revalidatePath('/invoices');
 
   return { success: t.scenario.saved };

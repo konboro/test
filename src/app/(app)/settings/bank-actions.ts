@@ -31,7 +31,7 @@ import { writableOrganization } from '@/lib/orgs/active';
 export async function syncBankNow(): Promise<void> {
   const org = await writableOrganization();
   // Read-only members may look at the bank card; they may not press sync.
-  if (!org) redirect('/settings?bank=forbidden');
+  if (!org) redirect('/settings/sources?bank=forbidden');
 
   // Customer-present, and said so. The nightly sweep passes no PSU context
   // because nobody is there — claiming otherwise would misstate to the bank why
@@ -51,7 +51,7 @@ export async function syncBankNow(): Promise<void> {
       bank: 'sync_failed',
       reason: (first?.error ?? 'unknown').slice(0, 200),
     });
-    redirect(`/settings?${params}#bank`);
+    redirect(`/settings/sources?${params}#bank`);
   }
 
   const params = new URLSearchParams({
@@ -68,5 +68,5 @@ export async function syncBankNow(): Promise<void> {
     accounts: String(result.connectionsChecked),
   });
 
-  redirect(`/settings?${params}#bank`);
+  redirect(`/settings/sources?${params}#bank`);
 }

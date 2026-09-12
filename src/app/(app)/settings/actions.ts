@@ -115,7 +115,7 @@ export async function setChannel(
 
   if (error) return { error: saveFailed(t, 'settings', error) };
 
-  revalidatePath('/settings');
+  revalidatePath('/settings/reminders');
   revalidatePath('/dashboard');
 
   return { success: t.forms.success.settingsSaved };
@@ -153,7 +153,7 @@ export async function setAutomation(
 
   if (error) return { error: saveFailed(t, 'settings', error) };
 
-  revalidatePath('/settings');
+  revalidatePath('/settings/reminders');
   revalidatePath('/dashboard');
 
   return {
@@ -190,7 +190,7 @@ export async function updatePaymentProvider(formData: FormData): Promise<void> {
     .eq('id', org.id);
   if (error) return;
 
-  revalidatePath('/settings');
+  revalidatePath('/settings/payments');
 }
 
 const templateSchema = z.object({
@@ -272,7 +272,7 @@ export async function saveTemplate(
 
   if (error) return { error: saveFailed(t, 'settings', error) };
 
-  revalidatePath('/settings');
+  revalidatePath('/settings/reminders');
   return { success: t.forms.success.templateSaved };
 }
 
@@ -302,7 +302,7 @@ export async function resetTemplate(
 
   if (error) return { error: saveFailed(t, 'settings', error) };
 
-  revalidatePath('/settings');
+  revalidatePath('/settings/reminders');
   return { success: t.forms.success.templateReset };
 }
 
@@ -333,7 +333,7 @@ export async function setPaymentNotice(
 
   if (error) return { error: error.message };
 
-  revalidatePath('/settings');
+  revalidatePath('/settings/payments');
 
   return {
     success: enabled ? t.forms.success.paymentNoticeOn : t.forms.success.paymentNoticeOff,

@@ -227,7 +227,6 @@ const el = {
   members: {
     title: 'Πρόσβαση',
     subtitle: (company: string) => `Ποιος μπορεί να ενεργεί για την ${company}.`,
-    backToSettings: '← Ρυθμίσεις',
     listTitle: (n: number) => (n === 1 ? '1 άτομο' : `${n} άτομα`),
     you: 'εσείς',
     joined: (date: string) => `Από ${date}`,
@@ -1380,23 +1379,31 @@ const el = {
       on: 'Ενεργή',
       off: 'Ανενεργή',
     },
-    groups: {
-      company: {
-        title: 'Η επιχείρησή σας',
-        body: 'Πώς εμφανίζεστε στους πελάτες σας και πού σας απαντούν.',
-      },
-      reminders: {
-        title: 'Υπενθυμίσεις',
-        body: 'Τι φεύγει, πότε και με ποια λόγια — και πόσα SMS σας απομένουν.',
-      },
-      payments: {
-        title: 'Πληρωμές',
-        body: 'Πώς πληρώνουν οι πελάτες σας με κάρτα. Τα χρήματα πηγαίνουν απευθείας στον δικό σας λογαριασμό.',
-      },
-      books: {
-        title: 'Λογιστική και τράπεζα',
-        body: 'Από πού έρχονται τα παραστατικά και πώς αναγνωρίζεται μια εξόφληση.',
-      },
+    /**
+     * The tab strip. Short on purpose — these sit in a row that has to survive
+     * a phone, so they are one word each where the group headings are a phrase.
+     */
+    tabs: {
+      business: 'Επιχείρηση',
+      reminders: 'Υπενθυμίσεις',
+      payments: 'Πληρωμές',
+      sources: 'Πηγές',
+      team: 'Ομάδα',
+    },
+    /**
+     * One sentence under each tab, saying what the tab is for.
+     *
+     * These were the bodies of the four grey group headings the single page
+     * used to be divided by. The headings themselves are gone: the tab is the
+     * heading, and printing the group name again directly underneath it is a
+     * line that tells the reader what they just clicked.
+     */
+    tabIntro: {
+      business: 'Πώς εμφανίζεστε στους πελάτες σας και πού σας απαντούν.',
+      reminders: 'Τι φεύγει, πότε και με ποια λόγια — και πόσα SMS σας απομένουν.',
+      payments:
+        'Πώς πληρώνουν οι πελάτες σας με κάρτα. Τα χρήματα πηγαίνουν απευθείας στον δικό σας λογαριασμό.',
+      sources: 'Από πού έρχονται τα παραστατικά και πώς αναγνωρίζεται μια εξόφληση.',
     },
     channels: {
       title: 'Κανάλια',
@@ -1783,7 +1790,6 @@ const en: typeof el = {
   members: {
     title: 'Access',
     subtitle: (company: string) => `Who can act for ${company}.`,
-    backToSettings: '← Settings',
     listTitle: (n: number) => (n === 1 ? '1 person' : `${n} people`),
     you: 'you',
     joined: (date: string) => `Since ${date}`,
@@ -2907,23 +2913,18 @@ const en: typeof el = {
       on: 'On',
       off: 'Off',
     },
-    groups: {
-      company: {
-        title: 'Your business',
-        body: 'How you appear to your customers, and where they reply.',
-      },
-      reminders: {
-        title: 'Reminders',
-        body: 'What goes out, when, and in whose words — and how much SMS you have left.',
-      },
-      payments: {
-        title: 'Payments',
-        body: 'How your customers pay by card. The money goes straight to your own account.',
-      },
-      books: {
-        title: 'Accounting and bank',
-        body: 'Where the invoices come from, and how a settlement is noticed.',
-      },
+    tabs: {
+      business: 'Business',
+      reminders: 'Reminders',
+      payments: 'Payments',
+      sources: 'Sources',
+      team: 'Team',
+    },
+    tabIntro: {
+      business: 'How you appear to your customers, and where they reply.',
+      reminders: 'What goes out, when, and in whose words — and how much SMS you have left.',
+      payments: 'How your customers pay by card. The money goes straight to your own account.',
+      sources: 'Where the invoices come from, and how a settlement is noticed.',
     },
     channels: {
       title: 'Channels',

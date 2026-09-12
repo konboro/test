@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   const org = await writableOrganization();
   if (!org) return NextResponse.redirect(`${appUrl()}/login`);
 
-  const settings = `${appUrl()}/settings`;
+  const settings = `${appUrl()}/settings/sources`;
   if (!bankingConfigured()) return NextResponse.redirect(`${settings}?bank=unavailable`);
 
   const aspsp = request.nextUrl.searchParams.get('aspsp');

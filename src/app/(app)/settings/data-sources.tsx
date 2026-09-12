@@ -13,11 +13,18 @@ export interface SourceState {
   lastSync: string | null;
 }
 
-/** Where each source is pulled from, and where it is set up when it is not. */
+/**
+ * Where each source is pulled from, and where it is set up when it is not.
+ *
+ * Written as a full path rather than a bare hash even though this component now
+ * renders on the same screen as the three cards it points at. It began life on
+ * the dashboard, and the day it goes back to a summary somewhere else, a bare
+ * '#bank' would scroll to nothing instead of navigating.
+ */
 const ENDPOINTS: Record<SourceKey, { sync: string; settings: string }> = {
-  billing: { sync: '/api/elorus/sync', settings: '/settings#elorus' },
-  mydata: { sync: '/api/mydata/sync', settings: '/settings#mydata' },
-  bank: { sync: '/api/bank/sync', settings: '/settings#bank' },
+  billing: { sync: '/api/elorus/sync', settings: '/settings/sources#elorus' },
+  mydata: { sync: '/api/mydata/sync', settings: '/settings/sources#mydata' },
+  bank: { sync: '/api/bank/sync', settings: '/settings/sources#bank' },
 };
 
 const ORDER: SourceKey[] = ['billing', 'mydata', 'bank'];

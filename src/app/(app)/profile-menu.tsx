@@ -102,7 +102,7 @@ export function ProfileMenu({
               <span className="flex items-center gap-2">
                 <span className="tabular text-sm font-semibold text-ink-900">{smsCredits}</span>
                 <Link
-                  href="/settings#credits"
+                  href="/settings/reminders#credits"
                   onClick={() => setOpen(false)}
                   className="text-xs font-medium text-brand-700 underline-offset-2 hover:underline"
                 >

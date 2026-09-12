@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic';
  * tab halfway leaves a visible half-finished connection rather than silence.
  */
 export async function GET(request: NextRequest) {
-  const settings = `${appUrl()}/settings`;
+  const settings = `${appUrl()}/settings/sources`;
   const params = request.nextUrl.searchParams;
   const code = params.get('code');
   const state = params.get('state');

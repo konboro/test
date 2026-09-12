@@ -65,8 +65,8 @@ export async function POST(request: Request) {
       credits: String(pack.credits),
       pack: pack.id,
     },
-    success_url: `${appUrl()}/settings?credits=success`,
-    cancel_url: `${appUrl()}/settings?credits=cancelled`,
+    success_url: `${appUrl()}/settings/reminders?credits=success#credits`,
+    cancel_url: `${appUrl()}/settings/reminders?credits=cancelled#credits`,
   });
 
   return NextResponse.json({ url: session.url });

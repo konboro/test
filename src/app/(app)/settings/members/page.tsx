@@ -1,8 +1,7 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { DeleteButton } from '@/components/delete-button';
-import { Badge, Card, CardHeader, EmptyState, subtleLinkClass } from '@/components/ui';
+import { Badge, Card, CardHeader, EmptyState } from '@/components/ui';
 import { getDictionary } from '@/lib/i18n';
 import { formatDate } from '@/lib/money';
 import { requireOrganization } from '@/lib/orgs/active';
@@ -57,17 +56,14 @@ export default async function MembersPage() {
   const owners = people.filter((person) => person.role === 'owner').length;
 
   return (
-    <div className="space-y-6">
-      <Link href="/settings" className={`text-sm ${subtleLinkClass}`}>
-        {t.members.backToSettings}
-      </Link>
-
-      <div>
-        <h1 className="text-xl font-semibold text-ink-900">{t.members.title}</h1>
-        <p className="mt-0.5 text-sm text-ink-500">
-          {t.members.subtitle(org.name ?? t.companies.unnamed)}
-        </p>
-      </div>
+    <div className="space-y-4">
+      {/* No heading and no way back: the tab strip above is both. This page
+          had neither a link into it nor a place in the navigation — it was
+          reachable only by typing the URL — so it carried its own title and a
+          link home to stand in for the frame it now sits inside. */}
+      <p className="max-w-2xl text-sm leading-relaxed text-ink-500">
+        {t.members.subtitle(org.name ?? t.companies.unnamed)}
+      </p>
 
       <Card>
         <CardHeader title={t.members.listTitle(people.length)} />
