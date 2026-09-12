@@ -1633,6 +1633,26 @@ const el = {
     noCredits: 'Το επόμενο βήμα είναι SMS και δεν έχετε υπόλοιπο SMS.',
     fix: 'Ρύθμιση',
   },
+  /**
+   * Το περίβλημα των οδηγών — ό,τι δεν είναι το ίδιο το άρθρο.
+   *
+   * Τα άρθρα ζουν στο `lib/guides.ts`. Αυτά εδώ είναι ο τίτλος της λίστας, η
+   * εισαγωγή και η πρόσκληση στο τέλος κάθε άρθρου, που ήταν γραμμένα στα
+   * ελληνικά μέσα στις σελίδες — σε ένα τμήμα του site που είναι δημόσιο,
+   * ευρετηριασμένο, και συνδεδεμένο και από την αγγλική έκδοση.
+   */
+  guides: {
+    metaTitle: 'Οδηγοί',
+    metaDescription:
+      'Πρακτικοί οδηγοί για την είσπραξη ανεξόφλητων τιμολογίων, τις υπενθυμίσεις πληρωμής και το myDATA.',
+    intro:
+      'Ό,τι μάθαμε φτιάχνοντας το lefta.app, γραμμένο για επιχειρήσεις που κυνηγούν τα δικά τους τιμολόγια.',
+    back: '← Οδηγοί',
+    ctaTitle: 'Το lefta.app κάνει αυτό αυτόματα',
+    ctaBody:
+      'Παρακολουθεί τα ανεξόφλητα τιμολόγιά σας, στέλνει τις υπενθυμίσεις για λογαριασμό σας και δίνει στον πελάτη σύνδεσμο άμεσης πληρωμής. Τα χρήματα πηγαίνουν απευθείας σε εσάς.',
+    ctaButton: 'Ξεκινήστε δωρεάν',
+  },
   // Deliberately not `as const`: that would make every string its own literal
   // type and force the English dictionary to repeat the Greek words verbatim.
   // Parity is meant to be on keys, not values.
@@ -3129,6 +3149,18 @@ const en: typeof el = {
     stepOn: (step: string, date: string) => `${step} · ${date}`,
     nothingScheduled: 'No step scheduled',
     notStarted: 'Not started',
+  },
+  guides: {
+    metaTitle: 'Guides',
+    metaDescription:
+      'Practical guides to collecting unpaid invoices, payment reminders and myDATA.',
+    intro:
+      'What we learned building lefta.app, written for businesses chasing their own invoices.',
+    back: '← Guides',
+    ctaTitle: 'lefta.app does this for you',
+    ctaBody:
+      'It watches your unpaid invoices, sends the reminders on your behalf and gives the customer a link to pay on the spot. The money goes straight to you.',
+    ctaButton: 'Start free',
   },
   blockers: {
     title: 'Why nothing is going out',

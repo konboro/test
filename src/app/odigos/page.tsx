@@ -1,50 +1,64 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { LeftaLogo } from '@/components/logo';
-import { ButtonLink } from '@/components/ui';
-import { GUIDES } from '@/lib/guides';
+import { PublicFooter, PublicHeader } from '@/components/public-chrome';
+import { GUIDES, guideCopy } from '@/lib/guides';
+import { getDictionary, getLocale } from '@/lib/i18n';
 
-export const metadata = {
-  title: 'Οδηγοί',
-  description:
-    'Πρακτικοί οδηγοί για την είσπραξη ανεξόφλητων τιμολογίων, τις υπενθυμίσεις πληρωμής και το myDATA.',
-  alternates: { canonical: '/odigos' },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getDictionary();
 
-export default function GuidesPage() {
+  return {
+    title: t.guides.metaTitle,
+    description: t.guides.metaDescription,
+    alternates: { canonical: '/odigos' },
+  };
+}
+
+/**
+ * The guide index.
+ *
+ * It used to carry its own header, its own Greek headings and its own call to
+ * action, which made it the one public section that could not be read in
+ * English — while the top bar linked to it from both languages. It now uses the
+ * same chrome as every other public page, which also means it has the language
+ * menu: a visitor arriving here from a search result has somewhere to change it.
+ */
+export default async function GuidesPage() {
+  const [t, locale] = await Promise.all([getDictionary(), getLocale()]);
+
   return (
     <div className="min-h-screen">
-      <header className="border-b border-ink-200 bg-white">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-4">
-          <Link href="/" aria-label="lefta.app">
-            <LeftaLogo />
-          </Link>
-          <ButtonLink href="/register" variant="brand">
-            Δωρεάν δοκιμή
-          </ButtonLink>
-        </div>
-      </header>
+      <PublicHeader t={t} />
 
       <main className="mx-auto max-w-3xl px-4 py-12">
-        <h1 className="text-3xl font-semibold tracking-tight text-ink-900">Οδηγοί</h1>
-        <p className="mt-2 text-base leading-relaxed text-ink-600">
-          Ό,τι μάθαμε φτιάχνοντας το lefta.app, γραμμένο για επιχειρήσεις που κυνηγούν τα δικά τους
-          τιμολόγια.
-        </p>
+        <h1 className="text-3xl font-semibold tracking-tight text-ink-900">
+          {t.guides.metaTitle}
+        </h1>
+        <p className="mt-2 text-base leading-relaxed text-ink-600">{t.guides.intro}</p>
 
         <ul className="mt-10 space-y-6">
-          {GUIDES.map((guide) => (
-            <li key={guide.slug} className="rounded-xl border border-ink-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-ink-900">
-                <Link href={`/odigos/${guide.slug}`} className="hover:text-brand-600">
-                  {guide.title}
-                </Link>
-              </h2>
-              <p className="mt-2 text-sm leading-relaxed text-ink-600">{guide.summary}</p>
-            </li>
-          ))}
+          {GUIDES.map((guide) => {
+            const copy = guideCopy(guide, locale);
+
+            return (
+              <li
+                key={guide.slug}
+                className="rounded-xl border border-ink-200 bg-white p-6 shadow-sm"
+              >
+                <h2 className="text-lg font-semibold text-ink-900">
+                  <Link href={`/odigos/${guide.slug}`} className="hover:text-brand-600">
+                    {copy.title}
+                  </Link>
+                </h2>
+                <p className="mt-2 text-sm leading-relaxed text-ink-600">{copy.summary}</p>
+              </li>
+            );
+          })}
         </ul>
       </main>
+
+      <PublicFooter t={t} />
     </div>
   );
 }
