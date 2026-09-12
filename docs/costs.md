@@ -127,6 +127,16 @@ CSV mapping is once per file rather than per invoice, so it is negligible on
 multi-row batches. Prompt caching would cut the chat's input (the history
 repeats) — not counted, because it is not switched on.
 
+**The worst a caller can cost us is now bounded, but not small.** The dispute
+chat is reachable by whoever holds the payment link, and `CHAT_TURNS_PER_DAY`
+in `src/lib/reports/chat.ts` caps it at 30 turns per invoice per day. At a full
+history and a maxed reply that is ~$0.201 (€0.184) per invoice per day, and the
+allowance refreshes daily until a report is filed — so an invoice hammered for
+a month costs **€5.53, about 36× a normal chased invoice**. It is a ceiling
+rather than a forecast, and the abuse case that reaches it also files no report
+and pays nothing. Worth revisiting if the chat is ever opened beyond one
+invoice per credential.
+
 ## Platform
 
 | | Item | € / mo | What is included, and where it ends |
