@@ -32,6 +32,18 @@ billed as two.
 
 Segment arithmetic straight from `segmentCount()` in `src/lib/sms/send.ts`.
 
+**Correction to the row above.** When this table was first written the English
+figure was measured by hand rather than through `renderSms`, and it was wrong in
+our favour. Through the real pipeline every English template was also two
+segments, because `applyPlaceholders` formats the amount as `455,00 €` and the
+old encoding check treated any byte above ASCII as UCS-2 — cutting the room from
+160 characters to 70. The euro sign is in the GSM-7 extension table, so those
+messages are one segment; on Brevo, which encodes what `unicodeEnabled` tells
+it, we were paying twice for all five. Fixed, with `src/lib/dunning/sms-cost.test.ts`
+recording the cost of every default template so copy edits cannot move one
+across a boundary unnoticed. Greek is unaffected: lowercase Greek really is
+outside the alphabet.
+
 One segment is reachable without dropping anything the debtor needs — who,
 what, how much, where to pay:
 
@@ -45,7 +57,87 @@ That leaves a budget of **42 characters** of text with the full
 binding constraint is the tenant name plus the invoice number, so a tenant with
 a long name needs the name truncated server-side — otherwise this silently
 reverts to two segments, which is why the CI length check below is worth an
-hour.
+hour. It now exists: `src/lib/dunning/sms-cost.test.ts`.
+
+## Going worldwide: the encoding map is the cost map
+
+Once the product leaves Greece, the segment question stops being a Greek
+footnote and becomes the main determinant of what a market costs to serve. A
+message is either GSM-7 at 160 characters per segment or UCS-2 at 70 — a factor
+of 2.3 in headroom — and which one you get is decided by the language, not by
+the carrier or the price list.
+
+Measured with the real tables (`GSM_BASIC` and `GSM_EXTENDED` in
+`src/lib/sms/send.ts`), the split is:
+
+| Fits GSM-7 — 160 chars | Forced to UCS-2 — 70 chars |
+| --- | --- |
+| English, German, Dutch | Polish, Czech, Slovak, Hungarian, Romanian, Croatian |
+| Italian, Swedish, Danish, Norwegian, Finnish | Spanish (any `á í ó ú`), Portuguese, French with a lowercase `ç` |
+| French with only `é è à ù` | Greek, Turkish, Vietnamese |
+| Spanish only if stripped of accents | Russian, Ukrainian, Bulgarian, Serbian |
+| | Arabic, Hebrew, Persian |
+| | Hindi and the Indic scripts, Thai |
+| | Chinese, Japanese, Korean |
+
+The practical reading: **the cheap markets are Germanic plus Italian, and
+everything else costs double per character.** Spanish is the trap — it looks
+Western European and belongs in the right-hand column, because "está" and
+"número" are unavoidable in a payment demand. Turkish and Vietnamese are in the
+right-hand column too despite Latin script.
+
+Two consequences for pricing rather than engineering:
+
+- A per-message price list understates the cost of most of the world by 2×. Any
+  market comparison has to be done per segment, after deciding what the message
+  will actually say in that language.
+- The one-segment discipline is worth more abroad than at home. At 70 characters
+  a UCS-2 market has room for the essentials and nothing else, so the template
+  has to be designed against the ceiling from the start — and for CJK markets
+  70 characters is comparatively generous, since the same sentence takes far
+  fewer characters (Japanese ran to 59, Chinese 58).
+
+### The provider question, reframed
+
+The earlier conclusion here was "not Twilio for Greece", because Twilio's Greek
+rate is the dearest on the sheet and a local aggregator is roughly half. That
+conclusion does not survive going worldwide, and it should be restated rather
+than quietly kept:
+
+- One Twilio integration reaches every market. The alternative is an aggregator
+  per country, each with its own contract, credit balance, sender registration,
+  error semantics and failure modes — and `src/lib/sms/` already carries two
+  transports for one country, which is the shape of that problem starting.
+- Sender-ID registration stops being one item (EETT) and becomes a per-market
+  workstream. A global provider files those on our behalf, and that is most of
+  what the premium buys.
+- The premium is real and should be quantified per market before committing, not
+  assumed uniform: on the two markets measured it was +73% against a local
+  Greek route and the Polish rate is 30% below the Greek one.
+
+**This is the open piece of work.** The worldwide Twilio rate table and the
+per-country registration matrix were being researched when the account's spend
+limit stopped it, so they are not in this document and are not guessed at. What
+is needed, and is a mechanical job once quota allows: Twilio's published
+per-segment rate for each target market (Twilio exposes machine-readable pricing
+CSVs from its pricing pages, which is the right source rather than the country
+pages one at a time), the US 10DLC brand and campaign fees plus carrier
+surcharges, India's DLT charges, Singapore's SSIR fees, and the list of
+countries where an alphanumeric sender is unsupported so a number must be
+rented monthly instead.
+
+### A blocker worth naming before the first non-Greek tenant
+
+`normalisePhone` in `src/lib/sms/send.ts` is Greece-only, and it fails closed.
+It accepts E.164 (`+…`) and `00…` prefixes, and beyond that only a bare ten-digit
+Greek mobile starting `69`. A German tenant entering `0171 234567` gets null,
+which means: the debtor form rejects the number
+(`src/app/(app)/debtors/actions.ts`), and `engine.ts` treats the debtor as
+having no phone at all and **silently skips the SMS rung** rather than
+reporting a problem. Worldwide, that is a correctness bug before it is a cost
+one. The fix needs a default country per organisation — the sensible home for it
+is the organisation record, since a tenant's debtors are overwhelmingly in one
+country — and it is not done.
 
 ## Marginal cost of one chased invoice
 
@@ -276,8 +368,9 @@ tenants — "already paid" works without it, only without automatic confirmation
 
 | Action | Saving | Effort | Risk |
 | --- | --: | --: | --- |
+| ~~Fix the encoding check so GSM-7 languages get 160 characters~~ **done** | −50% on every English, German, Italian, Dutch and Nordic SMS | done | none — 768 tests, lint and build clean |
+| ~~A template length check in CI~~ **done** | guards every template's cost | done | none; without it the first content edit quietly returns to 2 segments |
 | Rewrite the 5 Greek SMS templates under 70 chars | −43% / invoice | 1 day | low — the content stays complete, the variant is proven |
-| A template length check in CI | guards the above | 1 hour | none; without it the first content edit quietly returns to 2 segments |
 | WhatsApp utility as default, SMS as fallback | −57% / invoice | 1–2 weeks | medium — Meta approves templates, needs a BSP and verification |
 | RFQ to Greek SMS carriers | up to −39% on SMS | a few emails | none |
 | Defer the bank feed to the first paying tenants | €150–500/mo | a decision | medium — loses automatic payment confirmation |
