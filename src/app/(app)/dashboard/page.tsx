@@ -1,31 +1,47 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
-import { Badge, Card, CardHeader, EmptyState, linkClass, Stat } from '@/components/ui';
-import { displayName } from '@/lib/debtors';
-import { workflowStatus } from '@/lib/dunning/status';
-import { getDictionary, getLocale } from '@/lib/i18n';
-import { smsCreditsEnforced } from '@/lib/limits';
+import { Card, CardHeader, EmptyState, linkClass, Stat } from '@/components/ui';
 import { DEFAULT_CURRENCY, totalsByCurrency } from '@/lib/currency';
-import { athensDate, daysBetween, formatDate, formatMoney } from '@/lib/money';
-import { createClient } from '@/lib/supabase/server';
-import type { DunningStep } from '@/types/database';
-
+import {
+  agingBuckets,
+  collectedAmounts,
+  collectedThroughLefta,
+  failedSendsWorthFixing,
+  funnelSince,
+  funnelTotals,
+  startedNotPaid,
+} from '@/lib/dashboard/figures';
+import { displayName } from '@/lib/debtors';
 import { loadScenario } from '@/lib/dunning/engine';
 import { effectiveNoticeTexts } from '@/lib/dunning/template-store';
+import { getDictionary, getLocale } from '@/lib/i18n';
+import { athensDate, daysBetween, formatMoney } from '@/lib/money';
 import { requireOrganization } from '@/lib/orgs/active';
+import { createClient } from '@/lib/supabase/server';
 
-import { AutomationSwitch } from '../settings/automation-switch';
 import { CreateInvoiceForm } from '../invoices/invoice-forms';
 import { Dropzone } from '../invoices/upload/dropzone';
+import { AutomationSwitch } from '../settings/automation-switch';
 
 /**
- * Totals for a tile, one figure per currency.
+ * What a person opening this product needs, and nothing else.
  *
- * Joined rather than added. An empty book still shows a zero so the tile never
- * renders blank, and the single-currency case — every tenant today — looks
- * exactly as it always has.
+ * This screen had grown to eleven blocks and 868 lines. Four of the five figures
+ * above the fold were the same money counted four ways — outstanding and overdue
+ * printed the identical total side by side, the aging strip printed it a third
+ * time, and a quarter of the tile row was spent on an SMS balance of zero on an
+ * account with no SMS provider. Two hundred of those lines were a funnel table,
+ * rendered twice for mobile and desktop, reporting thirty page views.
+ *
+ * What is left is the four things the screen is for: whether the product is
+ * writing to customers on its own, how much is owed, somewhere to throw an
+ * invoice, and the queue of what the automation could not decide. The funnel
+ * stays, as one line, because the reading matters even when the detail does not
+ * belong here. Everything removed is on /statistics — moved, not deleted.
  */
+
+/** Totals for a tile, one figure per currency, joined rather than added. */
 function money(totals: ReturnType<typeof totalsByCurrency>): string {
   if (!totals.length) return formatMoney(0);
   return totals.map((total) => formatMoney(total.cents, total.currency)).join(' · ');
@@ -34,6 +50,7 @@ function money(totals: ReturnType<typeof totalsByCurrency>): string {
 export async function generateMetadata() {
   return { title: (await getDictionary()).dashboard.title };
 }
+
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
@@ -45,6 +62,7 @@ export default async function DashboardPage() {
   if (!user) redirect('/login');
 
   const today = athensDate();
+  const since = funnelSince();
 
   // The account cadence, so a manually raised invoice can be given its terms
   // here rather than remembered and applied on a later screen.
@@ -53,294 +71,255 @@ export default async function DashboardPage() {
   // For the quick wording editor beside the cadence in the create form.
   const notice = await effectiveNoticeTexts(org.id, await getLocale());
 
-  // The funnel window: how far back reminders and link activity are counted.
-  const FUNNEL_DAYS = 30;
-  /** An invoice counts as converted when it settles this soon after a contact. */
-  const ATTRIBUTION_DAYS = 7;
-  const funnelSince = new Date(Date.now() - FUNNEL_DAYS * 24 * 60 * 60 * 1000).toISOString();
-
   // RLS scopes every one of these to the company this session is acting for.
   const [
     { data: profile },
     { data: invoices },
     { data: debtors },
-    { data: contacts },
     { data: recentPayments },
-    { data: recentComms },
+    { data: recentSends },
+    { data: sentComms },
+    { data: failedSends },
+    { count: pendingScans },
     { data: funnelEvents },
   ] = await Promise.all([
-      supabase
-        .from('users')
-        .select(
-          'company_name, sms_credits, automation_enabled',
-        )
-        // No filter: the policy already shows exactly the active company, and
-        // the signed-in person's id is not it once they act for more than one.
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from('invoices')
-        .select(
-          'id, debtor_id, amount_cents, currency, due_date, status, paid_at, paid_amount_cents, invoice_number, series, mark, stripe_payment_intent_id, viva_transaction_id, revolut_order_id',
-        )
-        .in('status', ['pending', 'paid'])
-        .order('due_date', { ascending: true }),
-      supabase.from('debtors').select('id, name, vat_number, email, phone, muted').order('name'),
-      supabase.from('dunning_contacts').select('invoice_id, debtor_id, step, contact_on'),
-      supabase
-        .from('invoices')
-        .select('id, debtor_id, amount_cents, currency, paid_at, paid_amount_cents, invoice_number, series, mark')
-        .eq('status', 'paid')
-        .not('stripe_checkout_session_id', 'is', null)
-        .order('paid_at', { ascending: false })
-        .limit(8),
-      supabase
-        .from('communications_log')
-        .select('invoice_id, channel, status, sent_at')
-        .eq('status', 'sent')
-        .gte('sent_at', funnelSince)
-        .limit(5000),
-      supabase
-        .from('funnel_events')
-        .select('invoice_id, debtor_id, channel, event, occurred_at')
-        .gte('occurred_at', funnelSince)
-        .limit(5000),
-    ]);
+    supabase
+      .from('users')
+      .select('company_name, automation_enabled')
+      // No filter: the policy already shows exactly the active company, and the
+      // signed-in person's id is not it once they act for more than one.
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('invoices')
+      .select(
+        'id, debtor_id, amount_cents, currency, due_date, status, paid_at, paid_amount_cents, invoice_number, series, mark, stripe_payment_intent_id, viva_transaction_id, revolut_order_id',
+      )
+      .in('status', ['pending', 'paid'])
+      .order('due_date', { ascending: true }),
+    supabase.from('debtors').select('id, name, vat_number, email, phone, muted').order('name'),
+    supabase
+      .from('invoices')
+      .select('id, debtor_id, amount_cents, currency, paid_at, paid_amount_cents, invoice_number, series, mark')
+      .eq('status', 'paid')
+      .not('stripe_checkout_session_id', 'is', null)
+      .order('paid_at', { ascending: false })
+      .limit(8),
+    // The feed, which is about sends as much as payments: a refusal is the most
+    // important thing that can happen to a reminder and it never appeared here.
+    supabase
+      .from('communications_log')
+      .select('id, debtor_id, invoice_id, channel, status, sent_at')
+      .order('sent_at', { ascending: false })
+      // More than the feed shows, because skipped rows are dropped below: a run
+      // that skipped eight invoices would otherwise leave the feed empty.
+      .limit(24),
+    supabase
+      .from('communications_log')
+      .select('invoice_id, channel, status, sent_at')
+      .eq('status', 'sent')
+      .gte('sent_at', since)
+      .limit(5000),
+    // Every refusal on file, not just recent ones — a customer who was never
+    // told is still owed the message a year later. Narrowed to invoices that
+    // are still open by `failedSendsWorthFixing`.
+    supabase
+      .from('communications_log')
+      .select('invoice_id')
+      .eq('status', 'failed')
+      .limit(2000),
+    supabase
+      .from('invoice_uploads')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending'),
+    supabase
+      .from('funnel_events')
+      .select('invoice_id, channel, event, occurred_at')
+      .gte('occurred_at', since)
+      .limit(5000),
+  ]);
 
   const allInvoices = invoices ?? [];
   const pending = allInvoices.filter((i) => i.status === 'pending');
   const overdue = pending.filter((i) => daysBetween(i.due_date, today) > 0);
+  const stillOpen = new Set(pending.map((i) => i.id));
 
-  // Kept apart by currency rather than added together.
-  //
-  // These were plain reduces over `amount_cents`: right while every invoice is
-  // in euros, and silently wrong the first time one is not — a zloty invoice
-  // added to the euro total and the sum shown with a euro sign. There is no
-  // exchange rate in this product and there should not be one; inventing one to
-  // keep a tidy single figure is how a dashboard reports money that does not
-  // exist. With a single currency this renders exactly as it always did.
+  // Kept apart by currency rather than added together: there is no exchange
+  // rate in this product and inventing one to keep a tidy single figure is how
+  // a dashboard reports money that does not exist.
   const outstandingTotals = totalsByCurrency(pending);
-  const overdueTotals = totalsByCurrency(overdue);
-  const overdueCents = overdueTotals.reduce((sum, x) => sum + x.cents, 0);
+  const collectedTotals = totalsByCurrency(collectedAmounts(collectedThroughLefta(allInvoices)));
 
-  /**
-   * Money that actually arrived through lefta.
-   *
-   * Every paid invoice used to count, which made the tile a total of everything
-   * ever marked settled — including documents synced from myDATA and Elorus that
-   * were paid long before this product touched them, and anything ticked off by
-   * hand. It read as revenue this tool collected, and it was not.
-   *
-   * A provider reference is what distinguishes the two: it exists only when the
-   * debtor paid through a link this system issued. The amount taken is what was
-   * actually captured where that is recorded, not what was invoiced.
-   */
-  const collectedThroughLefta = allInvoices.filter(
-    (i) =>
-      i.status === 'paid' &&
-      (i.stripe_payment_intent_id !== null ||
-        i.viva_transaction_id !== null ||
-        i.revolut_order_id !== null),
-  );
-
-  // What was captured, in the currency it was captured in: the charge went
-  // through the provider in the invoice's own currency.
-  const collectedTotals = totalsByCurrency(
-    collectedThroughLefta.map((i) => ({
-      amount_cents: i.paid_amount_cents ?? i.amount_cents,
-      currency: i.currency,
-    })),
-  );
-
-  // Aging buckets over the open balance. The thresholds mirror the ladder: at
-  // 1–9 days overdue the automated steps are still doing the chasing; from day
-  // 10 the final reminder has fired and the money is the operator's problem.
-  // The strip compares amounts against one another, so every figure in it has to
-  // be in one currency: widths built from a mixture mean nothing, and a segment
-  // labelled with a euro sign over a zloty sum is worse than no segment. The
-  // currency carrying the most outstanding leads the tiles above, so the strip
-  // follows it and the rest stay in those tiles where they are named.
+  // The bar inside the tile compares amounts against one another, so it is
+  // scoped to one currency — the one carrying the most outstanding, which is
+  // also the figure leading the tile. The rest are named in the tile's own
+  // total and broken down in full on the statistics screen.
   const stripCurrency = outstandingTotals[0]?.currency ?? DEFAULT_CURRENCY;
-  const outstandingCents = outstandingTotals[0]?.cents ?? 0;
-  const stripInvoices = pending.filter(
-    (i) => (i.currency?.toUpperCase() || DEFAULT_CURRENCY) === stripCurrency,
+  const stripCents = outstandingTotals[0]?.cents ?? 0;
+  const buckets = agingBuckets(
+    pending.filter((i) => (i.currency?.toUpperCase() || DEFAULT_CURRENCY) === stripCurrency),
+    (i) => daysBetween(i.due_date, today),
+    {
+      notDue: t.dashboard.agingNotDue,
+      late1to9: t.dashboard.agingLate(1, 9),
+      late10plus: t.dashboard.agingLatePlus(10),
+    },
   );
 
-  const agingBuckets = [
-    { key: 'notDue', label: t.dashboard.agingNotDue, swatch: 'bg-brand-500', match: (d: number) => d <= 0 },
-    { key: 'late1to9', label: t.dashboard.agingLate(1, 9), swatch: 'bg-amber-500', match: (d: number) => d >= 1 && d <= 9 },
-    { key: 'late10plus', label: t.dashboard.agingLatePlus(10), swatch: 'bg-red-500', match: (d: number) => d >= 10 },
-  ].map((bucket) => {
-    const own = stripInvoices.filter((i) => bucket.match(daysBetween(i.due_date, today)));
-    return { ...bucket, count: own.length, cents: own.reduce((sum, i) => sum + i.amount_cents, 0) };
-  });
-
-  // The reminder funnel, per channel, over the last FUNNEL_DAYS. Every count is
-  // distinct invoices — a refreshed page or a resent message is not engagement
-  // growth. "Paid" is an invoice settled within ATTRIBUTION_DAYS of a sent
-  // contact on that channel; a debtor who reads the SMS and pays by transfer
-  // never clicks anything, which is why payment timing is counted per channel
-  // rather than clicks alone (docs/funnel-analytics.md).
   const paidAtByInvoice = new Map(
     allInvoices
       .filter((i) => i.status === 'paid' && i.paid_at)
       .map((i) => [i.id, new Date(i.paid_at as string).getTime()]),
   );
 
-  const funnelRows = (['email', 'sms'] as const).map((channel) => {
-    const sentInvoices = new Map<string, number>();
-    for (const comm of recentComms ?? []) {
-      if (comm.channel !== channel || !comm.invoice_id) continue;
-      const at = new Date(comm.sent_at).getTime();
-      const earliest = sentInvoices.get(comm.invoice_id);
-      if (earliest === undefined || at < earliest) sentInvoices.set(comm.invoice_id, at);
-    }
-
-    const opened = new Set<string>();
-    const checkout = new Set<string>();
-    for (const event of funnelEvents ?? []) {
-      if (event.channel !== channel) continue;
-      if (event.event === 'page_view') opened.add(event.invoice_id);
-      if (event.event === 'checkout_started') checkout.add(event.invoice_id);
-    }
-
-    let paid = 0;
-    const attributionMs = ATTRIBUTION_DAYS * 24 * 60 * 60 * 1000;
-    for (const [invoiceId, sentAt] of sentInvoices) {
-      const paidAt = paidAtByInvoice.get(invoiceId);
-      if (paidAt !== undefined && paidAt >= sentAt && paidAt <= sentAt + attributionMs) paid += 1;
-    }
-
-    return { channel, sent: sentInvoices.size, opened: opened.size, checkout: checkout.size, paid };
-  });
-
-
-  const funnelHasData =
-    funnelRows.some((row) => row.sent > 0) || (funnelEvents?.length ?? 0) > 0;
-  const untaggedViews = new Set(
-    (funnelEvents ?? [])
-      .filter((event) => event.event === 'page_view' && event.channel === 'other')
-      .map((event) => event.invoice_id),
-  ).size;
-
-  // Steps already fired, per invoice. Manual reminders carry no step — they are
-  // contacts, not rungs, and must not move an invoice along the ladder.
-  const stepsByInvoice = new Map<string, Set<DunningStep>>();
-  for (const c of contacts ?? []) {
-    if (!c.step) continue;
-    const set = stepsByInvoice.get(c.invoice_id) ?? new Set<DunningStep>();
-    set.add(c.step);
-    stepsByInvoice.set(c.invoice_id, set);
-  }
+  const performance = funnelTotals(sentComms ?? [], funnelEvents ?? [], paidAtByInvoice);
+  const performanceHasData = performance.sent > 0 || (funnelEvents?.length ?? 0) > 0;
 
   const debtorsById = new Map((debtors ?? []).map((d) => [d.id, d]));
 
-  /**
-   * The funnel one row per invoice, rather than as four totals.
-   *
-   * Totals answer whether the channel works; this answers who to call. An
-   * operator looking at "3 opened, 1 paid" cannot act on it — the two who
-   * opened and did not pay are the entire point of the screen.
-   *
-   * Earliest event of each kind wins: a debtor who opens the link four times
-   * engaged once, and counting the refreshes would make the busiest procrastinator
-   * look like the warmest lead.
-   */
-  const activity = (() => {
-    const byInvoice = new Map<
-      string,
-      { opened: string | null; started: string | null; channel: string }
-    >();
+  /** How an invoice is named wherever it is mentioned by one line of text. */
+  const invoiceLabel = (invoice: {
+    id: string;
+    series?: string | null;
+    invoice_number?: string | null;
+    mark?: string | null;
+  }) =>
+    [invoice.series, invoice.invoice_number].filter(Boolean).join(' ') ||
+    invoice.mark ||
+    invoice.id.slice(0, 8);
 
-    for (const event of funnelEvents ?? []) {
-      if (!event.invoice_id) continue;
-      const row = byInvoice.get(event.invoice_id) ?? {
-        opened: null,
-        started: null,
-        // An untagged visit is a real visit; it just cannot say which message
-        // brought it, so it starts as 'other' and yields to a tagged one below.
-        channel: event.channel ?? 'other',
-      };
-      const at = event.occurred_at;
+  const invoicesById = new Map(allInvoices.map((i) => [i.id, i]));
 
-      if (event.event === 'page_view' && (!row.opened || at < row.opened)) row.opened = at;
-      if (event.event === 'checkout_started' && (!row.started || at < row.started)) row.started = at;
-      // A tagged event names the message that brought them; it always beats an
-      // untagged visit already recorded for the same invoice.
-      if (event.channel && event.channel !== 'other') row.channel = event.channel;
-
-      byInvoice.set(event.invoice_id, row);
-    }
-
-    return [...byInvoice.entries()]
-      .map(([invoiceId, row]) => {
-        const invoice = allInvoices.find((i) => i.id === invoiceId);
-        const debtor = invoice ? debtorsById.get(invoice.debtor_id) : undefined;
-
-        return {
-          invoiceId,
-          label: invoice
-            ? [invoice.series, invoice.invoice_number].filter(Boolean).join(' ') || invoice.mark || invoiceId.slice(0, 8)
-            : invoiceId.slice(0, 8),
-          name: debtor ? displayName(debtor) : null,
-          amountCents: invoice?.amount_cents ?? 0,
-          currency: invoice?.currency,
-          ...row,
-          paidAt: invoice?.status === 'paid' ? (invoice.paid_at ?? null) : null,
-        };
-      })
-      // Newest engagement first: the person who just opened the link is the
-      // one worth a call today.
-      .sort((a, b) => (b.started ?? b.opened ?? '').localeCompare(a.started ?? a.opened ?? ''));
-  })();
-
-  // Roll pending invoices up per debtor for the overview table.
-  const rows = [...debtorsById.values()]
-    .map((debtor) => {
-      const own = pending.filter((i) => i.debtor_id === debtor.id);
-      const total = own.reduce((sum, i) => sum + i.amount_cents, 0);
-      const oldest = own.reduce<(typeof own)[number] | null>(
-        (worst, i) => (!worst || i.due_date < worst.due_date ? i : worst),
-        null,
-      );
-
-      const status = oldest
-        ? workflowStatus(oldest, stepsByInvoice.get(oldest.id) ?? new Set(), today, t)
-        : null;
-
-      const lastContact = (contacts ?? [])
-        .filter((c) => c.debtor_id === debtor.id)
-        .map((c) => c.contact_on)
-        .sort()
-        .at(-1);
-
-      return { debtor, count: own.length, total, oldest, status, lastContact };
-    })
-    .filter((row) => row.count > 0)
-    .sort((a, b) => b.total - a.total);
+  // ------------------------------------------------------------- needs you
+  //
+  // The queue this screen did not have. Forty-five refused sends and a scan
+  // waiting to be confirmed were invisible here while the page reported thirty
+  // page views in a two-hundred-line table.
 
   const unreachable = (debtors ?? []).filter(
     (d) => !d.email && !d.phone && pending.some((i) => i.debtor_id === d.id),
   ).length;
 
+  const needs = [
+    {
+      key: 'failed',
+      count: failedSendsWorthFixing(failedSends ?? [], stillOpen),
+      title: (n: number) => t.dashboard.needsFailed(n),
+      hint: t.dashboard.needsFailedHint,
+      action: t.dashboard.needsFailedAction,
+      href: '/logs',
+      tone: 'bg-red-50 text-red-700',
+      icon: (
+        <>
+          <path d="M3.5 6h17v12h-17z" />
+          <path d="M3.5 6.8 12 13l8.5-6.2" />
+        </>
+      ),
+    },
+    {
+      key: 'scans',
+      count: pendingScans ?? 0,
+      title: (n: number) => t.dashboard.needsScans(n),
+      hint: t.dashboard.needsScansHint,
+      action: t.dashboard.needsScansAction,
+      href: '/invoices/upload',
+      tone: 'bg-brand-50 text-brand-700',
+      icon: (
+        <>
+          <path d="M6 3h9l5 5v13H6z" />
+          <path d="M14 3v6h6" />
+          <path d="M9 14.5l2.2 2.2L16 12" />
+        </>
+      ),
+    },
+    {
+      key: 'started',
+      count: startedNotPaid(funnelEvents ?? [], stillOpen),
+      title: (n: number) => t.dashboard.needsStarted(n),
+      hint: t.dashboard.needsStartedHint,
+      action: t.dashboard.needsStartedAction,
+      href: '/statistics#activity',
+      tone: 'bg-ink-100 text-ink-600',
+      icon: (
+        <>
+          <circle cx="12" cy="12" r="8.5" />
+          <path d="M12 7.6v4.6l3 1.8" />
+        </>
+      ),
+    },
+    {
+      key: 'unreachable',
+      count: unreachable,
+      title: (n: number) => t.dashboard.unreachable(n),
+      hint: null,
+      action: t.dashboard.fixContacts,
+      href: '/debtors',
+      tone: 'bg-amber-50 text-amber-700',
+      icon: (
+        <>
+          <circle cx="10" cy="8" r="3.4" />
+          <path d="M4 20a6 6 0 0 1 12 0" />
+          <path d="M17 8.5v3.5M17 15.3v.2" />
+        </>
+      ),
+    },
+  ].filter((item) => item.count > 0);
+
+  // ---------------------------------------------------------- latest activity
+  //
+  // One feed where there were two half-stories: "recent payments" showed money
+  // and never a send, and the message history showed sends on another screen
+  // entirely. What happened last is one sequence.
+
+  const feed = [
+    ...(recentPayments ?? []).map((payment) => ({
+      key: `paid-${payment.id}`,
+      at: payment.paid_at,
+      kind: 'paid' as const,
+      name: (() => {
+        const customer = debtorsById.get(payment.debtor_id);
+        return customer ? displayName(customer) : null;
+      })(),
+      label: invoiceLabel(payment),
+      amount: formatMoney(payment.paid_amount_cents ?? payment.amount_cents, payment.currency),
+    })),
+    ...(recentSends ?? [])
+      // A skipped send is a decision the engine took and explained in the log;
+      // it is not something that happened to a customer.
+      .filter((send) => send.status === 'sent' || send.status === 'failed')
+      .map((send) => {
+        const invoice = send.invoice_id ? invoicesById.get(send.invoice_id) : undefined;
+        const customer = debtorsById.get(send.debtor_id);
+
+        return {
+          key: `send-${send.id}`,
+          at: send.sent_at,
+          kind: send.status === 'failed' ? ('failed' as const) : ('sent' as const),
+          name: customer ? displayName(customer) : null,
+          label: invoice ? invoiceLabel(invoice) : null,
+          amount: null,
+        };
+      }),
+  ]
+    .filter((entry): entry is typeof entry & { at: string } => Boolean(entry.at))
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, 8);
+
+  const feedTone = {
+    paid: { dot: 'bg-emerald-500', text: t.dashboard.feedPaid },
+    sent: { dot: 'bg-ink-300', text: t.dashboard.feedSent },
+    failed: { dot: 'bg-red-500', text: t.dashboard.feedFailed },
+  };
+
   return (
     <div className="space-y-6">
-      {/* The title stands alone. It used to carry myDATA's last sync time as
-          though that spoke for every source, which it never did — the billing
-          system and the bank had their own clocks and neither was shown. All
-          three are reported together on the settings screen. */}
       <h1 className="text-xl font-semibold text-ink-900">{t.dashboard.title}</h1>
 
       {/* The master switch, at the size of what it governs.
-          It used to be a banner here that said automation was off and sent the
-          reader to settings to do something about it — a notice about a control
-          rather than the control. Whether the product writes to customers on its
-          own is the single biggest thing about it, so it is the first thing on
-          the screen and it is switchable where it is read.
-
-          The same component the settings row uses, so the two cannot drift into
-          meaning different things: off takes effect on one click, on asks first
-          and says how many customers it is about to start writing to. */}
+          Whether the product writes to customers on its own is the single
+          biggest thing about it, so it is the first thing on the screen and it
+          is switchable where it is read — the same component the settings row
+          uses, so the two cannot drift into meaning different things. */}
       <Card>
         <AutomationSwitch
           enabled={Boolean(profile?.automation_enabled)}
@@ -349,59 +328,96 @@ export default async function DashboardPage() {
         />
       </Card>
 
-      {unreachable > 0 ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          {t.dashboard.unreachable(unreachable)}{' '}
-          <Link href="/debtors" className="font-medium underline">
-            {t.dashboard.fixContacts}
-          </Link>
-        </div>
-      ) : null}
+      {/* One money figure, not four.
+          The overdue count lives inside this tile as a clause rather than
+          beside it as a second tile printing the same total; the age split is
+          the bar, and the full breakdown is one click away. */}
+      <div className="grid gap-3 sm:gap-4 lg:grid-cols-3">
+        {/* Stat's own anatomy, because this is a Stat that carries a bar: the
+            padding sits on the Card, not on an inner wrapper. */}
+        <Card className="px-4 py-4 sm:px-5 lg:col-span-2">
+          <div>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-ink-500">
+                {t.dashboard.owed}
+              </p>
+              {stripCents > 0 ? (
+                <Link href="/statistics" className={`text-xs ${linkClass}`}>
+                  {t.dashboard.owedBreakdown}
+                </Link>
+              ) : null}
+            </div>
 
-      {/* Two columns on a phone rather than one. Four full-width tiles pushed
-          everything else below the fold, and these are the numbers the page
-          exists to show. */}
-      <div
-        className={`grid grid-cols-2 gap-3 sm:gap-4 ${
-          smsCreditsEnforced() ? 'lg:grid-cols-4' : 'lg:grid-cols-3'
-        }`}
-      >
-        <Stat
-          label={t.dashboard.outstanding}
-          value={money(outstandingTotals)}
-          hint={t.dashboard.outstandingHint(pending.length)}
-        />
-        <Stat
-          label={t.dashboard.overdue}
-          value={money(overdueTotals)}
-          hint={t.dashboard.overdueHint(overdue.length)}
-          tone={overdueCents > 0 ? 'warning' : 'default'}
-        />
+            {/* Not tabular: at this size every digit as wide as a zero reads
+                loose, which is why Stat leaves its own value proportional. */}
+            <p className="mt-2 text-[28px] font-semibold leading-9 tracking-tight text-ink-900">
+              {money(outstandingTotals)}
+            </p>
+
+            <p className="mt-1 text-xs text-ink-500">
+              {pending.length === 0
+                ? t.dashboard.outstandingHint(0)
+                : overdue.length === pending.length
+                  ? t.dashboard.owedAllOverdue(pending.length)
+                  : overdue.length === 0
+                    ? t.dashboard.owedNoneOverdue(pending.length)
+                    : t.dashboard.owedSomeOverdue(pending.length, overdue.length)}
+            </p>
+
+            {stripCents > 0 ? (
+              <>
+                <div
+                  className="mt-4 flex h-1.5 w-full gap-[2px]"
+                  role="img"
+                  aria-label={t.dashboard.aging}
+                >
+                  {buckets
+                    .filter((bucket) => bucket.cents > 0)
+                    .map((bucket) => (
+                      <div
+                        key={bucket.key}
+                        className={`${bucket.swatch} first:rounded-l-full last:rounded-r-full`}
+                        style={{
+                          width: `${(bucket.cents / stripCents) * 100}%`,
+                          minWidth: '8px',
+                        }}
+                        title={`${bucket.label}: ${formatMoney(bucket.cents, stripCurrency)}`}
+                      />
+                    ))}
+                </div>
+
+                <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
+                  {buckets
+                    .filter((bucket) => bucket.count > 0)
+                    .map((bucket) => (
+                      <div key={bucket.key} className="flex items-baseline gap-1.5">
+                        <span
+                          aria-hidden="true"
+                          className={`inline-block h-2 w-2 translate-y-px rounded-sm ${bucket.swatch}`}
+                        />
+                        <dt className="text-xs text-ink-500">{bucket.label}</dt>
+                        <dd className="tabular text-xs font-medium text-ink-700">{bucket.count}</dd>
+                      </div>
+                    ))}
+                </dl>
+              </>
+            ) : null}
+          </div>
+        </Card>
+
         <Stat
           label={t.dashboard.collected}
           value={money(collectedTotals)}
           hint={t.dashboard.collectedHint}
           tone="positive"
         />
-        {smsCreditsEnforced() ? (
-          <Stat
-            label={t.dashboard.smsBalance}
-            value={String(profile?.sms_credits ?? 0)}
-            hint={(profile?.sms_credits ?? 0) < 20 ? t.dashboard.smsLow : t.dashboard.smsOk}
-            tone={(profile?.sms_credits ?? 0) < 20 ? 'warning' : 'default'}
-          />
-        ) : null}
       </div>
 
       {/* The way in.
-          This is where the integrations card used to repeat what the settings
-          screen already says. Nobody comes to a dashboard to read that myDATA
-          is connected; they come having just been handed an invoice. Raising
-          one is the act the whole product hangs off, and it was two clicks and
-          a different screen away.
-
-          Both roads, because they are different jobs: drop the document and let
-          it be read, or type one in for a customer already on file. */}
+          Raising an invoice is the act the whole product hangs off, and it was
+          five blocks down. Both roads, because they are different jobs: drop
+          the document and let it be read, or type one in for a customer
+          already on file. */}
       <Card>
         <CardHeader title={t.dashboard.addTitle} subtitle={t.dashboard.addHint} />
         <Dropzone reviewHref="/invoices/upload" />
@@ -410,457 +426,150 @@ export default async function DashboardPage() {
         </div>
       </Card>
 
-      {outstandingCents > 0 ? (
+      {/* Nothing to decide, nothing to render: an empty queue is not a card
+          saying the queue is empty. */}
+      {needs.length > 0 ? (
         <Card>
-          <CardHeader title={t.dashboard.aging} subtitle={t.dashboard.agingHint} />
-          <div className="px-5 py-5">
-            {/* One stacked strip; the 2px gaps are the card surface doing the
-                separating, so no segment needs a border. */}
-            <div className="flex h-3 w-full gap-[2px]" role="img" aria-label={t.dashboard.aging}>
-              {agingBuckets
-                .filter((bucket) => bucket.cents > 0)
-                .map((bucket) => (
-                  <div
-                    key={bucket.key}
-                    className={`${bucket.swatch} first:rounded-l-full last:rounded-r-full`}
-                    style={{
-                      width: `${(bucket.cents / outstandingCents) * 100}%`,
-                      minWidth: '8px',
-                    }}
-                    title={`${bucket.label}: ${formatMoney(bucket.cents, stripCurrency)}`}
-                  />
-                ))}
-            </div>
+          <CardHeader title={t.dashboard.needsTitle} subtitle={t.dashboard.needsHint} />
+          <ul className="divide-y divide-ink-100">
+            {needs.map((item) => (
+              <li
+                key={item.key}
+                className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5 sm:px-5"
+              >
+                <span
+                  className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${item.tone}`}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.75}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-[18px] w-[18px]"
+                    aria-hidden
+                  >
+                    {item.icon}
+                  </svg>
+                </span>
 
-            <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-2">
-              {agingBuckets.map((bucket) => (
-                <div key={bucket.key} className="flex items-baseline gap-2">
-                  <span
-                    aria-hidden="true"
-                    className={`inline-block h-2.5 w-2.5 translate-y-px rounded-sm ${bucket.swatch}`}
-                  />
-                  <dt className="text-xs text-ink-500">{bucket.label}</dt>
-                  <dd className="tabular text-sm font-semibold text-ink-900">
-                    {formatMoney(bucket.cents, stripCurrency)}
-                  </dd>
-                  <dd className="text-xs text-ink-400">{t.dashboard.agingInvoices(bucket.count)}</dd>
+                <div className="min-w-0 flex-grow basis-48">
+                  <p className="text-sm font-semibold text-ink-900">{item.title(item.count)}</p>
+                  {item.hint ? <p className="mt-0.5 text-xs text-ink-500">{item.hint}</p> : null}
                 </div>
-              ))}
-            </dl>
-          </div>
+
+                <Link
+                  href={item.href}
+                  className="inline-flex min-h-11 shrink-0 items-center rounded-lg border border-ink-300 px-3.5 text-sm font-medium text-ink-700 transition hover:bg-ink-50 sm:min-h-9"
+                >
+                  {item.action}
+                </Link>
+              </li>
+            ))}
+          </ul>
         </Card>
       ) : null}
 
+      {/* The funnel as one line. The per-channel table and the who-opened-what
+          list are on the statistics screen; what belongs here is whether the
+          chasing is working at all. */}
       <Card>
-        <CardHeader title={t.dashboard.funnel} subtitle={t.dashboard.funnelHint} />
-
-        {!funnelHasData ? (
+        <CardHeader
+          title={t.dashboard.funnel}
+          subtitle={t.dashboard.funnelStripHint}
+          action={
+            <Link href="/statistics" className={`text-sm ${linkClass}`}>
+              {t.dashboard.funnelDetails}
+            </Link>
+          }
+        />
+        {!performanceHasData ? (
           <EmptyState title={t.dashboard.funnelEmptyTitle} body={t.dashboard.funnelEmptyBody} />
         ) : (
-          <>
-            {/* The other three tables on this page have a card list behind
-                them; this one did not, so on a phone it was a sideways drag
-                with the number that matters — paid — always off the edge. */}
-            <ul className="divide-y divide-ink-100 md:hidden">
-              {funnelRows.map((row) => {
-                const pct = (part: number) =>
-                  row.sent > 0 ? `${Math.round((part / row.sent) * 100)}%` : null;
-
-                const stat = (label: string, value: number, share: string | null) => (
-                  <div>
-                    <dt className="text-xs uppercase tracking-wide text-ink-400">{label}</dt>
-                    <dd className="tabular mt-0.5 text-sm font-medium text-ink-900">
-                      {value}
-                      {share !== null ? (
-                        <span className="ml-1.5 text-xs font-normal text-ink-400">{share}</span>
-                      ) : null}
-                    </dd>
-                  </div>
-                );
-
-                return (
-                  <li key={row.channel} className="px-4 py-4">
-                    <Badge tone={row.channel === 'sms' ? 'info' : 'neutral'}>
-                      {row.channel === 'sms' ? t.common.sms : t.common.email}
-                    </Badge>
-
-                    <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
-                      {stat(t.dashboard.funnelSent, row.sent, null)}
-                      {stat(t.dashboard.funnelOpened, row.opened, pct(row.opened))}
-                      {stat(t.dashboard.funnelCheckout, row.checkout, pct(row.checkout))}
-                      {stat(t.dashboard.funnelPaid, row.paid, pct(row.paid))}
-                    </dl>
-                  </li>
-                );
-              })}
-            </ul>
-
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-500">
-                    <th className="px-5 py-2.5 font-medium">{t.dashboard.funnelChannel}</th>
-                    <th className="px-5 py-2.5 text-right font-medium">{t.dashboard.funnelSent}</th>
-                    <th className="px-5 py-2.5 text-right font-medium">{t.dashboard.funnelOpened}</th>
-                    <th className="px-5 py-2.5 text-right font-medium">
-                      {t.dashboard.funnelCheckout}
-                    </th>
-                    <th className="px-5 py-2.5 text-right font-medium">{t.dashboard.funnelPaid}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {funnelRows.map((row) => {
-                    const pct = (part: number) =>
-                      row.sent > 0 ? `${Math.round((part / row.sent) * 100)}%` : null;
-
-                    const cell = (value: number, share: string | null) => (
-                      <td className="px-5 py-3 text-right">
-                        <div className="tabular font-medium text-ink-900">{value}</div>
-                        {share !== null ? (
-                          <div className="tabular text-xs text-ink-400">{share}</div>
-                        ) : null}
-                      </td>
-                    );
-
-                    return (
-                      <tr key={row.channel} className="border-b border-ink-100 last:border-0">
-                        <td className="px-5 py-3">
-                          <Badge tone={row.channel === 'sms' ? 'info' : 'neutral'}>
-                            {row.channel === 'sms' ? t.common.sms : t.common.email}
-                          </Badge>
-                        </td>
-                        {cell(row.sent, null)}
-                        {cell(row.opened, pct(row.opened))}
-                        {cell(row.checkout, pct(row.checkout))}
-                        {cell(row.paid, pct(row.paid))}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            {untaggedViews > 0 ? (
-              <p className="border-t border-ink-100 px-5 py-3 text-xs text-ink-500">
-                {t.dashboard.funnelUntagged(untaggedViews)}
-              </p>
-            ) : null}
-
-            {/* Who, not how many. The totals above say whether a channel works;
-                this says which customer opened the link and stopped — which is
-                the only part of the funnel anyone can act on today. */}
-            {activity.length ? (
-              <div className="border-t border-ink-200">
-                <p className="px-5 pb-1 pt-4 text-xs font-medium uppercase tracking-wide text-ink-400">
-                  {t.dashboard.activityTitle}
-                </p>
-                {/* Five columns, two of them dates that are usually a dash. On a
-                    phone each row becomes one line of prose: who, on what, and
-                    how far they got. */}
-                <ul className="divide-y divide-ink-100 md:hidden">
-                  {activity.slice(0, 20).map((row) => (
-                    <li key={row.invoiceId} className="px-5 py-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm text-ink-800">
-                            {row.name ?? t.debtors.nameMissing}
-                          </p>
-                          <p className="tabular mt-0.5 truncate text-xs text-ink-500">
-                            {row.label}
-                          </p>
-                        </div>
-                        {row.paidAt ? (
-                          <span className="tabular shrink-0 text-sm font-medium text-emerald-700">
-                            {formatMoney(row.amountCents, row.currency)}
-                          </span>
-                        ) : null}
-                      </div>
-
-                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-500">
-                        <Badge tone={row.channel === 'sms' ? 'info' : 'neutral'}>
-                          {row.channel === 'sms'
-                            ? t.common.sms
-                            : row.channel === 'email'
-                              ? t.common.email
-                              : t.dashboard.activityDirect}
-                        </Badge>
-                        {row.opened ? (
-                          <span className="tabular">
-                            {t.dashboard.activityOpened}: {formatDate(row.opened.slice(0, 10))}
-                          </span>
-                        ) : null}
-                        {row.started ? (
-                          <span className="tabular">
-                            {t.dashboard.activityStarted}: {formatDate(row.started.slice(0, 10))}
-                          </span>
-                        ) : null}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="hidden overflow-x-auto md:block">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-ink-100 text-left text-xs uppercase tracking-wide text-ink-500">
-                        <th className="px-5 py-2 font-medium">{t.invoices.colCustomer}</th>
-                        <th className="px-5 py-2 font-medium">{t.invoices.colInvoice}</th>
-                        <th className="px-5 py-2 font-medium">{t.dashboard.activityOpened}</th>
-                        <th className="px-5 py-2 font-medium">{t.dashboard.activityStarted}</th>
-                        <th className="px-5 py-2 font-medium">{t.dashboard.activityPaid}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {activity.slice(0, 20).map((row) => (
-                        <tr key={row.invoiceId} className="border-b border-ink-100 last:border-0">
-                          <td className="px-5 py-2.5">
-                            <span className="text-ink-800">{row.name ?? t.debtors.nameMissing}</span>
-                            <Badge tone={row.channel === 'sms' ? 'info' : 'neutral'}>
-                              {row.channel === 'sms'
-                                ? t.common.sms
-                                : row.channel === 'email'
-                                  ? t.common.email
-                                  : t.dashboard.activityDirect}
-                            </Badge>
-                          </td>
-                          <td className="tabular px-5 py-2.5 text-ink-600">{row.label}</td>
-                          <td className="tabular px-5 py-2.5 text-ink-600">
-                            {row.opened ? formatDate(row.opened.slice(0, 10)) : '—'}
-                          </td>
-                          <td className="tabular px-5 py-2.5 text-ink-600">
-                            {row.started ? formatDate(row.started.slice(0, 10)) : '—'}
-                          </td>
-                          <td className="tabular px-5 py-2.5">
-                            {row.paidAt ? (
-                              <span className="font-medium text-emerald-700">
-                                {formatMoney(row.amountCents, row.currency)}
-                              </span>
-                            ) : (
-                              <span className="text-ink-400">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {activity.length > 20 ? (
-                  <p className="px-5 py-2.5 text-xs text-ink-500">
-                    {t.dashboard.activityMore(activity.length - 20)}
-                  </p>
-                ) : null}
+          <dl className="grid grid-cols-2 gap-4 px-4 py-4 sm:grid-cols-4 sm:px-5">
+            {[
+              { label: t.dashboard.funnelSent, value: performance.sent, share: null as string | null },
+              {
+                label: t.dashboard.funnelOpened,
+                value: performance.opened,
+                share:
+                  performance.sent > 0
+                    ? `${Math.round((performance.opened / performance.sent) * 100)}%`
+                    : null,
+              },
+              {
+                label: t.dashboard.funnelCheckout,
+                value: performance.checkout,
+                share:
+                  performance.sent > 0
+                    ? `${Math.round((performance.checkout / performance.sent) * 100)}%`
+                    : null,
+              },
+              {
+                label: t.dashboard.funnelPaid,
+                value: performance.paid,
+                share:
+                  performance.sent > 0
+                    ? `${Math.round((performance.paid / performance.sent) * 100)}%`
+                    : null,
+              },
+            ].map((cell) => (
+              <div key={cell.label}>
+                <dt className="text-xs text-ink-500">{cell.label}</dt>
+                <dd className="tabular mt-1 text-xl font-semibold leading-7 text-ink-900">
+                  {cell.value}
+                  {cell.share !== null ? (
+                    <span className="ml-1.5 text-xs font-normal text-ink-400">{cell.share}</span>
+                  ) : null}
+                </dd>
               </div>
-            ) : null}
-          </>
-        )}
-      </Card>
-
-      <Card>
-        <CardHeader title={t.recentPayments.title} subtitle={t.recentPayments.subtitle} />
-
-        {!recentPayments?.length ? (
-          <EmptyState title={t.recentPayments.emptyTitle} body={t.recentPayments.emptyBody} />
-        ) : (
-          <>
-            {/* A settled payment is read as a line, not a grid: who paid, and
-                how much. The timestamp goes underneath rather than first — it
-                was taking the widest column on the narrowest screen to answer a
-                question nobody had. */}
-            <ul className="divide-y divide-ink-100 md:hidden">
-              {recentPayments.map((payment) => {
-                const customer = debtorsById.get(payment.debtor_id);
-                const name = customer ? displayName(customer) : null;
-                const number =
-                  [payment.series, payment.invoice_number].filter(Boolean).join(' ') ||
-                  payment.mark ||
-                  payment.id.slice(0, 8);
-
-                return (
-                  <li key={payment.id} className="flex items-start justify-between gap-3 px-5 py-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm text-ink-800">
-                        {name ?? (
-                          <span className="italic text-ink-400">{t.debtors.nameMissing}</span>
-                        )}
-                      </p>
-                      <p className="tabular mt-0.5 truncate text-xs text-ink-500">
-                        {number}
-                        {payment.paid_at
-                          ? ` · ${new Date(payment.paid_at).toLocaleString(t.dateTimeTag)}`
-                          : ''}
-                      </p>
-                    </div>
-                    <span className="tabular shrink-0 text-sm font-medium text-emerald-700">
-                      {formatMoney(payment.paid_amount_cents ?? payment.amount_cents, payment.currency)}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-
-            <div className="hidden overflow-x-auto md:block">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-500">
-                  <th className="px-5 py-2.5 font-medium">{t.recentPayments.colWhen}</th>
-                  <th className="px-5 py-2.5 font-medium">{t.invoices.colCustomer}</th>
-                  <th className="px-5 py-2.5 font-medium">{t.invoices.colInvoice}</th>
-                  <th className="px-5 py-2.5 text-right font-medium">{t.invoices.colAmount}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentPayments.map((payment) => {
-                  const customer = debtorsById.get(payment.debtor_id);
-                  const name = customer ? displayName(customer) : null;
-                  const number =
-                    [payment.series, payment.invoice_number].filter(Boolean).join(' ') ||
-                    payment.mark ||
-                    payment.id.slice(0, 8);
-
-                  return (
-                    <tr key={payment.id} className="border-b border-ink-100 last:border-0">
-                      <td className="tabular px-5 py-3 text-ink-600">
-                        {payment.paid_at
-                          ? new Date(payment.paid_at).toLocaleString(t.dateTimeTag)
-                          : '—'}
-                      </td>
-                      <td className="px-5 py-3">
-                        {name ? (
-                          <span className="text-ink-800">{name}</span>
-                        ) : (
-                          <span className="italic text-ink-400">{t.debtors.nameMissing}</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-3 text-ink-700">{number}</td>
-                      <td className="tabular px-5 py-3 text-right font-medium text-emerald-700">
-                        {formatMoney(payment.paid_amount_cents ?? payment.amount_cents, payment.currency)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            </div>
-          </>
+            ))}
+          </dl>
         )}
       </Card>
 
       <Card>
         <CardHeader
-          title={t.dashboard.openBalances}
-          subtitle={t.dashboard.openBalancesHint}
+          title={t.dashboard.feedTitle}
+          subtitle={t.dashboard.feedHint}
           action={
-            <Link href="/debtors" className={`text-sm ${linkClass}`}>
-              {t.dashboard.allCustomers}
+            <Link href="/logs" className={`text-sm ${linkClass}`}>
+              {t.dashboard.feedAll}
             </Link>
           }
         />
 
-        {rows.length === 0 ? (
-          <EmptyState
-            title={t.dashboard.emptyTitle}
-            body={t.dashboard.emptyBody}
-          />
+        {feed.length === 0 ? (
+          <EmptyState title={t.dashboard.feedEmptyTitle} body={t.dashboard.feedEmptyBody} />
         ) : (
-          <>
-            {/* Six columns do not survive a phone. Below `md` the same rows are
-                stacked as cards, so the balance and the state are readable
-                without dragging a table sideways; from `md` up the table is
-                still the better shape for comparing customers. */}
-            <ul className="divide-y divide-ink-100 md:hidden">
-              {rows.map(({ debtor, count, total, oldest, status, lastContact }) => (
-                <li key={debtor.id} className="px-5 py-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <Link
-                        href={`/debtors/${debtor.id}`}
-                        className="font-medium text-ink-900 underline-offset-2 transition hover:text-brand-600 hover:underline"
-                      >
-                        {debtor.name}
-                      </Link>
-                      <p className="mt-0.5 text-xs text-ink-500">
-                        {t.dashboard.colInvoices}: {count}
-                      </p>
-                    </div>
-                    <span className="tabular shrink-0 text-base font-semibold text-ink-900">
-                      {formatMoney(total)}
-                    </span>
-                  </div>
-
-                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                    {status ? <Badge tone={status.tone}>{status.label}</Badge> : null}
-                    {debtor.muted ? <Badge tone="neutral">{t.dashboard.muted}</Badge> : null}
-                    {!debtor.email && !debtor.phone ? (
-                      <Badge tone="danger">{t.dashboard.noContact}</Badge>
-                    ) : null}
-                  </div>
-
-                  <dl className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1 text-xs text-ink-500">
-                    <div className="flex gap-1.5">
-                      <dt>{t.dashboard.colOldestDue}:</dt>
-                      <dd className="tabular text-ink-700">
-                        {oldest ? formatDate(oldest.due_date) : '—'}
-                      </dd>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <dt>{t.dashboard.colLastContact}:</dt>
-                      <dd className="tabular text-ink-700">
-                        {lastContact ? formatDate(lastContact) : '—'}
-                      </dd>
-                    </div>
-                  </dl>
-                </li>
-              ))}
-            </ul>
-
-            <div className="hidden overflow-x-auto md:block">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-500">
-                  <th className="px-5 py-2.5 font-medium">{t.dashboard.colCustomer}</th>
-                  <th className="px-5 py-2.5 font-medium">{t.dashboard.colInvoices}</th>
-                  <th className="px-5 py-2.5 text-right font-medium">{t.dashboard.colBalance}</th>
-                  <th className="px-5 py-2.5 font-medium">{t.dashboard.colOldestDue}</th>
-                  <th className="px-5 py-2.5 font-medium">{t.dashboard.colWorkflow}</th>
-                  <th className="px-5 py-2.5 font-medium">{t.dashboard.colLastContact}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(({ debtor, count, total, oldest, status, lastContact }) => (
-                  <tr key={debtor.id} className="border-b border-ink-100 last:border-0">
-                    <td className="px-5 py-3">
-                      <Link
-                        href={`/debtors/${debtor.id}`}
-                        className="font-medium text-ink-900 underline-offset-2 transition hover:text-brand-600 hover:underline"
-                      >
-                        {debtor.name}
-                      </Link>
-                      <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-500">
-                        {debtor.vat_number ? <span>{t.debtors.vat} {debtor.vat_number}</span> : null}
-                        {debtor.muted ? <Badge tone="neutral">{t.dashboard.muted}</Badge> : null}
-                        {!debtor.email && !debtor.phone ? (
-                          <Badge tone="danger">{t.dashboard.noContact}</Badge>
-                        ) : null}
-                      </div>
-                    </td>
-                    <td className="tabular px-5 py-3 text-ink-600">{count}</td>
-                    <td className="tabular px-5 py-3 text-right font-medium text-ink-900">
-                      {formatMoney(total)}
-                    </td>
-                    <td className="tabular px-5 py-3 text-ink-600">
-                      {oldest ? formatDate(oldest.due_date) : '—'}
-                    </td>
-                    <td className="px-5 py-3">
-                      {status ? <Badge tone={status.tone}>{status.label}</Badge> : '—'}
-                    </td>
-                    <td className="tabular px-5 py-3 text-ink-500">
-                      {lastContact ? formatDate(lastContact) : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            </div>
-          </>
+          <ul className="divide-y divide-ink-100">
+            {feed.map((entry) => (
+              <li key={entry.key} className="flex items-start gap-3 px-4 py-3 sm:px-5">
+                <span
+                  aria-hidden="true"
+                  className={`mt-1.5 inline-block h-[7px] w-[7px] shrink-0 rounded-full ${feedTone[entry.kind].dot}`}
+                />
+                <div className="min-w-0 flex-grow">
+                  <p className="truncate text-sm text-ink-800">
+                    {feedTone[entry.kind].text}
+                    {' — '}
+                    {entry.name ?? <span className="italic text-ink-400">{t.debtors.nameMissing}</span>}
+                  </p>
+                  <p className="tabular mt-0.5 truncate text-xs text-ink-500">
+                    {[entry.label, new Date(entry.at).toLocaleString(t.dateTimeTag)]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                </div>
+                {entry.amount ? (
+                  <span className="tabular shrink-0 text-sm font-medium text-emerald-700">
+                    {entry.amount}
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
         )}
       </Card>
     </div>

@@ -83,6 +83,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: '/debtors', label: t.nav.debtors },
     { href: '/bank', label: t.nav.bank },
     { href: '/logs', label: t.nav.logs },
+    // The portfolio totals, its shape by age, the reminder funnel and the
+    // balance per customer. All of it used to be stacked on the dashboard,
+    // which reported the same money four times before it reached anything a
+    // person could act on.
+    { href: '/statistics', label: t.nav.statistics },
     // Only once there is more than one: for a single company the portfolio and
     // the dashboard answer the same question, and a navigation item that
     // duplicates the one beside it is noise.

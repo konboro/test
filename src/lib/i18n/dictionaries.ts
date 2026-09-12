@@ -905,6 +905,7 @@ const el = {
     logs: 'Ιστορικό επικοινωνίας',
     settings: 'Ρυθμίσεις',
     bank: 'Εισπράξεις',
+    statistics: 'Στατιστικά',
     /** Εμφανίζεται μόνο σε όποιον διαχειρίζεται περισσότερες από μία. */
     companies: 'Εταιρείες',
     smsCredits: 'SMS',
@@ -1075,6 +1076,54 @@ const el = {
     activityPaid: 'Εξοφλήθηκε',
     activityDirect: 'Απευθείας',
     activityMore: (n: number) => `και άλλες ${n} εγγραφές`,
+
+    /** Ο τίτλος και το νόημα της σελίδας στην οποία μετακόμισαν τα παραπάνω. */
+    statsTitle: 'Στατιστικά',
+    statsHint: 'Όλο το χαρτοφυλάκιο, η δομή του και η απόδοση των υπενθυμίσεων.',
+    statsPortfolio: 'Χαρτοφυλάκιο',
+
+    // Ένα ποσό, όχι τέσσερα. Το «ανοιχτό υπόλοιπο» και τα «ληξιπρόθεσμα»
+    // έδειχναν το ίδιο νούμερο δύο φορές δίπλα-δίπλα όσο κάθε ανοιχτό
+    // παραστατικό ήταν και ληξιπρόθεσμο — που είναι ο κανόνας, όχι η εξαίρεση.
+    owed: 'Σας οφείλουν',
+    owedAllOverdue: (n: number) =>
+      `${n} ${n === 1 ? 'παραστατικό' : 'παραστατικά'} — όλα ληξιπρόθεσμα`,
+    owedSomeOverdue: (n: number, late: number) =>
+      `${n} ${n === 1 ? 'παραστατικό' : 'παραστατικά'} — ${late} ληξιπρόθεσμα`,
+    owedNoneOverdue: (n: number) =>
+      `${n} ${n === 1 ? 'παραστατικό' : 'παραστατικά'} — κανένα ληξιπρόθεσμο`,
+    owedBreakdown: 'Ανάλυση ανά ηλικία',
+
+    // Η ουσία της σελίδας: ό,τι δεν μπόρεσε να κρίνει ο αυτοματισμός.
+    // Γραμμή χωρίς νούμερο δεν εμφανίζεται καθόλου.
+    needsTitle: 'Χρειάζονται ενέργεια',
+    needsHint: 'Ό,τι δεν μπόρεσε να τακτοποιήσει μόνος του ο αυτοματισμός.',
+    needsFailed: (n: number) =>
+      `${n} ${n === 1 ? 'υπενθύμιση δεν έφυγε' : 'υπενθυμίσεις δεν έφυγαν'} ποτέ`,
+    needsFailedHint: 'Ο πάροχος τις απέρριψε. Αυτοί οι πελάτες δεν ειδοποιήθηκαν καθόλου.',
+    needsFailedAction: 'Έλεγχος',
+    needsScans: (n: number) =>
+      `${n} ${n === 1 ? 'σκανάρισμα περιμένει' : 'σκαναρίσματα περιμένουν'} επιβεβαίωση`,
+    needsScansHint: 'Διαβάστηκαν από το αρχείο. Δεν καταχωρείται τίποτε πριν συμφωνήσετε.',
+    needsScansAction: 'Έλεγχος ανάγνωσης',
+    needsStarted: (n: number) =>
+      `${n} ${n === 1 ? 'πληρωμή ξεκίνησε' : 'πληρωμές ξεκίνησαν'} και δεν ολοκληρώθηκε`,
+    needsStartedHint: 'Άνοιξαν τον σύνδεσμο και σταμάτησαν. Δεν χρεώθηκε τίποτε.',
+    needsStartedAction: 'Δείτε ποιοι',
+
+    // Η απόδοση μένει στην επισκόπηση, αλλά σε μία γραμμή: τα αναλυτικά
+    // ανά κανάλι και ανά παραστατικό είναι ένα κλικ μακριά.
+    funnelStripHint: 'Τελευταίες 30 ημέρες, και τα δύο κανάλια μαζί.',
+    funnelDetails: 'Αναλυτικά',
+
+    feedTitle: 'Τελευταία κίνηση',
+    feedHint: 'Πληρωμές και υπενθυμίσεις μαζί, με τη νεότερη πρώτη.',
+    feedAll: 'Πλήρες ιστορικό',
+    feedPaid: 'Πληρώθηκε με κάρτα',
+    feedSent: 'Στάλθηκε υπενθύμιση',
+    feedFailed: 'Η αποστολή απορρίφθηκε',
+    feedEmptyTitle: 'Καμία κίνηση ακόμη',
+    feedEmptyBody: 'Εδώ θα φαίνονται οι πληρωμές και οι υπενθυμίσεις μόλις αρχίσουν.',
   },
 
   invoices: {
@@ -2392,6 +2441,7 @@ const en: typeof el = {
     logs: 'Message history',
     settings: 'Settings',
     bank: 'Payments in',
+    statistics: 'Statistics',
     /** Only shown to someone who works on more than one. */
     companies: 'Companies',
     smsCredits: 'SMS',
@@ -2560,6 +2610,54 @@ const en: typeof el = {
     activityPaid: 'Settled',
     activityDirect: 'Direct',
     activityMore: (n: number) => `and ${n} more`,
+
+    /** The screen the blocks above moved to, and what it is for. */
+    statsTitle: 'Statistics',
+    statsHint: 'The whole book, its shape, and how the reminders are performing.',
+    statsPortfolio: 'Portfolio',
+
+    // One figure, not four. "Outstanding" and "Overdue" printed the same
+    // number twice side by side for as long as every open invoice was also
+    // overdue — which is the rule here, not the exception.
+    owed: 'Owed to you',
+    owedAllOverdue: (n: number) =>
+      `${n} ${n === 1 ? 'invoice' : 'invoices'} — all of them overdue`,
+    owedSomeOverdue: (n: number, late: number) =>
+      `${n} ${n === 1 ? 'invoice' : 'invoices'} — ${late} overdue`,
+    owedNoneOverdue: (n: number) =>
+      `${n} ${n === 1 ? 'invoice' : 'invoices'} — none overdue`,
+    owedBreakdown: 'Breakdown by age',
+
+    // The heart of the screen: what the automation could not decide. A row
+    // with nothing in it does not render at all.
+    needsTitle: 'Needs you',
+    needsHint: 'Everything the automation could not settle on its own.',
+    needsFailed: (n: number) =>
+      `${n} ${n === 1 ? 'reminder' : 'reminders'} never left`,
+    needsFailedHint: 'The provider refused them. Those customers were not told anything.',
+    needsFailedAction: 'Review',
+    needsScans: (n: number) =>
+      `${n} ${n === 1 ? 'scan' : 'scans'} waiting for you to confirm`,
+    needsScansHint: 'Read from the document. Nothing is filed until you agree with it.',
+    needsScansAction: 'Check the reading',
+    needsStarted: (n: number) =>
+      `${n} ${n === 1 ? 'payment' : 'payments'} started but never finished`,
+    needsStartedHint: 'They opened the link and stopped. Nothing was charged.',
+    needsStartedAction: 'See them',
+
+    // Performance stays on the overview, but as one line: the per-channel
+    // and per-invoice detail is one click away.
+    funnelStripHint: 'Last 30 days, both channels together.',
+    funnelDetails: 'Details',
+
+    feedTitle: 'Latest activity',
+    feedHint: 'Payments and reminders together, newest first.',
+    feedAll: 'Full history',
+    feedPaid: 'Paid by card',
+    feedSent: 'Reminder sent',
+    feedFailed: 'Send refused',
+    feedEmptyTitle: 'Nothing has happened yet',
+    feedEmptyBody: 'Payments and reminders will show up here as soon as they start.',
   },
 
   invoices: {
